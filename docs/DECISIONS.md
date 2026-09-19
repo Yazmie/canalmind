@@ -50,7 +50,7 @@
 
 | # | 决策点 | 选项 | 出处 | 状态 |
 |---|---|---|---|---|
-| P-01 | **Spring Boot / Spring AI 版本** | 2.0.0 + Boot 4.x / 其他 | `AI 可观测性与 Trace` 第 420 行 | ☐ 待确认（**第 1 周硬阻塞**）|
+| P-01 | **Spring Boot / Spring AI 版本** | 见下方「P-01 查证结果」 | 实测本机 Maven 仓库 | 🔶 **已有硬证据，待确认** |
 | P-02 | 技术栈最终确认 | 规格书方案（Spring Boot+Spring AI+PG/PgVector+Redis+MyBatis-Plus）是否照用 | 规格书 §3.2 | ☐ 待确认 |
 | P-03 | 业务领域模型与数据规模 | 10 张表设计、仿真数据量级 | 规格书 §2.2 | ✅ 已确认 → **C-14** |
 | P-04 | 仿真数据时间窗与运河业务占比 | A 截至今日 / B 通航日起一年 / C 双段窗口 | `docs/数据模型-ER图.md` §四 | ✅ 已确认 → **C-13**（选 B）|
@@ -60,6 +60,37 @@
 | D6 | 向量库选型 | PgVector / Milvus / Qdrant / Weaviate / Elasticsearch | 同上 第 244–247 行 | ☐ 待决 |
 | D11 | Schema 约束强度 | JSON Mode / JSON Schema / Structured Outputs | `大模型结构化输出` 第 105 行 | ☐ 待决 |
 | D12 | 结构化查询形态 | 契约化受控工具集 / 模型自生成 SQL | 规格书 §0.3 | ☐ 待决 |
+
+### P-01 查证结果（2026-09-19，基于本机 Maven 仓库实测）
+
+**背景**：知识库 `AI 可观测性与 Trace` 第 420 行以 **Spring AI 2.0.0 + Spring Boot 4.x** 为例。
+项目沙箱无外网，故改用「本机 Maven 仓库实际缓存」作为证据来源。
+
+**实测发现（`D:\MavenRepo\maven-3.9.12`，快照时间 2026-05-28）**：
+
+| 事实 | 证据 |
+|---|---|
+| Spring AI 仅有 **1.0.0 / 1.1.0 / 1.1.2**，**不存在任何 2.x** | 遍历 `org/springframework/ai` 全部构件版本 |
+| **Spring AI 1.1.2 的 starter 明确依赖 Spring Boot 3.5.8** | `spring-ai-starter-model-deepseek-1.1.2.pom` → `spring-boot-starter:3.5.8` |
+| Spring AI 1.1.2 编译期依赖 **Spring Framework 6.2.14** | `spring-ai-deepseek-1.1.2.pom` |
+| 存在 **DeepSeek 官方支持** | `spring-ai-starter-model-deepseek`（含 JAR，SHA1 校验通过） |
+| 本机缓存 Spring Boot：3.5.0 / **3.5.9**（无 3.5.8） | `org/springframework/boot/spring-boot` |
+| `spring-boot-dependencies:4.0.0` 的 **POM 存在**（仅 BOM，属 Spring Boot 4 线） | `spring-boot-dependencies/4.0.0` |
+
+**⚠️ 结论：知识库第 420 行的「Spring AI 2.0.0 + Spring Boot 4.x」在本机缓存中 **无对应证据**，不应照用。**
+
+**建议方案**：
+- **Spring Boot 3.5.9**（本机已缓存，与 Spring AI 1.1.2 的 3.5.x 线一致）
+- **Spring AI 1.1.2**（本机缓存最完整：56 个构件；含 DeepSeek starter）
+
+**⚠️ 已知阻塞（需用户在有网环境执行）**：Maven 离线解析失败，原因是
+`_remote.repositories` 记录的来源仓库 id 为 `huaweicloud`，而
+`settings.xml` 中镜像 id 为 `aliyunmaven`，两者不一致导致 Maven 拒绝使用已缓存构件。
+**在有网环境下正常 `mvn` 拉取即可解决**（或统一镜像 id）。
+
+**待补下载的构件**：
+- `spring-ai-rag:1.1.2`（本地仅有 1.1.0）
+- `spring-ai-pgvector-store`（本地完全缺失，向量库接入时必需）
 
 ### 中期（第 2–3 周）
 
@@ -117,6 +148,7 @@
 | 2026-09-19 | **DDL 与装载在真实 PG18.4 上执行验证通过** | 临时集群（端口 55432）实测：DDL 无错误、10 张表、46 索引、`btree_gist` 与 `tariff_no_overlap` EXCLUDE 约束生效；227,026 行全部入库。**并修复装载脚本 bug**：`setval` 对无 `id` 列的 `port`/`cargo_type` 报错（`WHERE EXISTS` 无法兜底，PostgreSQL 解析期即报错），改为显式 `TABLES_WITH_ID` 列表 |
 | 2026-09-19 | 新增环境自检与 pgvector 编译脚本 | `verify_env.ps1`（8 项通过 / 1 项失败）、`build_pgvector.ps1`（含 PG18 需 0.8+ 的版本守卫）。**唯一剩余环境缺口：pgvector 未安装** |
 | 2026-09-19 | 验证 Redis 可用 | 本机 Redis 5.0.14.1 启动成功，PING/读写/DEL 均正常 |
+| 2026-09-19 | **P-01 取得硬证据** | 实测本机 Maven 仓库：Spring AI 只有 1.0.0/1.1.0/1.1.2（**无 2.x**）；1.1.2 starter 依赖 **Boot 3.5.8**；含 DeepSeek 官方 starter。**知识库的「Spring AI 2.0.0 + Boot 4.x」无证据支撑**。建议 Boot 3.5.9 + Spring AI 1.1.2，待用户确认 |
 
 ---
 
