@@ -60,18 +60,56 @@
 
 ## 快速开始
 
+### 前置要求
+
+| 依赖 | 版本 | 说明 |
+|---|---|---|
+| JDK | **21** | Spring Boot 3.x / Spring AI 要求 Java 17+ |
+| Maven | 3.9+ | 或用仓库自带 `mvnw` |
+| PostgreSQL | **18** | 需扩展 `btree_gist`、`vector` |
+| pgvector | **0.8.x** | ⚠️ PostgreSQL 18 不兼容 0.7 及以下 |
+| Redis | 5.0+ | 缓存与会话 |
+| Python | 3.10+ | 仅用于仿真数据生成与评测脚本 |
+
+> **不使用 Docker**：本项目主路径直接使用本机 PostgreSQL 与 Redis。
+> 仓库内 `docker-compose.yml` 保留，供未装本机数据库的读者快速试用。
+
+### 首次环境自检
+
+```powershell
+# 逐项检查环境，输出可用性与版本号
+powershell -ExecutionPolicy Bypass -File backend/scripts/verify_env.ps1
+```
+
+### 初始化数据库
+
 ```bash
-# 1. 配置密钥
-cp .env.example .env
-# 编辑 .env 填入 DEEPSEEK_API_KEY
+# 1. 建库
+createdb -U postgres canalmind
 
-# 2. 启动依赖（PostgreSQL + PgVector + Redis）
-docker compose up -d
+# 2. 建表（含 btree_gist 扩展与费率防重叠约束）
+psql -U postgres -d canalmind -f backend/src/main/resources/db/migration/V1__init_business_schema.sql
 
-# 3. 启动后端
+# 3. 生成仿真数据（确定性，固定随机种子）
+python backend/scripts/generate_seed_data.py
+
+# 4. 装载（CSV 不入库版本控制，需本地生成）
+psql -U postgres -d canalmind -f backend/scripts/seed_output/load_seed.sql
+```
+
+> **pgvector 尚未安装**时，第 2 步仍可成功（`vector` 扩展不在 V1 迁移中）；
+> 向量表随检索通道实现时单独建。安装方式见 `backend/scripts/build_pgvector.ps1`。
+
+### 启动服务
+
+```bash
+# 配置密钥
+cp .env.example .env   # 填入 DEEPSEEK_API_KEY
+
+# 启动后端
 cd backend && ./mvnw spring-boot:run
 
-# 4. 启动前端
+# 启动前端
 cd frontend && npm install && npm run dev
 ```
 
@@ -80,12 +118,14 @@ cd frontend && npm install && npm run dev
 ```
 canalmind/
 ├── AGENTS.md              # 工程约定与决策纪律
-├── docker-compose.yml     # 一键起依赖
+├── docker-compose.yml     # 可选：一键起依赖（非主路径）
 ├── docs/
 │   ├── DECISIONS.md       # 决策记录（已确认/待决/已否决）
+│   ├── 数据模型-ER图.md    # ER 图与表设计说明
 │   ├── 规格与执行清单.md    # 工程技术规格书（唯一执行依据）
 │   └── 评测报告/           # ★ 评测产物
 ├── backend/               # Java 后端
+│   └── scripts/           # 环境自检、仿真数据生成、pgvector 编译
 └── frontend/              # 前端
 ```
 
@@ -125,9 +165,28 @@ canalmind/
 
 ## 已知限制
 
+- **pgvector 尚未安装**，向量检索通道未开始（检索通道为第 2 周任务）
+- **后端服务尚未搭建**：Spring Boot / Spring AI 版本待确认后方可定骨架
 - 知识库文档来源为公开资料整理，**生效版本权威性有限**，生产使用需接入官方数据源
-- SSE 流式调用下，HTTP Span 无法挂到模型 Span 下（Spring AI 已知限制，详见 `docs/DECISIONS.md`）
+- SSE 流式调用下，HTTP Span 无法挂到模型 Span 下（Spring AI 已知限制，详见 `DECISIONS.md`）
 - 结构化查询目前为契约化受控工具集，尚未支持模型自生成 SQL
+
+## 当前进度
+
+| 模块 | 状态 |
+|---|---|
+| 领域建模（10 张表 + 索引 + 约束） | ✅ 完成，已在真实 PG18.4 执行验证 |
+| 仿真数据生成（22.7 万行） | ✅ 完成，7 项一致性检查通过 |
+| ER 图与设计说明 | ✅ 完成 |
+| 环境自检脚本 | ✅ 完成（`backend/scripts/verify_env.ps1`） |
+| pgvector 安装 | ⛔ 待编译（脚本已备：`backend/scripts/build_pgvector.ps1`） |
+| 后端骨架 / DeepSeek 调用 / SSE | ⛔ 待 Spring AI 版本确认 |
+| 文档检索通道 | ⏳ 第 2 周 |
+| 结构化查询通道 | ⏳ 第 3 周 |
+| 评测体系 | ⏳ 第 4 周 |
+| Trace 观测 | ⏳ 第 5 周 |
+
+> **所有能力指标均为「待测」**，尚未产生任何评测数据。本项目不使用无出处的数字。
 
 ## 文档
 
@@ -135,6 +194,7 @@ canalmind/
 |---|---|
 | `docs/规格与执行清单.md` | 项目定位、领域建模、模块规格、5 周执行计划 |
 | `docs/DECISIONS.md` | 所有方向性决策的确认记录与已否决方案 |
+| `docs/数据模型-ER图.md` | ER 图、表设计关键点、数据窗口说明、一致性检查结果 |
 | `AGENTS.md` | 工程约定、知识库参照要求、决策分级机制 |
 
 ---
