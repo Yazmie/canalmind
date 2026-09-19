@@ -78,6 +78,66 @@ function Invoke-Native {
     return [pscustomobject]@{ ExitCode = $code; Output = $text.Trim() }
 }
 
+# 带硬超时的原生命令执行。
+#
+# 为什么需要它：某些 PostgreSQL 操作会**无限挂起**而不是报错。
+# 最典型的是 DROP DATABASE —— 它需要给所有后端发 ProcSignalBarrier，
+# 若有进程无法被投递信号，则该语句永久卡在 wait_event=ProcSignalBarrier，
+# 而且 **statement_timeout 无法生效**（超时检查本身也依赖同一套信号机制）。
+#
+# 挂起是最糟的失败模式：用户只看到「卡住」，既没有错误也没有提示，
+# 无法判断是自己环境的问题还是脚本的问题。
+# 因此这里用带超时的进程启动，保证「最坏情况 = 明确失败」。
+function Invoke-NativeTimeout {
+    param(
+        [Parameter(Mandatory)][string]$Exe,
+        [Parameter(Mandatory)][string[]]$Args,
+        [int]$TimeoutSeconds = 30
+    )
+    # ⚠️ 用 System.Diagnostics.Process 而不是 Start-Process -PassThru。
+    # 实测 Windows PowerShell 5.1 下 Start-Process -PassThru 的 $p.ExitCode
+    # 会返回 $null（进程对象已被回收），导致「命令其实成功了」被误判为失败。
+    # System.Diagnostics.Process 的 ExitCode 稳定可靠。
+    #
+    # ⚠️ .Arguments 是**一个字符串**而非数组；含空格的参数（如内联 SQL）
+    # 必须自己加引号，否则会被拆成多个参数 —— 表现为 psql 报
+    # 'extra command-line argument "..." ignored' 加 "syntax error at end of input"。
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $Exe
+    $psi.Arguments = ($Args | ForEach-Object {
+        if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+    }) -join ' '
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+
+    $p = $null
+    try {
+        $p = [System.Diagnostics.Process]::Start($psi)
+        # 必须先异步读完两个流再 WaitForExit：否则管道缓冲区写满会互相死锁
+        $outTask = $p.StandardOutput.ReadToEndAsync()
+        $errTask = $p.StandardError.ReadToEndAsync()
+        if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
+            try { $p.Kill() } catch { }
+            return [pscustomobject]@{
+                ExitCode = -1
+                TimedOut = $true
+                Output   = "命令超过 $TimeoutSeconds 秒未返回，已强制终止"
+            }
+        }
+        $text = (@($outTask.Result, $errTask.Result) |
+                 Where-Object { $_ -and $_ -notmatch '^\s*$' }) -join "`n"
+        return [pscustomobject]@{
+            ExitCode = $p.ExitCode
+            TimedOut = $false
+            Output   = $text.Trim()
+        }
+    } finally {
+        if ($p) { $p.Dispose() }
+    }
+}
+
 # 推断仓库根
 if (-not $RepoRoot) {
     $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -85,7 +145,7 @@ if (-not $RepoRoot) {
 
 $psql = Join-Path $PgHome "bin\psql.exe"
 $createdb = Join-Path $PgHome "bin\createdb.exe"
-$dropdb = Join-Path $PgHome "bin\dropdb.exe"
+# 不使用 dropdb.exe：本脚本的重建走「删 schema」而非「删库」，原因见 Step 2。
 $ddl = Join-Path $RepoRoot "backend\src\main\resources\db\migration\V1__init_business_schema.sql"
 $loadSql = Join-Path $RepoRoot "backend\scripts\seed_output\load_seed.sql"
 
@@ -101,7 +161,7 @@ Say "  仓库根    : $RepoRoot"
 # ---------------------------------------------------------------------------
 Step 1 "前置检查"
 # ---------------------------------------------------------------------------
-foreach ($exe in @($psql, $createdb, $dropdb)) {
+foreach ($exe in @($psql, $createdb)) {
     if (-not (Test-Path $exe)) { Bad "缺少 $(Split-Path $exe -Leaf)"; exit 1 }
 }
 Good "PostgreSQL 工具齐备"
@@ -147,35 +207,77 @@ $exists = (Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $Pg
     '-d', 'postgres', '-tAc', "SELECT 1 FROM pg_database WHERE datname='$Database';")).Output
 
 if ($exists -eq "1" -and $Recreate) {
-    Info "库已存在，按 -Recreate 删除重建"
-    $r = Invoke-Native $dropdb @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '--if-exists', $Database)
-    if ($r.ExitCode -ne 0) { Bad "删除失败：$($r.Output)"; exit 1 }
-    $exists = ""
+    Info "库已存在，按 -Recreate 重置业务数据"
+
+    # ⚠️ 这里刻意**不删库**，而是删 schema 再重建。
+    #
+    # 为什么不用 DROP DATABASE：该语句需要向**所有后端**投递 ProcSignalBarrier，
+    # 只要有一个进程收不到信号，语句就永久卡在 wait_event=ProcSignalBarrier。
+    # 实测在本机受限环境下即使库上**零连接**也会无限挂起（2 分钟以上不返回），
+    # 而且 **statement_timeout 也拦不住** —— 超时检查本身依赖同一套信号机制。
+    # 这会把「重建」变成一个静默卡死的操作，非常难排查。
+    #
+    # DROP SCHEMA public CASCADE 不涉及跨后端信号，实测 0.4 秒完成，
+    # 效果等价（业务对象全在 public 下），且天然幂等。
+    #
+    # 注意：CASCADE 会连带删掉 btree_gist 扩展 —— 这是预期的，
+    # DDL 里有 CREATE EXTENSION IF NOT EXISTS，重建时会自动装回。
+    #
+    # 外层仍套硬超时作兜底，保证最坏情况是「明确失败」而不是「无限等待」。
+    $r = Invoke-NativeTimeout $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
+        '-v', 'ON_ERROR_STOP=1',
+        '-c', 'DROP SCHEMA IF EXISTS public CASCADE;',
+        '-c', 'CREATE SCHEMA public;') -TimeoutSeconds 30
+
+    if ($r.TimedOut) {
+        Bad "重置 schema 超时（30 秒未返回），已强制终止"
+        Info "通常是有客户端正持有该库的锁，请关闭 IDE 的 DB 面板 / 正在运行的服务后重试"
+        exit 1
+    }
+    if ($r.ExitCode -ne 0) {
+        Bad "重置 schema 失败"
+        Info $r.Output
+        exit 1
+    }
+    Good "已清空 public schema，业务对象将重建"
 }
 
 if ($exists -ne "1") {
     $r = Invoke-Native $createdb @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, $Database)
     if ($r.ExitCode -ne 0) { Bad "建库失败：$($r.Output)"; exit 1 }
     Good "已创建库 $Database"
-} else {
+} elseif (-not $Recreate) {
     Info "库 $Database 已存在（未加 -Recreate，保留现有数据）"
 }
+# 注意：-Recreate 分支已在上面重置 schema，这里不再重复提示，
+# 否则会出现「已重置」紧跟「未加 -Recreate」的自相矛盾输出。
 
 # ---------------------------------------------------------------------------
 Step 3 "执行 DDL"
 # ---------------------------------------------------------------------------
-$r = Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser,
-    '-d', $Database, '-q', '-v', 'ON_ERROR_STOP=1', '-f', $ddl)
-if ($r.ExitCode -ne 0) {
-    Bad "DDL 执行失败"
-    Info $r.Output
-    Info "若表已存在，请加 -Recreate 重建（会清空现有数据）"
-    exit 1
+# 先看表是否已建。DDL 里的 CREATE TABLE 不是幂等的（未加 IF NOT EXISTS），
+# 重复执行必然报 "already exists"，这是预期行为而非错误。
+# 因此这里显式判断：已建表就跳过 DDL，让脚本可以安全重复运行，
+# 而不是逼用户为了重跑一次就去 -Recreate 清库。
+$preTbl = [int]((Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
+    '-tAc', "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")).Output)
+
+if ($preTbl -gt 0) {
+    Info "检测到已有 $preTbl 张表，跳过 DDL（如需重建请加 -Recreate）"
+} else {
+    $r = Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser,
+        '-d', $Database, '-q', '-v', 'ON_ERROR_STOP=1', '-f', $ddl)
+    if ($r.ExitCode -ne 0) {
+        Bad "DDL 执行失败"
+        Info $r.Output
+        exit 1
+    }
+    Good "DDL 执行完成"
 }
 
 $tblCount = (Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
     '-tAc', "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")).Output
-Good "建表完成，当前 $tblCount 张表"
+Good "当前共 $tblCount 张表"
 
 # 关键约束检查：EXCLUDE 约束是 tariff_rule 防重叠的保证
 $excl = (Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
@@ -186,14 +288,22 @@ else { Bad "期望 1 个 EXCLUDE 约束，实际 $excl 个" }
 # ---------------------------------------------------------------------------
 Step 4 "装载仿真数据"
 # ---------------------------------------------------------------------------
+# 先查 waybill 是否已有数据。装载脚本用 OVERRIDING SYSTEM VALUE 直接插主键，
+# 重复执行会撞主键而非报错退出，产出难以理解的中途失败状态。
+# 与 DDL 同理：有数据就跳过，让脚本可安全重复运行。
+$preRows = [int]((Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
+    '-tAc', "SELECT count(*) FROM waybill;")).Output)
+
 if ($SkipSeed) {
     Info "按 -SkipSeed 跳过数据装载"
+} elseif ($preRows -gt 0) {
+    Info "检测到已有 $preRows 行运单，跳过装载（如需重装请加 -Recreate）"
 } elseif (-not (Test-Path $loadSql)) {
     Bad "找不到装载脚本: $loadSql"
     Info "请先执行: python backend/scripts/generate_seed_data.py"
     exit 1
 } else {
-    Info "装载中（22 万行，约需 1-3 分钟）…"
+    Info "装载中（22 万行，约需 5-15 秒）…"
     $r = Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser,
         '-d', $Database, '-q', '-v', 'ON_ERROR_STOP=1', '-f', $loadSql)
     if ($r.ExitCode -ne 0) { Bad "数据装载失败：$($r.Output)"; exit 1 }

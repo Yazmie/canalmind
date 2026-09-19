@@ -83,6 +83,19 @@ powershell -ExecutionPolicy Bypass -File backend/scripts/verify_env.ps1
 
 ### 初始化数据库
 
+**推荐：一键脚本**（建库 → 建表 → 装载 → 校验，实测 10 秒内完成）
+
+```powershell
+# 需先设置口令（脚本绝不弹交互提示，无口令会立即失败而非挂起）
+$env:PGPASSWORD = "你的口令"
+powershell -ExecutionPolicy Bypass -File backend/scripts/setup_local_db.ps1
+
+# 库已存在需重建时（会清空现有数据）
+powershell -ExecutionPolicy Bypass -File backend/scripts/setup_local_db.ps1 -Recreate
+```
+
+**手动分步**（等价于上面的脚本）：
+
 ```bash
 # 1. 建库
 createdb -U postgres canalmind
@@ -95,6 +108,16 @@ python backend/scripts/generate_seed_data.py
 
 # 4. 装载（CSV 不入库版本控制，需本地生成）
 psql -U postgres -d canalmind -f backend/scripts/seed_output/load_seed.sql
+```
+
+### 验证数据模型可用
+
+```bash
+# 能力探针：8 项检查「模型能否回答业务问题」（不只是建得起来）
+psql -U postgres -d canalmind -f backend/scripts/probe_domain_model.sql
+
+# L1 出题可行性：核对哪些问法可答、哪些不可答（第 3-4 周前置）
+psql -U postgres -d canalmind -f backend/scripts/check_l1_feasibility.sql
 ```
 
 > **pgvector 尚未安装**时，第 2 步仍可成功（`vector` 扩展不在 V1 迁移中）；
@@ -181,6 +204,7 @@ canalmind/
 | 环境自检脚本 | ✅ 完成（`backend/scripts/verify_env.ps1`） |
 | **一键建库脚本** | ✅ 完成并端到端实测（`backend/scripts/setup_local_db.ps1`） |
 | **领域模型能力探针** | ✅ 8 项全部通过（`backend/scripts/probe_domain_model.sql`） |
+| **L1 题目可行性核查** | ✅ 9 类问法核验（`backend/scripts/check_l1_feasibility.sql`） |
 | pgvector 安装 | ⛔ 待编译（脚本已备：`backend/scripts/build_pgvector.ps1`） |
 | 后端骨架 / DeepSeek 调用 / SSE | ⛔ 待 Spring AI 版本确认 |
 | 文档检索通道 | ⏳ 第 2 周 |
