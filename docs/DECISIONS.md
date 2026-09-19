@@ -55,6 +55,7 @@
 | P-03 | 业务领域模型与数据规模 | 10 张表设计、仿真数据量级 | 规格书 §2.2 | ✅ 已确认 → **C-14** |
 | P-04 | 仿真数据时间窗与运河业务占比 | A 截至今日 / B 通航日起一年 / C 双段窗口 | `docs/数据模型-ER图.md` §四 | ✅ 已确认 → **C-13**（选 B）|
 | P-05 | pgvector 安装方式与版本 | Docker / 源码编译 / 放弃 | 实测环境 | ✅ 已确认 → **C-15**（0.8.x + MSVC 源码编译）|
+| P-06 | **航线级「是否经运河」标记** | A 加 voyage 字段 / B 加航段路径表 / C 维持现状并声明口径 | 探针 7 实测发现（见下） | ☐ **待决（属于③数据与领域模型，A 类）** |
 | D1 | Chunk 切分策略 | 固定长度 / 结构化 / Parent-Child / 语义 | `RAG 优化` 第 364 行；`RAG 文档处理与切分策略` 第 25、67 行 | ☐ 待决 |
 | D5 | 向量索引算法 | HNSW / IVFFLAT | `RAG 向量索引算法和向量数据库` 第 111、171 行 | ☐ 待决 |
 | D6 | 向量库选型 | PgVector / Milvus / Qdrant / Weaviate / Elasticsearch | 同上 第 244–247 行 | ☐ 待决 |
@@ -86,11 +87,110 @@
 **⚠️ 已知阻塞（需用户在有网环境执行）**：Maven 离线解析失败，原因是
 `_remote.repositories` 记录的来源仓库 id 为 `huaweicloud`，而
 `settings.xml` 中镜像 id 为 `aliyunmaven`，两者不一致导致 Maven 拒绝使用已缓存构件。
-**在有网环境下正常 `mvn` 拉取即可解决**（或统一镜像 id）。
 
-**待补下载的构件**：
-- `spring-ai-rag:1.1.2`（本地仅有 1.1.0）
-- `spring-ai-pgvector-store`（本地完全缺失，向量库接入时必需）
+### P-01 补充查证（2026-09-19 第二轮，含对前一轮结论的更正）
+
+**❌ 前一轮的错误结论**：曾称「`spring-boot-starter-web:3.5.9` 已可离线解析」。
+**该结论是错的** —— 当时用 `Select-Object -Last 10` 截断了输出，漏看了错误。
+实测**仅 Spring Boot（不含 Spring AI）同样离线解析失败**。
+
+**离线阻塞的真实范围**（已量化）：
+
+| 阻塞类型 | 具体缺失 |
+|---|---|
+| 来源仓库 id 不匹配 | `_remote.repositories` 记 `huaweicloud`，settings 镜像 id 为 `aliyunmaven` → Maven 判定 "present, but unavailable" |
+| **插件 JAR 缺失** | `maven-compiler-plugin:3.13.0`、`maven-resources-plugin`、`maven-dependency-plugin` 的传递依赖（`doxia-sink-api`、`commons-io`、`plexus-xml`）等 |
+| 全库 `.lastUpdated` 失败标记 | 1114 个 |
+
+**✅ 但找到了可复现的离线构建配方（已实测 BUILD SUCCESS）**：
+
+```bash
+mvn -o \
+  -s <settings 中镜像 id 必须为 huaweicloud> \
+  -gs <同上，全局设置也需覆盖> \
+  "-Daether.enhancedLocalRepository.trackingFilename=_none.repositories" \
+  clean compile
+```
+
+配合在 POM 中**固定插件版本到本机已缓存者**：
+
+| 插件 | Boot 默认（缺失） | 本机已缓存 → 改用 |
+|---|---|---|
+| `maven-compiler-plugin` | 3.13.0 | **3.14.0** |
+| `maven-resources-plugin` | 3.3.1 | 3.3.1（恰好已有） |
+
+**实测结果**：`Spring Boot 3.5.9 + Spring AI 1.1.2 + spring-ai-starter-model-deepseek`
+离线编译通过（`BUILD SUCCESS`，`javac target 21`），且
+`ChatClient` / `DeepSeekChatModel` 类可正常引用。
+
+**因此 P-01 的方案在技术上已被验证可行**，仅差用户确认。
+
+### ⚠️ 影响 D6（向量库选型）的新发现
+
+Spring AI **1.1.2** 在本机仓库中**没有 PgVector store**：
+
+| 向量库 | 1.1.2 本地可用 |
+|---|---|
+| Milvus | ✅ `spring-ai-starter-vector-store-milvus` |
+| Qdrant | ✅ `spring-ai-starter-vector-store-qdrant` |
+| Redis | ✅ `spring-ai-starter-vector-store-redis` |
+| **PgVector** | ❌ **无 `spring-ai-pgvector-store` / `spring-ai-starter-vector-store-pgvector`** |
+
+**这不改变规格书的 PgVector 选型**（联网后可正常下载），但需注意：
+- 若坚持 PgVector，**必须联网下载**该构件，且需先完成 pgvector 扩展编译（C-15）
+- 若某天 PgVector 扩展编译受阻，Milvus/Qdrant/Redis 三个方案**本地已具备**，可作为备选
+- 该发现记入 D6，正式选型仍在第 2 周决策时确认
+
+**待联网补下载的构件（本地缺失，第 2 周检索通道会用到）**：
+
+| 构件 | 本地状况 | 何时需要 |
+|---|---|---|
+| `spring-ai-rag:1.1.2` | 仅有 1.1.0 | 第 2 周（RAG 编排） |
+| `spring-ai-pgvector-store:1.1.2` | **完全缺失** | 第 2 周（向量检索入库） |
+| `spring-ai-starter-vector-store-pgvector:1.1.2` | **完全缺失** | 第 2 周 |
+| `maven-compiler-plugin:3.13.0` | 仅有 3.10.1/3.11.0/3.14.0 | 首次联网构建即可解决 |
+
+> 联网后一次 `mvn dependency:go-offline` 即可补齐全部缺失构件。
+
+### P-06 详情：航线级「是否经运河」标记（2026-09-19 探针 7 实测发现）
+
+**发现过程**：编写 `backend/scripts/probe_domain_model.sql` 时，探针 7 想验证
+「多少业务真正走了运河」，结果实测 **97.67%**，与 `docs/数据模型-ER图.md`
+原先写的「100%（全部经运河）」**不符**。
+
+**根因**：`port.is_canal_node` 是**港口**属性，只能回答「这个港口是不是运河节点」，
+**回答不了「这条航线是否穿越运河」**。实测存在两端都非节点、但地理上仍经运河的航线：
+
+```
+南宁港六景作业区 → 北海港     56 航次（两端均非运河节点）
+```
+
+按地理实际该航线仍需 郁江 → 平陆运河 → 钦州 → 沿海 → 北海，
+即**端点口径会漏计**，97.67% 只是**下界**。
+
+同时发现：生成器把过闸费设为**必收项**（`generate_seed_data.py` 第 504 行注释
+「业务窗口中所有货流均经平陆运河」），因此**这 56 个航次上的 743 张运单
+明明两端都不在运河节点，却仍被收了过闸费**。
+
+**性质**：这不是 bug，而是**建模口径不完整** —— 缺一个权威的「航线是否经运河」事实来源。
+
+| 选项 | 做法 | 代价 | 影响 |
+|---|---|---|---|
+| **A** | `voyage` 加 `via_canal BOOLEAN` 字段，生成时按航线规则判定 | 改 DDL + 重生成数据 | 查询简单，但规则仍是我们自己定的 |
+| **B** | 新增航段路径表（`voyage_leg`），记录经停港序列，据此推导 | 建模成本最高 | 最贴近真实，也能支撑「途经哪些闸」类问题 |
+| **C** | 维持现状，在文档与对外表述中**明确声明口径**（过闸费覆盖率 100% / 端点口径 97.67% 下界） | 零成本 | 无法回答「不经运河的货流」类对比问题 |
+
+**我的建议：A**（若时间紧则 C）。理由：本项目**不需要精确的航线路径**，
+只需要一个「是否经运河」的判定位；A 的改造成本可控，且能让
+「运河 vs 非运河」成为**可对比的评测维度**（例如"不走运河的话费用是多少"）。
+但**跑道规模**（B）对本项目收益递减，不建议。
+
+⚠️ **该决策属于 A 类（③数据与领域模型）**，且会改动已确认的 C-14 数据规模，
+**须用户确认后再动手**。在确认前：
+
+- 探针 7 已改为**同时输出两个口径**并标注 97.67% 是下界
+- `docs/数据模型-ER图.md` §四已更正，删除「100%」的绝对表述
+- **对外表述中不得引用单一数字**称"运河业务占比 X%"
 
 ### 中期（第 2–3 周）
 
@@ -149,6 +249,9 @@
 | 2026-09-19 | 新增环境自检与 pgvector 编译脚本 | `verify_env.ps1`（8 项通过 / 1 项失败）、`build_pgvector.ps1`（含 PG18 需 0.8+ 的版本守卫）。**唯一剩余环境缺口：pgvector 未安装** |
 | 2026-09-19 | 验证 Redis 可用 | 本机 Redis 5.0.14.1 启动成功，PING/读写/DEL 均正常 |
 | 2026-09-19 | **P-01 取得硬证据** | 实测本机 Maven 仓库：Spring AI 只有 1.0.0/1.1.0/1.1.2（**无 2.x**）；1.1.2 starter 依赖 **Boot 3.5.8**；含 DeepSeek 官方 starter。**知识库的「Spring AI 2.0.0 + Boot 4.x」无证据支撑**。建议 Boot 3.5.9 + Spring AI 1.1.2，待用户确认 |
+| 2026-09-19 | 更正 P-01 前一轮的错误结论 | 前轮曾称「Boot 3.5.9 已可离线解析」——**该结论错误**（当时用 `Select-Object -Last 10` 截断输出漏看错误）。实测仅 Boot 也失败。**已找到可复现的离线构建配方**并实测 BUILD SUCCESS：统一镜像 id 为 `huaweicloud` + `-gs` 同时覆盖全局设置 + `-Daether.enhancedLocalRepository.trackingFilename=_none.repositories` + POM 固定插件版本（compiler 3.14.0） |
+| 2026-09-19 | 新增 `setup_local_db.ps1` 并端到端实测通过 | 一键建库→建表→装载→校验。实测输出：10 张表、EXCLUDE 约束生效、227,026 行、32,000 waybill / 110,167 fee_record。**过程中修复 3 个脚本缺陷**：①`psql` 缺 `-w` 导致认证失败时挂起 2 分钟 ②`$ErrorActionPreference="Stop"` 使 psql 的 stderr 变成终止错误、友好提示打不出来 ③`Test-NetConnection` 在受限环境误报端口不通 |
+| 2026-09-19 | 新增 `probe_domain_model.sql` 领域模型能力探针（8 项） | 验证模型**能回答业务问题**（不止建得起来）。8 项全部通过，耗时 0.4 秒。**发现真实建模缺口 → P-06**：`port.is_canal_node` 无法回答「航线是否经运河」，端点口径实测 97.67% 与文档原写的 100% 不符。**已更正 `数据模型-ER图.md` 并删除「100%」绝对表述**。过程中修复 3 个探针缺陷（UNION 类型不匹配、`v.name` 别名错、`ORDER BY amount` 无索引导致卡死 4.5 分钟） |
 
 ---
 

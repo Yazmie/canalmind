@@ -179,6 +179,8 @@ canalmind/
 | 仿真数据生成（22.7 万行） | ✅ 完成，7 项一致性检查通过 |
 | ER 图与设计说明 | ✅ 完成 |
 | 环境自检脚本 | ✅ 完成（`backend/scripts/verify_env.ps1`） |
+| **一键建库脚本** | ✅ 完成并端到端实测（`backend/scripts/setup_local_db.ps1`） |
+| **领域模型能力探针** | ✅ 8 项全部通过（`backend/scripts/probe_domain_model.sql`） |
 | pgvector 安装 | ⛔ 待编译（脚本已备：`backend/scripts/build_pgvector.ps1`） |
 | 后端骨架 / DeepSeek 调用 / SSE | ⛔ 待 Spring AI 版本确认 |
 | 文档检索通道 | ⏳ 第 2 周 |
@@ -187,6 +189,10 @@ canalmind/
 | Trace 观测 | ⏳ 第 5 周 |
 
 > **所有能力指标均为「待测」**，尚未产生任何评测数据。本项目不使用无出处的数字。
+
+**已知建模缺口**（记录而非隐藏）：`port.is_canal_node` 是**港口**属性，
+回答不了「这条航线是否穿越运河」。实测端点口径为 **97.67%**（下界，非真实占比）。
+详见 `docs/DECISIONS.md` **P-06**。
 
 ## 文档
 
