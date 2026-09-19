@@ -583,6 +583,12 @@ TABLES = [
                     "created_at"], "fee_record.csv"),
 ]
 
+# 含 id 列（GENERATED ALWAYS AS IDENTITY）的表。
+# port / cargo_type 用业务主键（port_code / cargo_code），没有 id 列。
+# 装载脚本需据此决定哪些表要 setval 修正序列。
+TABLES_WITH_ID = ["lock", "vessel", "customer", "voyage", "waybill",
+                  "tariff_rule", "fee_record"]
+
 
 def write_csv(path: str, header, rows):
     with open(path, "w", newline="", encoding="utf-8") as fh:
@@ -612,10 +618,12 @@ def write_load_sql(out_dir: str, counts: dict):
         "",
     ]
 
-    # 有 id 列的表：先入临时表，再 OVERRIDING SYSTEM VALUE 插入
-    id_tables = ["lock", "vessel", "customer", "voyage", "waybill", "tariff_rule",
-                 "fee_record"]
-    # documents 的 id 也需显式？不需要——documents 无 FK 指向其 id，让它自增即可
+    # 防止 TABLES_WITH_ID 与 TABLES 脱节（漏写会导致序列未修正，
+    # 后续插入自增主键时撞车）
+    known = {t for t, _c, _f in TABLES}
+    unknown = [t for t in TABLES_WITH_ID if t not in known]
+    assert not unknown, f"TABLES_WITH_ID 含未知表: {unknown}"
+
     for tbl, cols, fname in TABLES:
         if tbl == "documents":
             continue
@@ -637,13 +645,15 @@ def write_load_sql(out_dir: str, counts: dict):
         f"\\copy documents (waybill_no, doc_type, status, submit_time, audit_time, remark) FROM '{out_dir_sql}/documents.csv' WITH (FORMAT csv, HEADER true, NULL '')",
         "",
         "-- 修正 identity 序列，避免后续自增冲突",
+        "-- 注意：只有含 id 列的表才可 setval。port / cargo_type 用业务主键，",
+        "--       没有 id 列，对它们执行 setval 会报 column \"id\" does not exist。",
     ]
-    for tbl, _cols, _f in TABLES:
+    # 必须显式列举"含 id 列"的表：不能靠运行时 WHERE EXISTS 兜底，
+    # 因为 PostgreSQL 会对整条 SELECT 生成执行计划，MAX(id) 在解析期即报错。
+    for tbl in TABLES_WITH_ID:
         lines.append(
             f"SELECT setval(pg_get_serial_sequence('{tbl}', 'id'), "
-            f"COALESCE((SELECT MAX(id) FROM {tbl}), 1) + 1, false) "
-            f"WHERE EXISTS (SELECT 1 FROM information_schema.columns "
-            f"WHERE table_name='{tbl}' AND column_name='id');")
+            f"COALESCE((SELECT MAX(id) FROM {tbl}), 1) + 1, false);")
     lines += ["", "COMMIT;", "", "-- 行数校验"]
     for tbl, _cols, _f in TABLES:
         lines.append(f"SELECT '{tbl}' AS tbl, count(*) FROM {tbl};")

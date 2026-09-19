@@ -155,7 +155,22 @@ EXCLUDE USING gist (
 - 装载脚本走「临时表 → `INSERT ... OVERRIDING SYSTEM VALUE`」两步，
   既保住 DDL 强约束，又让仿真数据的 `id` 与外键引用完全可控。
 - 装载末尾用 `setval` 修正 identity 序列，避免后续自增冲突。
+- **`port` / `cargo_type` 没有 `id` 列**（用业务主键 `port_code` / `cargo_code`），
+  `setval` 只对这 7 张含 `id` 的表执行（见脚本内 `TABLES_WITH_ID`）。
 - **编号年份与日期保持一致**：`voyage_no` / `waybill_no` 的年份段取实际业务日期年份（避免出现「VY2025」却挂在 2027 年航次上的矛盾）。
+
+### 已验证：DDL 与装载在真实 PG18 上执行通过
+
+DDL 与装载脚本已在**真实 PostgreSQL 18.4** 上完整执行验证（非静态检查）：
+
+| 验证项 | 结果 |
+|---|---|
+| DDL 执行（`ON_ERROR_STOP=1`） | ✅ 无错误 |
+| 建表数量 | ✅ 10 张 |
+| `btree_gist` 扩展 | ✅ 已创建 |
+| `tariff_no_overlap` EXCLUDE 约束 | ✅ 生效（`pg_constraint.contype='x'`） |
+| 索引数量 | ✅ 46 个 |
+| 仿真数据装载 | ✅ 227,026 行全部入库 |
 
 ### 已通过的一致性检查（7 项，实测）
 
