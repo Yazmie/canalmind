@@ -33,6 +33,8 @@
 | C-08 | 2026-09-18 | Git 基础设置 | `main` 分支；`core.quotepath=false`（中文文件名正常）；`core.autocrlf=false` + `.gitattributes` 统一 LF | 原 `init.defaultBranch` 未设会默认 `master`；全文件原为 LF，若不锁会在 Windows 产生全仓库换行噪音 | 全局（提交干净度） |
 | C-09 | 2026-09-18 | 仿真数据入库方式 | 只提交 **schema migration + seed 生成脚本**，不提交 bulk dump | 3–5 万行数据可由脚本重现，仓库轻量且数据可版本化 | `backend/`、`data/` |
 | C-10 | 2026-09-18 | **规格书拆分（公开/私有边界）** | 规格书拆为「工程规格（公开）」+「求职备战笔记（本地私有）」；求职内容移入 `docs/求职备战笔记.md` 并加入 `.gitignore` | push 前审查发现：已提交的规格书含实习状态、秋招时间线、简历话术、面试问答（20 处"面试"/9 处"简历"），**与 C-07 决策冲突**；且引用了被 gitignore 的 `岗位介绍.txt`，形成悬空引用。拆分后公开仓库读起来是工程文档，且消除冲突 | 规格书全文、`.gitignore`、`README.md`、`AGENTS.md` §3 |
+| C-11 | 2026-09-18 | **JDK 版本** | **JDK 21**（`D:\JDKmove\JDK21`，实测 21.0.1 LTS） | 环境实测默认仅 Java 8（`JAVA_HOME` 指向 corretto-1.8.0_482），**不满足 Spring Boot 3+/Spring AI 的 Java 17+ 要求**；用户提供本机 JDK 21，已验证可用 | 全局（编译、Maven、IDEA 配置） |
+| C-12 | 2026-09-18 | **运行环境不依赖 Docker** | 用**本机 PostgreSQL 18.4 + 本机 Redis**，弃用 Docker Compose | 环境实测**未安装 Docker**（命令不存在，WSL 受限）。而本机 PG18.4 已运行于 5432、Redis 5.0.14.1 已装。已写的 `docker-compose.yml` 保留作为可选方案（供他人 clone 后使用），但不作为本项目主路径 | `docker-compose.yml`、启动文档、`AGENTS.md` §5 |
 
 ---
 
@@ -47,7 +49,9 @@
 |---|---|---|---|---|
 | P-01 | **Spring Boot / Spring AI 版本** | 2.0.0 + Boot 4.x / 其他 | `AI 可观测性与 Trace` 第 420 行 | ☐ 待确认 |
 | P-02 | 技术栈最终确认 | 规格书方案（Spring Boot+Spring AI+PG/PgVector+Redis+MyBatis-Plus）是否照用 | 规格书 §3.2 | ☐ 待确认 |
-| P-03 | 业务领域模型与数据规模 | 10 张表设计、仿真数据量级（3–5 万） | 规格书 §2.2 | ☐ 待确认 |
+| P-03 | 业务领域模型与数据规模 | 10 张表设计、仿真数据量级（3–5 万） | 规格书 §2.2 | 🔶 部分完成（见下） |
+| P-04 | **仿真数据时间窗与运河业务占比** | A 截至今日 / B 通航日起一年 / C 双段窗口 | `docs/数据模型-ER图.md` §四 | ☐ 待确认 |
+| P-05 | **pgvector 安装方式** | Docker / 本机 PG18 编译安装 / 放弃 pgvector | 实测环境（无 Docker、无 C++ 工具链） | ☐ 待确认 |
 | D1 | Chunk 切分策略 | 固定长度 / 结构化 / Parent-Child / 语义 | `RAG 优化` 第 364 行；`RAG 文档处理与切分策略` 第 25、67 行 | ☐ 待决 |
 | D5 | 向量索引算法 | HNSW / IVFFLAT | `RAG 向量索引算法和向量数据库` 第 111、171 行 | ☐ 待决 |
 | D6 | 向量库选型 | PgVector / Milvus / Qdrant / Weaviate / Elasticsearch | 同上 第 244–247 行 | ☐ 待决 |
@@ -101,6 +105,10 @@
 | 2026-09-18 | 确认 C-06–C-09 | 仓库拓扑定为 monorepo；确定入库边界（知识库与个人资料不入库）；Git 基础设置；仿真数据仅提交脚本 |
 | 2026-09-18 | 初始化 git 仓库 | `git init -b main`，首个提交 13 个文件 / 1855 行；已验证无密钥泄漏、全部 LF |
 | 2026-09-18 | 确认 C-10 | push 前审查发现规格书含个人求职内容，与 C-07 冲突。拆分规格书为「工程规格（公开）」+「求职备战笔记（本地私有）」 |
+| 2026-09-18 | 开始第 1 周任务 | 环境实测发现三个阻塞项：默认仅 Java 8、未安装 Docker、pgvector 未装。确认 C-11（JDK 21）、C-12（本机 PG+Redis 不依赖 Docker） |
+| 2026-09-18 | 完成 10 张业务表 DDL | `V1__init_business_schema.sql`，含 `btree_gist` 依赖与 `tariff_rule` 防重叠 EXCLUDE 约束 |
+| 2026-09-18 | 完成仿真数据生成脚本 | `generate_seed_data.py`，固定种子确定性生成 19.5 万行；FK 完整性 0 错误、费率规则 0 重叠。发现过闸费生成 bug 并修复 |
+| 2026-09-18 | 提出 P-04、P-05 | P-04：运河通航（2026-09-16）仅两日，导致运河业务数据占比 0.92%、过闸费占比 0.30%，需定时间窗策略；P-05：pgvector 安装方式待定（无 Docker、无 C++ 工具链） |
 
 ---
 
