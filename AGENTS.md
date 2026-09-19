@@ -8,10 +8,13 @@
 ## 1. commit 注释约定（重要）
 
 - 本工作区的**代码改动完成后**，AI 必须在最终回复末尾附上**一条简短的 git commit 注释语句**（中文），方便用户直接复制 push。
-- 风格参考仓库历史提交：`type(scope): 摘要 — 细节`，例如：
-  - `feat(activity): 活动浏览氛围收尾 — 列表悬浮"＋"发布, 详情"···"菜单`
-  - `fix: 列表 + 详情补 createdByName 字段`
-- type 取值：`feat` / `fix` / `refactor` / `docs` 等；scope 取模块名（如 activity / media / member）。
+- **最多两行：一行标题 +（可选）一行补充说明。不要写多行 body。**
+  - 示例（两行）：
+    `docs(canalmind): 拆分求职内容至本地私有文档`
+    `公开仓库仅保留工程规格，求职内容移至本地私有笔记`
+  - 示例（一行）：
+    `feat(rag): 补齐混合检索与三档 Top-K`
+- 风格：`type(scope): 摘要`。type 取 `feat` / `fix` / `refactor` / `docs` / `chore` 等；scope 取模块名（如 rag / chat / eval / docs）。
 - 若前后端仓库都有改动，可各给一条。
 
 ---
