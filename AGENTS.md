@@ -191,12 +191,29 @@ canalmind/                          ← git 仓库根（main 分支）
 
 ## 5. 技术栈与版本纪律
 
-**技术栈**：Spring Boot + Spring AI、PostgreSQL + PgVector、Redis、MyBatis-Plus、DeepSeek API、OpenTelemetry、Docker Compose。
+**技术栈**：Spring Boot + Spring AI、PostgreSQL + PgVector、Redis、MyBatis-Plus、DeepSeek API、OpenTelemetry。
+
+> ⚠️ **不使用 Docker**（决策 C-12）：环境实测未安装 Docker，改用本机 PostgreSQL 18.4 + Redis 5.0.14.1。
+> 仓库内 `docker-compose.yml` 保留，供他人 clone 后使用，**不是本项目主路径**。
 
 ⚠️ **版本纪律**：知识库 `AI 可观测性与 Trace` 第 420 行以 **Spring AI 2.0.0 + Spring Boot 4.x** 为例，并明确提醒"不同版本的依赖和属性可能有调整，升级时以对应版本官方文档为准"。
 
 - **项目起步第一件事：确认 Spring AI / Spring Boot 实际版本**，不要照旧教程装 1.x。（属 A 类决策，需确认）
+- ⚠️ **不得凭记忆假设版本号**。知识库引用的版本可能已过时，必须查证官方仓库或 Maven 中央仓后再定。
 - 版本一旦确定，写入 §7"版本记录"区与 `DECISIONS.md`，后续统一。
+
+### 5.1 已验证的本机环境（实测，2026-09-18）
+
+| 项 | 实测结果 | 说明 |
+|---|---|---|
+| JDK | **21.0.1 LTS** @ `D:\JDKmove\JDK21` | 决策 C-11。默认 `JAVA_HOME` 仅 Java 8，**不可用** |
+| Maven | 3.9.12 @ `D:\APP\apache-maven-3.9.12` | 本地 `.m2` 已缓存 Spring Boot 3.5.0 |
+| PostgreSQL | **18.4**，服务 `postgresql-x64-18` 运行于 5432 | 决策 C-12 |
+| pgvector | ❌ 未安装 → 需源码编译 **0.8.x**（PG18 不兼容 0.7 及以下） | 决策 C-15 |
+| Redis | 5.0.14.1 @ `D:\APP\Redis-x64-5.0.14.1` | 需手动启动 |
+| MSVC | 14.36 / 14.41 @ `D:\Visual Studio\IDE` | pgvector 编译前置条件，已具备 |
+| Python | 3.12.3 @ `D:\APP\Python` | 用于仿真数据生成与评测脚本 |
+| Docker | ❌ 未安装 | 决策 C-12 |
 
 ---
 
@@ -214,12 +231,17 @@ canalmind/                          ← git 仓库根（main 分支）
 
 | 项 | 版本 | 确定日期 |
 |---|---|---|
+| JDK | **21.0.1 LTS**（`D:\JDKmove\JDK21`） | 2026-09-18 |
+| PostgreSQL | **18.4**（本机服务，端口 5432） | 2026-09-18 |
+| pgvector | **0.8.x**（须源码编译；**禁止 0.7 及以下**，不兼容 PG18） | 2026-09-18 |
+| Redis | 5.0.14.1（本机） | 2026-09-18 |
+| Maven | 3.9.12 | 2026-09-18 |
 | Spring Boot | 待定 | — |
 | Spring AI | 待定 | — |
-| PostgreSQL / PgVector | 待定 | — |
 | DeepSeek 模型 | 待定 | — |
 
 > 每确认一项即更新此行，避免后续会话重复摸索。
+> **Spring Boot / Spring AI 版本是第 1 周的硬阻塞项**（P-01）：须查证官方仓库或 Maven 中央仓后确定，不得凭记忆填写。
 
 ---
 

@@ -18,11 +18,17 @@ CanalMind 仿真数据生成脚本
 3. **仅输出 CSV + 装载脚本，不入库**：遵守 DECISIONS.md C-09，
    仿真数据只提交生成脚本，csv 产物在 .gitignore 中。
 
-时间窗说明（★ 见回复中的决策点）
+时间窗说明（决策 P-04 方案 B）
 ------------------------------
-平陆运河 2026-09-16 正式通航。本脚本默认把业务窗口设为
-BUSINESS_START ~ BUSINESS_END，并让运河闸费自 CANAL_OPEN_DATE 起生效，
-使「通航前后」成为数据里的一个真实断点（可用于对比类问答）。
+平陆运河 2026-09-16 正式通航。业务窗口取「通航后一年」
+（2026-09-16 ~ 2027-09-15），系统「今天」为 2027-09-15。
+
+为什么不是「截至真实今天」：运河 2026-09-16 才通航，若窗口覆盖通航前，
+运河业务在数据中占比仅 0.92%、过闸费仅 0.30%，运河专项查询无法评测。
+窗口整体后移后，运河成为数据主体。
+
+⚠️ 代价与纪律：本数据集是**前瞻模拟**（时间点在真实今天之后），
+不是历史真实数据。README 必须主动交底，且不得对外宣称任何指标。
 
 用法
 ----
@@ -45,12 +51,24 @@ from decimal import Decimal
 
 SEED = 20260918
 
-# 业务数据时间窗
-BUSINESS_START = date(2025, 10, 1)
-BUSINESS_END = date(2026, 9, 18)
-
 # 平陆运河正式通航日（真实事件：2026-09-16）
 CANAL_OPEN_DATE = date(2026, 9, 16)
+
+# 业务数据时间窗（决策 P-04 方案 B：通航后一年）
+#
+# 为什么从通航日起算：运河通航前不存在运河业务，若窗口覆盖通航前，
+# 「过闸费」「运河吞吐量」等运河专项查询会因数据稀薄而无法评测
+# （实测：窗口截至 2026-09-18 时，运河业务仅占 0.92%、过闸费仅占 0.30%）。
+# 故窗口整体后移到通航之后，使运河成为数据主体。
+#
+# ⚠️ README 须主动交底：本数据集为「前瞻模拟」，非历史真实数据。
+BUSINESS_START = CANAL_OPEN_DATE
+BUSINESS_END = date(2027, 9, 15)
+
+# 系统「今天」：仿真数据的时间原点。
+# 用于推断航次/运单状态（远早于此日期的已完成，近期的在途/计划）。
+# 问答中若涉及「现在 / 目前」，语义指向此日期。
+SYSTEM_TODAY = BUSINESS_END
 
 # 规模目标：核心事实表 3–5 万行
 N_VESSEL = 240
@@ -180,12 +198,12 @@ CATEGORY_FACTOR = {
     "其他":   Decimal("1.20"),
 }
 
-# 费率调整事件：每次调价形成一个新版费率
+# 费率调整事件：每次调价形成一个新版费率（须落在业务窗口内）
 RATE_CHANGE_DATES = [
-    date(2025, 10, 1),
-    date(2026, 1, 1),
-    date(2026, 4, 1),
-    date(2026, 7, 1),
+    date(2026, 9, 16),   # 通航日起按新费率执行
+    date(2027, 1, 1),
+    date(2027, 4, 1),
+    date(2027, 7, 1),
 ]
 
 # 吨位分段（防重叠：相邻段的 [min, max) 严格衔接）
@@ -285,15 +303,16 @@ def gen_voyage():
     route_weights = [w for (_, _, w) in routes]
 
     for i in range(N_VOYAGE):
-        vno = f"VY{2025 + (i % 2)}{i + 1:06d}"
         origin, dest = rng.choices(route_pairs, weights=route_weights)[0]
         etd = random_dt(BUSINESS_START, BUSINESS_END)
         # 航程 1~5 天
         eta = etd + timedelta(hours=rng.randint(20, 120))
-        # 状态按时间推断：早于今天多已完成，近期在途/计划
-        if eta.date() < BUSINESS_END - timedelta(days=20):
+        # 航次号年份取实际离港年份，保证编号与日期一致
+        vno = f"VY{etd.year}{i + 1:06d}"
+        # 状态按系统「今天」推断：远早于今天的已完成，近期的在途，未来的计划
+        if eta.date() < SYSTEM_TODAY - timedelta(days=20):
             status = rng.choices(["已完成", "已取消"], weights=[97, 3])[0]
-        elif etd.date() <= BUSINESS_END:
+        elif etd.date() <= SYSTEM_TODAY:
             status = rng.choices(["在途", "已完成"], weights=[40, 60])[0]
         else:
             status = "计划"
@@ -304,23 +323,39 @@ def gen_voyage():
     return rows
 
 
-def gen_waybill():
-    """运单：挂在航次上，是费用的计算对象。"""
+def gen_waybill(voyages):
+    """运单：挂在航次上，是费用的计算对象。日期锚定所属航次的离港日。"""
     rows = []
     for i in range(N_WAYBILL):
-        wno = f"WB{2025 + (i % 2)}{i + 1:07d}"
         voyage_idx = rng.randint(1, N_VOYAGE)
+        # 运单日期锚定其所属航次的离港日（前后 7 天内），保证业务时序自洽：
+        # 运单不可能早于航次很久，也不可能在航次结束后才创建
+        voz = voyages[voyage_idx - 1]
+        etd = datetime.strptime(voz[4], "%Y-%m-%d %H:%M:%S")
+        created = etd + timedelta(hours=rng.randint(-168, 72))
+        # 夹回业务窗口（航次 etd 可能接近窗口末端，偏移后会越界）
+        created = max(created, datetime.combine(BUSINESS_START, datetime.min.time()))
+        created = min(created, datetime.combine(BUSINESS_END, datetime.max.time()))
+
+        # 运单号年份取实际创建年份
+        wno = f"WB{created.year}{i + 1:07d}"
+        # 状态按相对系统「今天」的位置推断，避免"未来运单已结算"的矛盾
+        age_days = (SYSTEM_TODAY - created.date()).days
+        if age_days > 30:
+            status = rng.choices(["已结算", "已卸船", "已取消"],
+                                 weights=[95, 3, 2])[0]
+        elif age_days > 3:
+            status = rng.choices(["已卸船", "在途", "已结算"],
+                                 weights=[55, 35, 10])[0]
+        else:
+            status = rng.choices(["待装船", "在途"], weights=[65, 35])[0]
+
         customer_idx = rng.randint(1, N_CUSTOMER)
         cargo_idx = rng.randint(1, len(CARGO_TYPES))
         # 货重与吨位段分布匹配（多数落在中小吨位）
         weight = Decimal(str(round(rng.choices(
             [rng.uniform(200, 1000), rng.uniform(1000, 3000), rng.uniform(3000, 5000)],
             weights=[30, 45, 25])[0], 2)))
-        # 航次日期决定运单日期（运单不能早于航次太多）
-        created = random_dt(BUSINESS_START, BUSINESS_END)
-        status = rng.choices(
-            ["待装船", "在途", "已卸船", "已结算", "已取消"],
-            weights=[5, 8, 22, 63, 2])[0]
         rows.append([wno, str(voyage_idx), str(customer_idx),
                      CARGO_TYPES[cargo_idx - 1][0], q(weight),
                      "",  # freight_amount 后续由 fee_record 汇总回填
@@ -339,19 +374,15 @@ def gen_tariff_rule():
     这样任意两条规则要么吨位段不相交、要么生效期不相交，
     EXCLUDE 约束必然通过。
 
-    过闸费特殊处理：运河 2026-09-16 才通航，故过闸费自成一套生效期
-    （起点 = CANAL_OPEN_DATE，开放结束），不与 RATE_CHANGE_DATES 混用。
+    过闸费说明：运河 2026-09-16 才通航，而业务窗口起点即通航日，
+    因此所有费用类型（含过闸费）共用同一套调价日序列，无需特殊处理。
     """
     rows = []
     seq = 0
     categories = sorted({c[2] for c in CARGO_TYPES})
 
     for fee_type in FEE_TYPES:
-        # 过闸费用自己的生效期起点（通航日），其余费用用调价日序列
-        if fee_type == "过闸费":
-            periods = [CANAL_OPEN_DATE]
-        else:
-            periods = list(RATE_CHANGE_DATES)
+        periods = list(RATE_CHANGE_DATES)
 
         for cat in categories:
             for band_i, (bmin, bmax, _bname) in enumerate(TON_BANDS):
@@ -449,7 +480,7 @@ def gen_fee_record(tariff_rows, waybills):
     """
     费用明细：每条运单按货类生成 1~3 项费用。
     金额 = 货重 × 单价（按业务日期命中的费率）。
-    过闸费仅在运河通航后（CANAL_OPEN_DATE 起）对运河相关货流产生。
+    过闸费说明：业务窗口中所有货流均经平陆运河，故过闸费为必收项。
     """
     rows = []
     cargo_map = {c[0]: c for c in CARGO_TYPES}
@@ -469,11 +500,10 @@ def gen_fee_record(tariff_rows, waybills):
         is_dangerous = cargo_map[cargo_code][3]
 
         # 基础费用组合
-        fee_types = ["港杂费", "装卸费"]
+        # 过闸费：业务窗口中所有货流均经运河，故为必收项
+        fee_types = ["过闸费", "港杂费", "装卸费"]
         if is_dangerous:
             fee_types.append("停泊费")
-        if biz_date >= CANAL_OPEN_DATE and rng.random() < 0.85:
-            fee_types.append("过闸费")
         if rng.random() < 0.25:
             fee_types.append("引航费")
 
@@ -646,7 +676,7 @@ def main():
     cust_rows = gen_customer()
     vessel_rows = gen_vessel()
     voyage_rows = gen_voyage()
-    waybill_rows = gen_waybill()
+    waybill_rows = gen_waybill(voyage_rows)
     tariff_rows = gen_tariff_rule()
     doc_rows = gen_documents(waybill_rows)
     fee_rows = gen_fee_record(tariff_rows, waybill_rows)
