@@ -206,6 +206,7 @@ canalmind/
 | **领域模型能力探针** | ✅ 8 项全部通过（`backend/scripts/probe_domain_model.sql`） |
 | **L1 题目可行性核查** | ✅ 9 类问法核验（`backend/scripts/check_l1_feasibility.sql`） |
 | pgvector 安装 | ⛔ 待编译（脚本已备：`backend/scripts/build_pgvector.ps1`） |
+| **RAG 规则文档语料** | ⛔ **缺失**（需 20–30 篇，见 `docs/DECISIONS.md` P-07） |
 | 后端骨架 / DeepSeek 调用 / SSE | ⛔ 待 Spring AI 版本确认 |
 | 文档检索通道 | ⏳ 第 2 周 |
 | 结构化查询通道 | ⏳ 第 3 周 |
@@ -214,9 +215,12 @@ canalmind/
 
 > **所有能力指标均为「待测」**，尚未产生任何评测数据。本项目不使用无出处的数字。
 
-**已知建模缺口**（记录而非隐藏）：`port.is_canal_node` 是**港口**属性，
-回答不了「这条航线是否穿越运河」。实测端点口径为 **97.67%**（下界，非真实占比）。
-详见 `docs/DECISIONS.md` **P-06**。
+**已知建模缺口**（记录而非隐藏）：
+
+- `port.is_canal_node` 是**港口**属性，回答不了「这条航线是否穿越运河」。
+  实测端点口径为 **97.67%**（下界，非真实占比）。详见 `docs/DECISIONS.md` **P-06**。
+- `lock` 表**无水深字段**，故「吃水 X 米的船能否过闸」不可答；
+  等价问法（如「哪些船吃水超过 X 米」）可答。详见 **L1 可行性核查**。
 
 ## 文档
 
