@@ -236,12 +236,29 @@ canalmind/                          ← git 仓库根（main 分支）
 | pgvector | **0.8.x**（须源码编译；**禁止 0.7 及以下**，不兼容 PG18） | 2026-09-18 |
 | Redis | 5.0.14.1（本机） | 2026-09-18 |
 | Maven | 3.9.12 | 2026-09-18 |
-| Spring Boot | 待定 | — |
-| Spring AI | 待定 | — |
+| Spring Boot | **3.5.9**（建议，待确认 P-01） | — |
+| Spring AI | **1.1.2**（建议，待确认 P-01） | — |
 | DeepSeek 模型 | 待定 | — |
 
 > 每确认一项即更新此行，避免后续会话重复摸索。
-> **Spring Boot / Spring AI 版本是第 1 周的硬阻塞项**（P-01）：须查证官方仓库或 Maven 中央仓后确定，不得凭记忆填写。
+
+### 7.1 ⚠️ Spring AI 版本查证结论（2026-09-19）
+
+**知识库 `AI 可观测性与 Trace` 第 420 行称「Spring AI 2.0.0 + Spring Boot 4.x」——实测本机 Maven 仓库无此证据：**
+
+| 事实 | 证据来源 |
+|---|---|
+| Spring AI 仅有 1.0.0 / 1.1.0 / **1.1.2**，**不存在 2.x** | `D:\MavenRepo\maven-3.9.12\org\springframework\ai` 全量遍历 |
+| Spring AI 1.1.2 starter 依赖 **Spring Boot 3.5.8** | `spring-ai-starter-model-deepseek-1.1.2.pom` |
+| 依赖 Spring Framework **6.2.14** | `spring-ai-deepseek-1.1.2.pom` |
+| **DeepSeek 有官方 starter** | `spring-ai-starter-model-deepseek` |
+
+**教训**：知识库引用的版本可能过时或超前。**不得照抄知识库版本号**，
+须以 Maven 仓库 / 官方发布为准（本机缓存快照时间 2026-05-28）。
+
+⚠️ **本地仓库来源 id 问题**：`_remote.repositories` 记录为 `huaweicloud`，
+而 `settings.xml` 镜像 id 为 `aliyunmaven`，不一致会导致 Maven 拒绝使用缓存构件。
+有网环境下正常拉取即可；若需离线构建，须统一镜像 id。
 
 ---
 
