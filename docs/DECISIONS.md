@@ -153,6 +153,88 @@ Spring AI **1.1.2** 在本机仓库中**没有 PgVector store**：
 
 > 联网后一次 `mvn dependency:go-offline` 即可补齐全部缺失构件。
 
+### P-01 第三轮补充查证（2026-09-19，原型实测：**方案可编译 + SSE 链路已跑通**）
+
+在等待确认期间，我把 P-01 的技术风险**提前清掉了**——用一份**不入仓库**的原型
+（`D:\Project_AI\.proto`）离线构建，证明方案可行。
+
+**1）离线构建结论：BUILD SUCCESS**
+
+| 构件 | 结论 |
+|---|---|
+| Spring Boot | **3.5.9**（缓存内最高；3.5.8/3.5.9 的 `starter-parent` 缺失，故用 `spring-boot-dependencies` 导入方式） |
+| Spring AI | **1.1.2**（`spring-ai-starter-model-deepseek` 可解析） |
+| Spring Framework | Boot 3.5.9 锁 **6.2.15**，而 Spring AI 1.1.2 的 POM 引用 **6.2.14**。实测**两者兼容**，构建与运行均正常（Spring AI 只用到稳定 API） |
+| JDK | 21.0.1 |
+
+**2）⚠️ 两个必须先知道的依赖坑**
+
+- **`spring-ai-bom` 本机缓存中完全不存在**（连 1.0.0/1.1.0/1.1.2 都没有）。
+  原型改为**逐个构件显式写版本号**。联网后应改回 BOM 方式，便于统一升级。
+- **Maven 插件版本需显式固定**（本机缓存所限）：
+  `maven-compiler-plugin:3.14.0`、`maven-surefire-plugin:3.5.3`（Boot 默认的 3.2.5 缺失）、
+  `maven-jar-plugin:3.4.2`、`maven-dependency-plugin:3.8.1`（3.3.0/3.6.1/3.7.0 均缺依赖）。
+
+**3）❌ 不需要 WebFlux（重要简化）**
+
+`ServerSentEvent` 位于 **`spring-web`**（`org.springframework.http.codec.ServerSentEvent`），
+`starter-web` 已传递引入。因此 **SSE 无需 `spring-boot-starter-webflux`**，
+也就**不必拖入整套 Netty**（`netty-codec-http:4.1.130.Final` 等本机均缺，无法离线解析）。
+
+这也正合知识库《大模型 API 调用工程实践》**第 106 行**的判断：
+> *"WebMVC + `Flux` 只是在 Controller 出口用了响应式类型做 SSE，底层仍是 Servlet 容器。"*
+
+代价仅是 `reactor-core`（缓存内已有）。**建议正式后端采用此方案。**
+
+**4）✅ 配置属性名以构件元数据为准**
+
+属性名**不是猜的**，而是从 `spring-ai-autoconfigure-model-deepseek-1.1.2.jar`
+的 `META-INF/spring-configuration-metadata.json` 读出，共 23 个，关键者：
+
+```
+spring.ai.deepseek.api-key          spring.ai.deepseek.chat.options.model
+spring.ai.deepseek.base-url         spring.ai.deepseek.chat.options.temperature
+spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
+```
+
+⚠️ **须同步修正 `.env.example`**：现有 `DEEPSEEK_API_KEY` 是自定义名，
+而 Spring AI 读取的是 **`spring.ai.deepseek.api-key`**，两者需要在
+`application.yml` 里显式桥接，否则配了也不生效。
+
+**5）⚠️ 新发现：SSE 换行转义的固有缺陷（属接口契约问题）**
+
+知识库第 114–118 行建议「出站把 `\n`/`\r` 转成字面量 `\\n`/`\\r`」。
+实测该方案**在正文含字面量反斜杠时会损坏内容**：
+
+```
+原文   : C:\new\path 与 JSON 示例 {\n}
+还原后 : C:<LF>ew\path 与 JSON 示例 {<LF>}
+```
+
+原因：转义不动反斜杠，还原时却把字面量 `\n` 当成转义序列。
+**触发场景真实存在**——答案里出现文件路径、JSON 示例、代码片段时会踩到。
+
+另实测 **CRLF 会被规范化为 LF**（`多段\r\n` → 还原为 `多段\n`）。
+这是**可接受且有意的选择**（展示语义等价，且避免 `\r` 残留导致前端多余空行），
+但**必须写进接口契约**，否则前端按「还原后应与原文完全一致」写断言会失败。
+
+**6）❌ 遗留框架注意事项（记录不修）**
+
+- 无 parent POM 时 `spring-boot-maven-plugin` 的 `repackage` **不会自动绑定**，
+  产出的 jar 无 `Main-Class`，`java -jar` 报「没有主清单属性」。需显式声明 `<executions>`。
+  （该插件 3.5.9 的 repackage 还依赖 `spring-boot-buildpack-platform:3.5.9`，本机缺失 →
+  原型改用 `-cp` 显式类路径启动，规避该问题。）
+- Spring Framework 6.1+ 需 `-parameters` 编译标志保留参数名，
+  否则启动日志提示 *"Ensure your compiler is configured to use the '-parameters' flag"*。
+  （`spring-boot-starter-parent` 默认已开；原型无 parent 故显式声明。）
+
+**7）DeepSeek starter 接线已验证正确**
+
+启动时自动配置**成功注册了 `deepSeekChatModel` Bean**（失败信息里明确列出
+`expected single matching bean but found 2: stubChatModel,deepSeekChatModel`），
+且缺少 API Key 时才抛 `DeepSeek API key must be set`。
+**这说明 DeepSeek 自动配置在 Boot 3.5.9 上接线正确**，只差密钥与网络。
+
 ### P-06 详情：航线级「是否经运河」标记（2026-09-19 探针 7 实测发现）
 
 **发现过程**：编写 `backend/scripts/probe_domain_model.sql` 时，探针 7 想验证
