@@ -56,7 +56,7 @@
 | 缓存 | Redis |
 | ORM | MyBatis-Plus |
 | 可观测 | Micrometer Observation + OpenTelemetry (OTLP) |
-| 部署 | Docker Compose |
+| 部署 | 本机 PostgreSQL + Redis（**不使用 Docker**，见下） |
 
 ## 快速开始
 
@@ -65,7 +65,7 @@
 | 依赖 | 版本 | 说明 |
 |---|---|---|
 | JDK | **21** | Spring Boot 3.x / Spring AI 要求 Java 17+ |
-| Maven | 3.9+ | 或用仓库自带 `mvnw` |
+| Maven | 3.9+ | 本项目暂未提供 `mvnw` 包装器，请使用本机 Maven |
 | PostgreSQL | **18** | 需扩展 `btree_gist`、`vector` |
 | pgvector | **0.8.x** | ⚠️ PostgreSQL 18 不兼容 0.7 及以下 |
 | Redis | 5.0+ | 缓存与会话 |
@@ -125,14 +125,17 @@ psql -U postgres -d canalmind -f backend/scripts/check_l1_feasibility.sql
 
 ### 启动服务
 
+> ⚠️ **后端骨架尚未搭建**（待 Spring AI 版本确认，见 `docs/DECISIONS.md` P-01）。
+> 以下为**目标形态**，当前执行会失败——列在此处是为了明确最终交付形态。
+
 ```bash
 # 配置密钥
 cp .env.example .env   # 填入 DEEPSEEK_API_KEY
 
-# 启动后端
-cd backend && ./mvnw spring-boot:run
+# 启动后端（当前无源码；本项目未提供 mvnw，用本机 mvn）
+cd backend && mvn spring-boot:run
 
-# 启动前端
+# 启动前端（当前 frontend/ 仅有 .gitkeep）
 cd frontend && npm install && npm run dev
 ```
 
