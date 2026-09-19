@@ -79,11 +79,11 @@ cd frontend && npm install && npm run dev
 
 ```
 canalmind/
-├── AGENTS.md              # AI 协作与决策纪律约定
+├── AGENTS.md              # 工程约定与决策纪律
 ├── docker-compose.yml     # 一键起依赖
 ├── docs/
 │   ├── DECISIONS.md       # 决策记录（已确认/待决/已否决）
-│   ├── 规格与执行清单.md    # 项目规格书（唯一执行依据）
+│   ├── 规格与执行清单.md    # 工程技术规格书（唯一执行依据）
 │   └── 评测报告/           # ★ 评测产物
 ├── backend/               # Java 后端
 └── frontend/              # 前端
@@ -124,7 +124,7 @@ canalmind/
 |---|---|
 | `docs/规格与执行清单.md` | 项目定位、领域建模、模块规格、5 周执行计划 |
 | `docs/DECISIONS.md` | 所有方向性决策的确认记录与已否决方案 |
-| `AGENTS.md` | AI 协作纪律、知识库参照要求、决策分级机制 |
+| `AGENTS.md` | 工程约定、知识库参照要求、决策分级机制 |
 
 ---
 
