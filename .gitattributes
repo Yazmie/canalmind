@@ -1,0 +1,45 @@
+# ============================================================
+# CanalMind .gitattributes
+# 目的：统一换行为 LF，避免 Windows/macOS 协作者产生全仓库换行噪音
+# ============================================================
+
+* text=auto eol=lf
+
+# 明确按文本处理（含中文文件名的 Markdown / SQL / 配置）
+*.md    text eol=lf
+*.txt   text eol=lf
+*.java  text eol=lf
+*.xml   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sql   text eol=lf
+*.json  text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.vue   text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+
+# Windows 专用脚本必须保留 CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# 二进制文件不做换行转换
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.svg   text eol=lf
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.jar   binary
+*.woff  binary
+*.woff2 binary
+
+# Git 统计时把生成物视为非源码
+backend/target/**  linguist-generated
+frontend/dist/**   linguist-generated
+*.lock             linguist-generated
