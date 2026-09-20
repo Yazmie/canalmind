@@ -125,19 +125,69 @@ psql -U postgres -d canalmind -f backend/scripts/check_l1_feasibility.sql
 
 ### 启动服务
 
-> ⚠️ **后端骨架尚未搭建**（待 Spring AI 版本确认，见 `docs/DECISIONS.md` P-01）。
-> 以下为**目标形态**，当前执行会失败——列在此处是为了明确最终交付形态。
+**1. 配置密钥**
 
 ```bash
-# 配置密钥
 cp .env.example .env   # 填入 DEEPSEEK_API_KEY
+```
 
-# 启动后端（当前无源码；本项目未提供 mvnw，用本机 mvn）
+> ⚠️ `.env` 里的 `DEEPSEEK_API_KEY` **不会**被 Spring AI 自动读取。
+> `application.yml` 中已用 `${DEEPSEEK_API_KEY:}` 显式桥接到 Spring AI 真正读取的
+> `spring.ai.deepseek.api-key`。若密钥留空，应用会**启动即失败**并提示
+> `DeepSeek API key must be set`——这是刻意设计，避免等到第一次问答才暴露问题。
+
+**2. 启动后端**（本项目未提供 `mvnw`，用本机 Maven；**须先将 `JAVA_HOME` 指向 JDK 21**）
+
+```bash
 cd backend && mvn spring-boot:run
+```
 
-# 启动前端（当前 frontend/ 仅有 .gitkeep）
+**3. 验证流式接口**
+
+```bash
+curl -N "http://localhost:8080/api/chat/stream?question=过闸费怎么算&sessionId=demo"
+```
+
+事件类型：`meta`（会话信息）→ `token`（增量正文，**换行已转义为字面量 `\n`**）→ `done`（分片数与耗时）。
+异常时以 `error` 事件结束，而不是直接断连。
+
+> **转义是接口契约的一部分**：前端必须用同一套语义解码，否则正文里的
+> 换行会让 SSE 事件边界错位。约定见 `SseTextCodec`（服务端与前端**必须固定同一种语义**，
+> 知识库《大模型 API 调用工程实践》第 124 行）。
+
+**4. 启动前端**（当前 `frontend/` 仅有 `.gitkeep`）
+
+```bash
 cd frontend && npm install && npm run dev
 ```
+
+### 运行测试
+
+```bash
+cd backend && mvn test
+```
+
+测试分两层，**刻意分开**，以便失败时能判断是接线错、协议错还是网络错：
+
+| 层 | 内容 | 是否依赖 DeepSeek |
+|---|---|---|
+| 单元测试 | `SseTextCodec` 转义与往返一致性（覆盖含换行 / CR / 空行 / 反斜杠片段） | 否 |
+| 端到端测试 | **真实启动 Tomcat，走真实 HTTP 连接**读 SSE 流，校验事件分帧未错位 | 否（用桩模型） |
+
+> 测试**不依赖真实大模型**：外部服务不稳定、慢、且要花钱。
+> 真实模型的连通性由手工冒烟验证，见 `.env` 配置后的 `curl` 步骤。
+
+<details>
+<summary>受限环境（沙箱）跑测试的额外参数</summary>
+
+Spring Boot 测试层会静态初始化 Mockito，其 ByteBuddy agent 在受限沙箱内无法自附加，
+需要显式以 agent 方式加载：
+
+```bash
+mvn test -DargLine=-javaagent:<本地仓库>/org/mockito/mockito-core/5.17.0/mockito-core-5.17.0.jar
+```
+
+</details>
 
 ## 目录结构
 
@@ -150,9 +200,12 @@ canalmind/
 │   ├── 数据模型-ER图.md    # ER 图与表设计说明
 │   ├── 规格与执行清单.md    # 工程技术规格书（唯一执行依据）
 │   └── 评测报告/           # ★ 评测产物
-├── backend/               # Java 后端
+├── backend/               # Java 后端（Spring Boot + Spring AI）
+│   ├── src/main/java/com/canalmind/
+│   │   ├── chat/          # SSE 流式问答接口与转义编解码
+│   │   └── config/        # ChatClient 装配
 │   └── scripts/           # 环境自检、仿真数据生成、pgvector 编译
-└── frontend/              # 前端
+└── frontend/              # 前端（当前仅 .gitkeep）
 ```
 
 > **说明**：`docs/AI应用开发知识库-Markdown/` 为本地只读参考资料（第三方内容），不纳入版本控制。
@@ -209,21 +262,26 @@ canalmind/
 | **领域模型能力探针** | ✅ 8 项全部通过（`backend/scripts/probe_domain_model.sql`） |
 | **L1 题目可行性核查** | ✅ 9 类问法核验（`backend/scripts/check_l1_feasibility.sql`） |
 | pgvector 安装 | ⛔ 待编译（脚本已备：`backend/scripts/build_pgvector.ps1`） |
-| **RAG 规则文档语料** | ⛔ **缺失**（需 20–30 篇，见 `docs/DECISIONS.md` P-07） |
-| 后端骨架 / DeepSeek 调用 / SSE | ⛔ 待 Spring AI 版本确认 |
+| **RAG 规则文档语料** | ⛔ **缺失**（已定方案，见 `docs/DECISIONS.md` **C-19**：自建仿真语料 20–30 篇） |
+| **后端骨架 / DeepSeek 接线 / SSE 流式接口** | ✅ 完成，28 项测试全过（含真实 HTTP 端到端） |
 | 文档检索通道 | ⏳ 第 2 周 |
 | 结构化查询通道 | ⏳ 第 3 周 |
 | 评测体系 | ⏳ 第 4 周 |
 | Trace 观测 | ⏳ 第 5 周 |
 
 > **所有能力指标均为「待测」**，尚未产生任何评测数据。本项目不使用无出处的数字。
+>
+> 已通过的 28 项测试验证的是**框架接线与 SSE 协议行为**，**不是模型效果**——
+> 它证明"流式链路是通的、换行转义在协议层成立"，不证明"回答是准的"。
 
 **已知建模缺口**（记录而非隐藏）：
 
 - `port.is_canal_node` 是**港口**属性，回答不了「这条航线是否穿越运河」。
-  实测端点口径为 **97.67%**（下界，非真实占比）。详见 `docs/DECISIONS.md` **P-06**。
+  实测端点口径为 **97.67%**（下界，非真实占比）。
+  已定方案见 `docs/DECISIONS.md` **C-18**（`voyage` 增加 `via_canal`），**尚未实现**。
 - `lock` 表**无水深字段**，故「吃水 X 米的船能否过闸」不可答；
   等价问法（如「哪些船吃水超过 X 米」）可答。详见 **L1 可行性核查**。
+- 数据时间窗为**前瞻模拟**（系统「今天」= 2027-09-15），非历史真实数据，详见 **C-13**。
 
 ## 文档
 

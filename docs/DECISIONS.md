@@ -38,6 +38,10 @@
 | C-13 | 2026-09-18 | **仿真数据时间窗（P-04）** | **通航后一年**：`2026-09-16 ~ 2027-09-15`，系统「今天」= 2027-09-15 | 运河 2026-09-16 才通航，真实今天仅 09-18。窗口截至今日时实测运河业务仅 0.92%、过闸费仅 0.30%，运河专项评测题无数据支撑。后移后过闸费占费用 29.05%。**代价**：数据集为前瞻模拟而非历史真实数据，README 须主动交底 | `generate_seed_data.py`、`docs/数据模型-ER图.md`、README 数据声明 |
 | C-14 | 2026-09-18 | **仿真数据规模（P-03）** | 核心事实表 `waybill` **32,000 行**，全库 227,026 行 | 落在规格书 §2.2「核心表 3–5 万行」区间内；其余表由 waybill 派生。数据量使索引与聚合查询具有真实意义 | `generate_seed_data.py`、`docs/数据模型-ER图.md` |
 | C-15 | 2026-09-18 | **pgvector 版本约束（P-05）** | 必须用 **pgvector 0.8.x**，**禁止 0.7 及以下**；从源码用 MSVC 编译安装 | 用户查证：**PostgreSQL 18 需搭配 pgvector 0.8.x**，0.7 及以下不兼容 PG18。实测本机无 Docker 但有 MSVC 14.36/14.41（`D:\Visual Studio\IDE`），故走源码编译路径 | 后端依赖、`docker-compose.yml`、启动文档 |
+| **C-16** | 2026-09-19 | **Spring Boot / Spring AI 版本（P-01）** | **Spring Boot 3.5.9 + Spring AI 1.1.2** | 用户确认。此前已实测：该组合离线**编译成功**，`ChatClient` / `DeepSeekChatModel` 可用，DeepSeek 自动配置接线正确。知识库所称「Spring AI 2.0.0 + Boot 4.x」在本机仓库无任何证据（不存在 2.x）。**注意**：本机无 `spring-boot-starter-parent:3.5.9`，故用 `spring-boot-dependencies` 导入并显式固定插件版本 | `backend/pom.xml`、`AGENTS.md` §7 |
+| **C-17** | 2026-09-19 | **技术栈照用（P-02）** | 照用规格书 §3.2 方案。**第 1 周暂不引入持久化**（PG/MyBatis-Plus/Redis），第 2 周做查询与检索通道时加入 | 用户确认。第 1 周交付物是「可流式对话的空壳服务」，此阶段引入 DataSource 会因缺数据库口令而启动失败，反而破坏"可运行"这一验收点。已实测 `mybatis-plus-spring-boot3-starter:3.5.9`、`postgresql:42.7.8`、`starter-data-redis:3.5.9` 均在缓存中，第 2 周可直接接入 | `backend/pom.xml` |
+| **C-18** | 2026-09-19 | **航线级运河标记（P-06）** | **在 `voyage` 表增加 `via_canal` 字段** | 用户确认（原建议 A）。探针实测：`port.is_canal_node` 是港口属性，无法回答"这条航线是否穿越运河"；有 56 个航次（743 票）两端都非运河节点却仍收过闸费。加字段可让航线级问题变成可答，并消除该口径矛盾 | `V1__init_business_schema.sql`、`generate_seed_data.py`、`docs/数据模型-ER图.md`、探针 |
+| **C-19** | 2026-09-19 | **RAG 语料来源（P-07）** | **自建仿真规则文档 20–30 篇**，每篇头部标注「本项目自建仿真语料，非官方文件」 | 用户确认（原建议 A）。规格书要求 20–30 篇规则文档，实测仓库一篇都没有，是第 2 周硬阻塞（文档检索通道与 Golden Set L2 层 40 条全依赖它）。自建口径与仿真数据一致，且可刻意放入"过期条款""相似冲突条款"以构造评测区分度。**必须在 README 与每篇文档头部交底是仿真语料** | `docs/规则语料/`（待建）、检索通道、Golden Set |
 
 ---
 
@@ -50,13 +54,13 @@
 
 | # | 决策点 | 选项 | 出处 | 状态 |
 |---|---|---|---|---|
-| P-01 | **Spring Boot / Spring AI 版本** | 见下方「P-01 查证结果」 | 实测本机 Maven 仓库 | 🔶 **已有硬证据，待确认** |
-| P-02 | 技术栈最终确认 | 规格书方案（Spring Boot+Spring AI+PG/PgVector+Redis+MyBatis-Plus）是否照用 | 规格书 §3.2 | ☐ 待确认 |
+| P-01 | **Spring Boot / Spring AI 版本** | 见下方「P-01 查证结果」 | 实测本机 Maven 仓库 | ✅ 已确认 → **C-16**（Boot 3.5.9 + Spring AI 1.1.2）|
+| P-02 | 技术栈最终确认 | 规格书方案（Spring Boot+Spring AI+PG/PgVector+Redis+MyBatis-Plus）是否照用 | 规格书 §3.2 | ✅ 已确认 → **C-17**（照用；第 1 周暂不引持久化）|
 | P-03 | 业务领域模型与数据规模 | 10 张表设计、仿真数据量级 | 规格书 §2.2 | ✅ 已确认 → **C-14** |
 | P-04 | 仿真数据时间窗与运河业务占比 | A 截至今日 / B 通航日起一年 / C 双段窗口 | `docs/数据模型-ER图.md` §四 | ✅ 已确认 → **C-13**（选 B）|
 | P-05 | pgvector 安装方式与版本 | Docker / 源码编译 / 放弃 | 实测环境 | ✅ 已确认 → **C-15**（0.8.x + MSVC 源码编译）|
-| P-06 | **航线级「是否经运河」标记** | A 加 voyage 字段 / B 加航段路径表 / C 维持现状并声明口径 | 探针 7 实测发现（见下） | ☐ **待决（属于③数据与领域模型，A 类）** |
-| P-07 | **RAG 语料来源** | A 我撰写仿真规则文档 / B 用户提供真实文档 / C 缩减至 8–10 篇 | 实测仓库无语料（见下） | ☐ **待决（属于①范围与交付物，A 类；第 2 周阻塞）** |
+| P-06 | **航线级「是否经运河」标记** | A 加 voyage 字段 / B 加航段路径表 / C 维持现状并声明口径 | 探针 7 实测发现（见下） | ✅ 已确认 → **C-18**（选 A：voyage 加 `via_canal`）|
+| P-07 | **RAG 语料来源** | A 我撰写仿真规则文档 / B 用户提供真实文档 / C 缩减至 8–10 篇 | 实测仓库无语料（见下） | ✅ 已确认 → **C-19**（选 A：自建仿真语料 20–30 篇）|
 | D1 | Chunk 切分策略 | 固定长度 / 结构化 / Parent-Child / 语义 | `RAG 优化` 第 364 行；`RAG 文档处理与切分策略` 第 25、67 行 | ☐ 待决 |
 | D5 | 向量索引算法 | HNSW / IVFFLAT | `RAG 向量索引算法和向量数据库` 第 111、171 行 | ☐ 待决 |
 | D6 | 向量库选型 | PgVector / Milvus / Qdrant / Weaviate / Elasticsearch | 同上 第 244–247 行 | ☐ 待决 |
@@ -197,9 +201,27 @@ spring.ai.deepseek.base-url         spring.ai.deepseek.chat.options.temperature
 spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 ```
 
+> ⚠️ **更正（2026-09-19 第 3 轮实测）**：上表里的
+> `spring.ai.deepseek.chat.enabled` **看起来像**关闭 DeepSeek 的开关，
+> 但实测**不起作用**——设为 `false` 后自动配置照常生效，
+> 仍因缺 Key 抛 `DeepSeek API key must be set`。
+>
+> **真正的开关是 `spring.ai.model.chat`**。用 `javap -v` 从
+> `DeepSeekChatAutoConfiguration.class` 的常量池读出其条件注解为：
+> ```
+> @ConditionalOnProperty(name = "spring.ai.model.chat",
+>                        havingValue = "deepseek", matchIfMissing = true)
+> ```
+> 故**关闭方式为 `spring.ai.model.chat=none`**，
+> 已在 `ChatStreamControllerTest` 中实际使用并验证通过。
+>
+> **教训（与 §7.1 同类）**：配置元数据里列出某属性，只说明"它可被绑定"，
+> **不代表它决定自动配置是否生效**——后者要看类上的条件注解。
+
 ⚠️ **须同步修正 `.env.example`**：现有 `DEEPSEEK_API_KEY` 是自定义名，
 而 Spring AI 读取的是 **`spring.ai.deepseek.api-key`**，两者需要在
 `application.yml` 里显式桥接，否则配了也不生效。
+**（已于第 3 轮落地：`.env.example` 补桥接说明，`application.yml` 用 `${}` 占位符桥接）**
 
 **5）⚠️ 新发现：SSE 换行转义的固有缺陷（属接口契约问题）**
 
@@ -414,6 +436,10 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 | 2026-09-19 | 新增 `check_l1_feasibility.sql` 并完成 L1 题目可行性核查 | **提前发现第 3–4 周返工风险**。9 类典型问法：6 类可答、2 类需改问法、1 类不可答。关键发现：①**数据窗仅一年，「今年比去年」类题目无法定义** ②`lock` 表**无水深字段**，"吃水能否过闸"不可答，须改为等价问法 ③`freight_amount` 回填率实测 **100%**，「运费测算」类问法可靠。约束已写入 DECISIONS 作为第 4 周出题检查项 |
 | 2026-09-19 | 建库脚本端到端加固（修复 5 个真实缺陷） | ①`psql` 缺 `-w` → 无口令时挂起 2 分钟 ②`$ErrorActionPreference="Stop"` 把 psql 的 stderr 变成终止错误、友好提示打不出来 ③`Test-NetConnection` 在受限环境误报端口不通 ④**`DROP DATABASE` 无限挂起**（`wait_event=ProcSignalBarrier`，且 `statement_timeout` 拦不住）→ 改用 **`DROP SCHEMA public CASCADE`**，实测 0.4 秒完成 ⑤`Start-Process -PassThru` 在 PS 5.1 下 `ExitCode` 返回 `$null` → 改用 `System.Diagnostics.Process`。**并新增幂等性**：DDL/装载前先检测，已存在则跳过，脚本可安全重复运行 |
 | 2026-09-19 | **发现 P-07：RAG 语料缺失（第 2 周阻塞）** | 规格书要求「规则文档 20–30 篇」，实测仓库**一篇都没有**。文档检索通道（模块 3）与 Golden Set L2 层（40 条）全部依赖语料。已提三个方案（A 自建仿真语料 / B 用户提供 / C 缩减），**建议 A**，待用户确认 |
+| 2026-09-19 | **确认 C-16 ~ C-19，三项待决决策全部落定** | 用户确认：①**P-01 → C-16**：Boot 3.5.9 + Spring AI 1.1.2 ②**P-02 → C-17**：技术栈照用规格书，第 1 周暂不引持久化 ③**P-06 → C-18**：`voyage` 加 `via_canal` 字段 ④**P-07 → C-19**：自建仿真规则文档 20–30 篇（须标注非官方） |
+| 2026-09-19 | **第 1 周「SSE 流式接口」目标达成（库内代码）** | 在 `backend/` 落地真实后端：`pom.xml`（Boot 3.5.9 + Spring AI 1.1.2）、`CanalMindApplication`、`ChatStreamController`（SSE，事件 meta/token/done/error）、`SseTextCodec`、`ChatClientConfig`、`application.yml`（用 `${}` 桥接 `.env` 到 `spring.ai.deepseek.*`）。**实测 28 项测试全过、`mvn` 退出码 0**，其中 4 项是**真实启动 Tomcat 走真实 HTTP 连接**的端到端测试，验证了 SSE 事件分帧与换行转义在协议层成立 |
+| 2026-09-19 | **更正：`spring.ai.deepseek.chat.enabled` 不是开关** | 实测设为 `false` 后 DeepSeek 自动配置**照常生效**，仍因缺 Key 报错。用 `javap -v` 从常量池读出真正的条件注解是 `@ConditionalOnProperty(name="spring.ai.model.chat", havingValue="deepseek", matchIfMissing=true)`，故关闭方式为 **`spring.ai.model.chat=none`**。**教训**：配置元数据列出某属性只代表"可绑定"，不代表它决定自动配置是否生效 |
+| 2026-09-19 | **SSE 换行转义改为无损实现** | 知识库第 117 行建议的 `replace("\n","\\n")` **不是双射**，实测会把正文里的字面量 `C:\new\path` 损坏成 `C:<LF>ew\path`。因前端尚未实现（无兼容负担），改为**同时转义反斜杠**，使 `unescape(escape(x)) ≡ x`。知识库第 124 行本就把具体约定留给项目自定，故不算违背 |
 
 ---
 

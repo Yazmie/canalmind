@@ -1,0 +1,47 @@
+# ============================================================
+# CanalMind 后端配置
+#
+# ⚠️ 关键：Spring AI 读的配置键是 `spring.ai.deepseek.*`，
+#    它**不会**自动读取 .env 里的 DEEPSEEK_API_KEY。
+#    因此下面用 ${} 占位符显式桥接。
+#    属性名来源（非猜测）：spring-ai-autoconfigure-model-deepseek-1.1.2.jar
+#      → META-INF/spring-configuration-metadata.json（共 23 个属性）
+# ============================================================
+spring:
+  application:
+    name: canalmind-api
+
+  ai:
+    deepseek:
+      # 从 .env / 环境变量注入。留空时应用会**快速失败**并提示
+      # "DeepSeek API key must be set"，这是刻意的——宁可启动就报错，
+      # 也不要等到第一次问答才失败。
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${DEEPSEEK_CHAT_MODEL:deepseek-chat}
+          # 业务问答要求稳定复现，温度调低；评测可复现性依赖这一点
+          temperature: 0.1
+
+server:
+  port: ${SERVER_PORT:8080}
+  # SSE 是长连接：Tomcat 的异步超时不能太小，否则长回答会被掐断
+  tomcat:
+    connection-timeout: 60s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.canalmind: DEBUG
+    # ⚠️ DEBUG 会打印提示词正文，正式环境务必调回 INFO
+    org.springframework.ai: INFO

@@ -236,9 +236,9 @@ canalmind/                          ← git 仓库根（main 分支）
 | pgvector | **0.8.x**（须源码编译；**禁止 0.7 及以下**，不兼容 PG18） | 2026-09-18 |
 | Redis | 5.0.14.1（本机） | 2026-09-18 |
 | Maven | 3.9.12 | 2026-09-18 |
-| Spring Boot | **3.5.9**（建议，待确认 P-01） | — |
-| Spring AI | **1.1.2**（建议，待确认 P-01） | — |
-| DeepSeek 模型 | 待定 | — |
+| Spring Boot | **3.5.9**（C-16，已确认） | 2026-09-19 |
+| Spring AI | **1.1.2**（C-16，已确认） | 2026-09-19 |
+| DeepSeek 模型 | `deepseek-chat`（默认值，可用 `DEEPSEEK_CHAT_MODEL` 覆盖） | 2026-09-19 |
 
 > 每确认一项即更新此行，避免后续会话重复摸索。
 
@@ -259,6 +259,31 @@ canalmind/                          ← git 仓库根（main 分支）
 ⚠️ **本地仓库来源 id 问题**：`_remote.repositories` 记录为 `huaweicloud`，
 而 `settings.xml` 镜像 id 为 `aliyunmaven`，不一致会导致 Maven 拒绝使用缓存构件。
 有网环境下正常拉取即可；若需离线构建，须统一镜像 id。
+
+### 7.2 ⚠️ 本机构建的必要写法（C-16 配套，实测）
+
+本机 Maven 缓存的特殊情况导致几处**不能照抄网上教程**的写法，改动前务必先读本节：
+
+| 情况 | 表现 | 必须这么写 |
+|---|---|---|
+| **无 `spring-boot-starter-parent:3.5.9`** | 缓存里最高只到 3.5.7 | 用 `spring-boot-dependencies` 导入，并**显式固定所有插件版本** |
+| **无 `spring-ai-bom`** | 连 1.0.0/1.1.0/1.1.2 都没有 | spring-ai 构件**逐个写版本号** |
+| 镜像 id 不一致 | 报 "present, but unavailable" | `settings.xml` 的 mirror id 必须为 **`huaweicloud`**，且 `-s` 与 `-gs` 都要指定 |
+| Maven 拒绝使用缓存 | 同上 | 加 `-Daether.enhancedLocalRepository.trackingFilename=_none.repositories` |
+| 插件 JAR 缺失 | Boot 默认的 compiler 3.13.0 / surefire 3.2.5 缺失 | 固定到 **compiler 3.14.0、surefire 3.5.3、jar 3.4.2** |
+
+**⚠️ SSE 不需要 WebFlux**：`ServerSentEvent` 在 `spring-web` 中，由 `starter-web` 传递引入。
+故**不要**引入 `starter-webflux`，否则会拖入本机缺失的一整套 Netty（`netty-codec-http:4.1.130` 等）。
+依据：知识库《大模型 API 调用工程实践》第 106 行。
+
+**⚠️ 关闭某个模型自动配置的正确写法**：不是 `spring.ai.deepseek.chat.enabled=false`
+（实测**无效**），而是 **`spring.ai.model.chat=none`**。原因见 `DECISIONS.md` P-01 第三轮更正。
+
+**受限环境跑测试需显式加载 Mockito agent**：Spring Boot 测试层会静态初始化 Mockito，
+其 ByteBuddy agent 在受限沙箱内无法自附加。追加参数即可：
+`-DargLine=-javaagent:<本地仓库>/org/mockito/mockito-core/5.17.0/mockito-core-5.17.0.jar`
+
+通过测试结果：`Tests run: 28, Failures: 0, Errors: 0`，`mvn` 退出码 0。
 
 ---
 
