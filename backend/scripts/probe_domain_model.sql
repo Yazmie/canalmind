@@ -26,7 +26,7 @@ SET statement_timeout = '30s';
 \echo ''
 \echo '【探针 1】数据规模与时间窗自洽性'
 \echo '  业务问题：「系统里有多少数据？覆盖什么时间段？」'
-\echo '  期望：总量 227,026 行；业务日期都在 2026-09-16 ~ 2027-09-15 内'
+\echo '  期望：总量 226,277 行；业务日期都在 2026-09-16 ~ 2027-09-15 内'
 \echo '---------------------------------------------------------------------------'
 -- 注意：UNION 各分支类型必须一致，故统一 ::text（否则报
 -- "UNION types bigint and text cannot be matched"）
@@ -166,13 +166,15 @@ SELECT count(*) AS 单据不全的运单数 FROM (
 \echo ''
 \echo '【探针 7】运河业务占比 —— 领域边界确认'
 \echo '  业务问题：「多少业务真正走了平陆运河？」'
-\echo '  期望：能判定「航次是否经运河」，占比可算'
+\echo '  期望：能**直接**判定「航次是否经运河」，占比可算'
 \echo ''
-\echo '  ⚠️ 本探针揭示一个建模缺口（已记入 DECISIONS.md P-06）：'
-\echo '  port.is_canal_node 是**港口**属性，无法回答「这条航线是否穿越运河」。'
-\echo '  南宁港六景作业区 → 北海港 这类航线两端都不是运河节点，'
-\echo '  但按地理实际仍需经运河（郁江→平陆运河→钦州→沿海→北海）。'
-\echo '  因此下面第二个查询给出的是**下界**（endpoint 口径），不是真实占比。'
+\echo '  ✅ 本探针原揭示的建模缺口已由决策 C-18 修复：'
+\echo '  V1 时只能靠 port.is_canal_node 推断，那是**港口**属性，'
+\echo '  回答不了「这条航线是否穿越运河」。V2 已为 voyage 增加 via_canal。'
+\echo ''
+\echo '  ⚠️ 口径声明（重要，别把它当成真实航道几何）：'
+\echo '  via_canal 的定义是「起点港或终点港为运河节点」，属**仿真数据的简化口径**。'
+\echo '  真实世界需按航道几何判定，见 V2__add_voyage_via_canal.sql 的注释。'
 \echo '---------------------------------------------------------------------------'
 \echo '  -- 港口类型分布'
 SELECT type AS 港口类型, count(*) AS 数量,
@@ -180,27 +182,35 @@ SELECT type AS 港口类型, count(*) AS 数量,
   FROM port GROUP BY type ORDER BY 2 DESC;
 
 \echo ''
-\echo '  -- 【下界口径】至少一端为运河节点的航次占比'
-\echo '     注意：这是下界。仅一端非节点、但实际经运河的航线会被漏计。'
-SELECT count(*) AS 总航次,
-       count(*) FILTER (WHERE p1.is_canal_node OR p2.is_canal_node) AS 至少一端为节点,
-       round(100.0 * count(*) FILTER (WHERE p1.is_canal_node OR p2.is_canal_node)
-             / NULLIF(count(*), 0), 2) AS 下界占比pct
-  FROM voyage v
-  JOIN port p1 ON p1.port_code = v.origin_port
-  JOIN port p2 ON p2.port_code = v.dest_port;
+\echo '  -- 【航线级口径】直接读 voyage.via_canal，不再是端点推算'
+SELECT via_canal AS 经运河, count(*) AS 航次数,
+       round(100.0 * count(*) / NULLIF(sum(count(*)) OVER (), 0), 2) AS 占比pct
+  FROM voyage GROUP BY via_canal ORDER BY via_canal DESC;
 
 \echo ''
-\echo '  -- 两端都非节点的航线（需人工判断是否真的不经运河）'
+\echo '  -- 不经运河的航线明细'
 SELECT p1.name || ' → ' || p2.name AS 航线, count(*) AS 航次数,
-       (SELECT count(*) FROM waybill w WHERE w.voyage_id IN (
-          SELECT v2.id FROM voyage v2
-           WHERE v2.origin_port = v.origin_port AND v2.dest_port = v.dest_port)) AS 运单数
+       sum((SELECT count(*) FROM waybill w WHERE w.voyage_id = v.id)) AS 运单数
   FROM voyage v
   JOIN port p1 ON p1.port_code = v.origin_port
   JOIN port p2 ON p2.port_code = v.dest_port
- WHERE NOT p1.is_canal_node AND NOT p2.is_canal_node
- GROUP BY p1.name, p2.name, v.origin_port, v.dest_port ORDER BY 2 DESC;
+ WHERE NOT v.via_canal
+ GROUP BY p1.name, p2.name ORDER BY 2 DESC;
+
+\echo ''
+\echo '  ★ 不变式检查：过闸费与 via_canal 必须严格一致（C-18 的核心收益）'
+\echo '     两个计数都必须是 0，否则费用数据与航道事实又会对不上。'
+SELECT
+  (SELECT count(*) FROM fee_record f
+     JOIN waybill w ON w.waybill_no = f.waybill_no
+     JOIN voyage  v ON v.id = w.voyage_id
+    WHERE f.fee_type = '过闸费' AND NOT v.via_canal) AS 非运河航次却收过闸费,
+  (SELECT count(*) FROM waybill w
+     JOIN voyage v ON v.id = w.voyage_id
+    WHERE v.via_canal
+      AND NOT EXISTS (SELECT 1 FROM fee_record f
+                       WHERE f.waybill_no = w.waybill_no
+                         AND f.fee_type = '过闸费')) AS 运河航次漏收过闸费;
 
 -- ---------------------------------------------------------------------------
 \echo ''

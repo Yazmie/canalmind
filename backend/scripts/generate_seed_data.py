@@ -129,6 +129,10 @@ PORTS = [
     ("FC01", "防城港",           "沿海",     "海港",   False),
 ]
 
+# 运河节点港集合（决策 C-18）：voyage.via_canal 的取值口径即
+# 「起点港或终点港属于本集合」。口径来源见 docs/DECISIONS.md C-18。
+CANAL_NODES = frozenset(p[0] for p in PORTS if p[4])
+
 # 船闸：平陆运河三大梯级枢纽，各双线（两个闸室）
 LOCKS = [
     # (lock_id, name, chamber_no, capacity_ton, length, width, is_double_line)
@@ -290,7 +294,13 @@ def gen_vessel():
 
 
 def gen_voyage():
-    """航次：船舶在起运港与目的港之间的一次运输。"""
+    """
+    航次：船舶在起运港与目的港之间的一次运输。
+
+    via_canal（决策 C-18）：起点港或终点港为运河节点即为真。
+    该字段是后续 fee_record 是否收过闸费的依据，两者必须由同一口径驱动，
+    否则又会回到「两端非运河节点却收过闸费」的矛盾。
+    """
     rows = []
     # 主要航线（起运 → 目的），权重体现真实货流方向
     routes = [
@@ -317,9 +327,12 @@ def gen_voyage():
         else:
             status = "计划"
         vessel_idx = rng.randint(1, N_VESSEL)
+        # C-18 口径：端点落在运河节点上即视为经运河
+        via_canal = (origin in CANAL_NODES) or (dest in CANAL_NODES)
         rows.append([vno, str(vessel_idx), origin, dest,
                      etd.strftime("%Y-%m-%d %H:%M:%S"),
-                     eta.strftime("%Y-%m-%d %H:%M:%S"), status])
+                     eta.strftime("%Y-%m-%d %H:%M:%S"), status,
+                     via_canal])
     return rows
 
 
@@ -476,11 +489,20 @@ def _match_rule(rules_by_key, fee_type, category, weight, biz_date):
     return None
 
 
-def gen_fee_record(tariff_rows, waybills):
+def gen_fee_record(tariff_rows, waybills, canal_voyage_ids):
     """
     费用明细：每条运单按货类生成 1~3 项费用。
     金额 = 货重 × 单价（按业务日期命中的费率）。
-    过闸费说明：业务窗口中所有货流均经平陆运河，故过闸费为必收项。
+
+    过闸费说明（决策 C-18，**本函数的行为在 C-18 中已变更**）：
+      原先写死为必收项（"业务窗口中所有货流均经平陆运河"），这与航道事实矛盾——
+      实测有 56 个航次两端都不是运河节点。现在改为**只在所属航次的
+      voyage.via_canal 为真时收取**，与 voyage 表由同一口径驱动。
+
+      canal_voyage_ids：经运河的航次 id 集合（voyage 表 id 即插入顺序 1..N）。
+
+    ⚠️ 副作用：过闸费在 fee_record 中的占比会因此下降
+       （实测 29.05% → **28.57%**），相关文档数字须同步重算，不要沿用旧值。
     """
     rows = []
     cargo_map = {c[0]: c for c in CARGO_TYPES}
@@ -492,16 +514,21 @@ def gen_fee_record(tariff_rows, waybills):
         rules_by_key.setdefault((r[1], r[2]), []).append(r)
 
     for wb in waybills:
-        wno, cargo_code, weight_str, created_str = wb[0], wb[3], wb[4], wb[7]
+        wno, voyage_id = wb[0], wb[1]
+        cargo_code, weight_str, created_str = wb[3], wb[4], wb[7]
         weight = Decimal(weight_str)
         created = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
         biz_date = created.date()
         category = cargo_map[cargo_code][2]
         is_dangerous = cargo_map[cargo_code][3]
 
-        # 基础费用组合
-        # 过闸费：业务窗口中所有货流均经运河，故为必收项
-        fee_types = ["过闸费", "港杂费", "装卸费"]
+        # 基础费用组合。
+        # C-18 只改了**一件事**：不经运河的航次不再收过闸费。
+        # 其余费用类型及其顺序与 C-18 之前完全一致——
+        # 刻意不新增任何费用类型，否则就超出用户确认的范围了。
+        fee_types = ["港杂费", "装卸费"]
+        if str(voyage_id) in canal_voyage_ids:
+            fee_types.insert(0, "过闸费")
         if is_dangerous:
             fee_types.append("停泊费")
         if rng.random() < 0.25:
@@ -570,7 +597,7 @@ TABLES = [
     ("customer", ["customer_id", "name", "type", "credit_level", "contact"],
      "customer.csv"),
     ("voyage", ["voyage_no", "vessel_id", "origin_port", "dest_port", "etd", "eta",
-                "status"], "voyage.csv"),
+                "status", "via_canal"], "voyage.csv"),
     ("waybill", ["waybill_no", "voyage_id", "customer_id", "cargo_code",
                  "weight_ton", "freight_amount", "status", "created_at"],
      "waybill.csv"),
@@ -689,8 +716,16 @@ def main():
     waybill_rows = gen_waybill(voyage_rows)
     tariff_rows = gen_tariff_rule()
     doc_rows = gen_documents(waybill_rows)
-    fee_rows = gen_fee_record(tariff_rows, waybill_rows)
+    # 过闸费的收取依据必须与 voyage.via_canal 同源，否则又会出现
+    # 「两端非运河节点却收过闸费」的矛盾（C-18 要消除的正是这个）。
+    # voyage 的 id 即插入顺序（1..N），与 gen_waybill 里的 voyage_id 口径一致。
+    canal_voyage_ids = {str(idx + 1) for idx, v in enumerate(voyage_rows) if v[7]}
+    fee_rows = gen_fee_record(tariff_rows, waybill_rows, canal_voyage_ids)
     fill_waybill_freight(waybill_rows, fee_rows)
+
+    n_canal = len(canal_voyage_ids)
+    print(f"  经运河航次 : {n_canal:,} / {len(voyage_rows):,} "
+          f"({n_canal / len(voyage_rows) * 100:.2f}%)")
 
     data = {
         "port": port_rows, "lock": lock_rows, "cargo_type": cargo_rows,

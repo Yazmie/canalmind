@@ -146,7 +146,11 @@ if (-not $RepoRoot) {
 $psql = Join-Path $PgHome "bin\psql.exe"
 $createdb = Join-Path $PgHome "bin\createdb.exe"
 # 不使用 dropdb.exe：本脚本的重建走「删 schema」而非「删库」，原因见 Step 2。
-$ddl = Join-Path $RepoRoot "backend\src\main\resources\db\migration\V1__init_business_schema.sql"
+$migrationDir = Join-Path $RepoRoot "backend\src\main\resources\db\migration"
+# 按文件名升序执行全部迁移（V1、V2、…）。
+# 升序很重要：V2 依赖 V1 建好的 voyage 表。
+$migrations = @(Get-ChildItem -Path $migrationDir -Filter "V*.sql" -ErrorAction SilentlyContinue |
+                Sort-Object Name)
 $loadSql = Join-Path $RepoRoot "backend\scripts\seed_output\load_seed.sql"
 
 # 统一客户端编码，避免中文注释/数据乱码
@@ -166,8 +170,8 @@ foreach ($exe in @($psql, $createdb)) {
 }
 Good "PostgreSQL 工具齐备"
 
-if (-not (Test-Path $ddl)) {
-    Bad "找不到 DDL: $ddl"
+if ($migrations.Count -eq 0) {
+    Bad "在 $migrationDir 找不到任何 V*.sql 迁移文件"
     exit 1
 }
 Good "DDL 就位"
@@ -253,26 +257,34 @@ if ($exists -ne "1") {
 # 否则会出现「已重置」紧跟「未加 -Recreate」的自相矛盾输出。
 
 # ---------------------------------------------------------------------------
-Step 3 "执行 DDL"
+Step 3 "执行 DDL 迁移"
 # ---------------------------------------------------------------------------
-# 先看表是否已建。DDL 里的 CREATE TABLE 不是幂等的（未加 IF NOT EXISTS），
+# 先看表是否已建。V1 里的 CREATE TABLE 不是幂等的（未加 IF NOT EXISTS），
 # 重复执行必然报 "already exists"，这是预期行为而非错误。
-# 因此这里显式判断：已建表就跳过 DDL，让脚本可以安全重复运行，
+# 因此这里显式判断：已建表就跳过迁移，让脚本可以安全重复运行，
 # 而不是逼用户为了重跑一次就去 -Recreate 清库。
+#
+# ⚠️ 已知限制（记录而非隐藏）：本脚本**没有迁移账本**（类似 Flyway 的
+#    schema_history），所以「已有表就跳过全部迁移」意味着——
+#    对**已建库**新增的迁移（如 V2）不会自动应用，必须走 -Recreate 重建。
+#    对本项目可接受：库里全是可再生的仿真数据。
+#    正式项目应引入 Flyway 做增量迁移，此处记为后续改进项。
 $preTbl = [int]((Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
     '-tAc', "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")).Output)
 
 if ($preTbl -gt 0) {
-    Info "检测到已有 $preTbl 张表，跳过 DDL（如需重建请加 -Recreate）"
+    Info "检测到已有 $preTbl 张表，跳过迁移（如需重建请加 -Recreate）"
 } else {
-    $r = Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser,
-        '-d', $Database, '-q', '-v', 'ON_ERROR_STOP=1', '-f', $ddl)
-    if ($r.ExitCode -ne 0) {
-        Bad "DDL 执行失败"
-        Info $r.Output
-        exit 1
+    foreach ($mig in $migrations) {
+        $r = Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser,
+            '-d', $Database, '-q', '-v', 'ON_ERROR_STOP=1', '-f', $mig.FullName)
+        if ($r.ExitCode -ne 0) {
+            Bad "迁移执行失败: $($mig.Name)"
+            Info $r.Output
+            exit 1
+        }
+        Good "已应用迁移 $($mig.Name)"
     }
-    Good "DDL 执行完成"
 }
 
 $tblCount = (Invoke-Native $psql @('-w', '-h', $PgHost, '-p', "$PgPort", '-U', $PgUser, '-d', $Database,
