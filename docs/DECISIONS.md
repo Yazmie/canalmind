@@ -257,6 +257,11 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 且缺少 API Key 时才抛 `DeepSeek API key must be set`。
 **这说明 DeepSeek 自动配置在 Boot 3.5.9 上接线正确**，只差密钥与网络。
 
+> ✅ **后续已进一步验证（2026-09-19）**：`DeepSeekRequestShapeTest` 用本地桩服务器
+> 把请求形态也验了——路径、`Bearer` 鉴权头、请求体内容、流式增量均正确。
+> 现在**唯一未验证的只剩"到 DeepSeek 服务器的那一跳"**（需有效密钥与外网）。
+> 详见本文件变更日志与 README「已知未验证项」。
+
 ### P-06 详情：航线级「是否经运河」标记（2026-09-19 探针 7 实测发现）
 
 **发现过程**：编写 `backend/scripts/probe_domain_model.sql` 时，探针 7 想验证
@@ -463,6 +468,10 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 | 2026-09-19 | **实施 C-18：`voyage.via_canal` + 过闸费跟随（P-06 结案）** | 用户确认口径为「端点判定 + 过闸费跟随」。新增 `V2__add_voyage_via_canal.sql`；生成器写入 `via_canal` 并**只对经运河航次收过闸费**；`setup_local_db.ps1` 改为**按文件名升序应用全部 V*.sql 迁移**。实测：2,344 / 2,400 航次经运河（97.67%），非运河航线仅 `南宁港六景作业区 → 北海港`（56 航次 / 743 票）。**不变式 0 / 0 通过**（非运河航次不得收过闸费、运河航次不得漏收），原先「两端非运河节点却收过闸费」的矛盾消除 |
 | 2026-09-19 | **C-18 连带数字全部重算并更正** | 过闸费占比 29.05% → **28.57%**；全库 227,026 → **226,277** 行；`fee_record` 110,167 → **109,418** 行（-749）；`waybill` 32,000 不变。已更正 `docs/数据模型-ER图.md`（表行数、口径表、实测分布、装载校验）、`README.md`、`DECISIONS.md` C-13/C-14 行。**探针 7 从"报告缺口"改写为"验证不变式"**，并把期望总量更新为 226,277 |
 | 2026-09-19 | **记录 setup 脚本的迁移限制（不隐藏）** | 脚本**没有迁移账本**（类 Flyway 的 schema_history），故"已有表即跳过全部迁移"意味着对已建库新增的迁移（如 V2）不会自动应用，必须走 `-Recreate`。对全为可再生仿真数据的项目可接受，已作为后续改进项写入脚本注释 |
+| 2026-09-19 | **新增调用链测试：用本地桩 DeepSeek 验证真实请求形态（测试数 28 → 34）** | 真实密钥与联网调用在开发环境无法验证，但"接线错"与"联不上网"是**两个独立失败原因**，必须分开验证。新增 `DeepSeekRequestShapeTest`：用 JDK 自带 `HttpServer` 起本地桩，把 `spring.ai.deepseek.base-url` 指过去，断言**真正发出去的请求**——路径 `/chat/completions`、`Authorization: Bearer <key>`、请求体含 `stream:true` / 模型名 / 系统提示词 / `temperature`，并校验 4 个桩增量产生 **4 个** `token` 事件。**实测全过** |
+| 2026-09-19 | **⚠️ 重要实测结论：本项目不需要 Netty 也能流式** | 类路径实测 110 个构件，HTTP 客户端相关**只有** `reactor-core` 与 `spring-webflux`，**没有 Netty / Apache HttpClient / OkHttp**。而 Spring AI 流式走 `WebClient`——按常识"没有传输层实现会失败或退化为整体缓冲"，但实测**两者都不是**：Boot 自动配置的 **JDK HttpClient 连接器**接管，且增量**逐个 flush 到达**。故**不要**为流式引入 `starter-webflux`/Netty。该结论由测试持续守护，避免后续升级悄悄打断链路 |
+| 2026-09-19 | **观测事实记录：上游未声明 `Accept: text/event-stream`** | 实测 Spring AI 发的是 `Accept: */*`，**流式由请求体的 `stream:true` 决定**，不靠 Accept 协商。排障时看到 `*/*` 不必怀疑流式没开。已写入 README 与测试注释，避免下次重复排查 |
+| 2026-09-19 | **⛔ 阻塞记录：pgvector 安装需管理员权限（非沙箱限制）** | 用户已下载 pgvector **0.8.0** 源码到 `D:\Project_AI\downloads\pgvector`（版本已核验，满足 C-15）。但 `build_pgvector.ps1` 在写权限检查处**失败**：`D:\APP\PostgreSQL\18\share\extension` 的 ACL 仅授予 `TrustedInstaller` / `SYSTEM` / `Administrators`，当前用户无写权限。**这是真实的 Windows ACL 限制，不是工具沙箱限制**（已实测直写报 `Access to the path ... is denied`），故不能靠提权沙箱绕过，须由用户在**管理员终端**执行。pgvector 仅影响第 2 周向量入库，**不阻塞第 1 周** |
 
 ---
 

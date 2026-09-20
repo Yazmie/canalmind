@@ -283,7 +283,13 @@ canalmind/                          ← git 仓库根（main 分支）
 其 ByteBuddy agent 在受限沙箱内无法自附加。追加参数即可：
 `-DargLine=-javaagent:<本地仓库>/org/mockito/mockito-core/5.17.0/mockito-core-5.17.0.jar`
 
-通过测试结果：`Tests run: 28, Failures: 0, Errors: 0`，`mvn` 退出码 0。
+通过测试结果：`Tests run: 34, Failures: 0, Errors: 0`，`mvn` 退出码 0。
+
+**⚠️ 本项目不需要 Netty**（实测）：类路径上只有 `spring-webflux` + `reactor-core`，
+**没有 Netty / Apache HttpClient / OkHttp**，但 Spring AI 的流式调用仍能工作——
+`WebClient` 借 Spring Boot 自动配置的 **JDK HttpClient 连接器**发请求，
+且增量**逐个到达**（非整体缓冲）。故**不要**为了"流式"去引入 `starter-webflux` 或 Netty。
+该结论由 `DeepSeekRequestShapeTest`（本地桩 DeepSeek）持续守护。
 
 ---
 
