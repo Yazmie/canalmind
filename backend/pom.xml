@@ -88,6 +88,38 @@
       <version>${spring-ai.version}</version>
     </dependency>
 
+    <!-- ===== 持久化（第 2 周检索通道：PgVector 入库）===== -->
+    <!--
+      为什么到这里才引入（第 1 周刻意不引，注释保留以示变化）：
+      第 1 周交付物是"可流式对话的空壳服务"，那时引入 DataSource 会让应用
+      因找不到数据库口令而启动失败，反而破坏"可运行"这一条。
+      第 2 周做检索通道，入库/校验必须连库，故此时加入。
+
+      ⚠️ 版本一律交给上面的 spring-boot-dependencies（3.5.9）BOM 管理，**不写版本号**
+      （与 starter-web / starter-test 的写法一致）：
+        - spring-boot-starter-jdbc → 3.5.9（传递 HikariCP 6.3.3 + spring-jdbc 6.2.15）
+        - org.postgresql:postgresql → **42.7.8**（BOM 属性 postgresql.version
+          = 42.7.8，见 spring-boot-dependencies-3.5.9.pom 第 159 行）
+      已实测本机缓冲仓库（.m2repo）中两者都存在，故离线构建可用。
+
+      ⚠️ 刻意**不引入**的两个：
+        - flyway-core：本项目的迁移用 `psql -f` 手工应用（见 docs/进度看板.md §5），
+          引入它会让应用启动时自动跑迁移，与"手工应用 + 无迁移账本"的现状冲突；
+        - mybatis-plus：属于结构化查询通道（第 3 周），检索通道用不到。
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <!--
+      PostgreSQL JDBC 驱动。用 compile 而非 runtime：PgVectorIngestCli 是独立
+      命令行入口，驱动必须出现在 `dependency:build-classpath` 产出的类路径上。
+    -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+
     <!-- ===== 测试 ===== -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -95,13 +127,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <!--
-    注：持久化（PostgreSQL + MyBatis-Plus + Redis）按规格书第 1 周范围**暂不引入**。
-    第 1 周交付物是"可流式对话的空壳服务"，此时引入 DataSource 会让应用
-    因找不到数据库口令而启动失败，反而破坏"可运行"这一条。
-    第 2 周做结构化查询通道与检索通道时再加入。
-  -->
 
   <build>
     <plugins>
