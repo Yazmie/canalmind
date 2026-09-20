@@ -162,6 +162,7 @@ $bat = @"
 @echo off
 call "$vcvars"
 if errorlevel 1 exit /b 1
+set "PGROOT=$PgHome"
 cd /d "$SourceDir"
 nmake /F Makefile.win clean
 nmake /F Makefile.win

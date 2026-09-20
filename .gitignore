@@ -38,6 +38,11 @@ docs/求职备战笔记.md
 backend/target/
 **/target/
 *.class
+
+# 工作区内的离线 Maven 仓库副本（约 1 GB，为受限/离线环境准备）
+# 生成方式见 AGENTS.md §7.1：复制全局仓库 + 跑 scripts/fix_repo_tracking.py 统一来源 id
+# ⛔ 绝不可提交：既巨大，又是可再生的第三方构件
+backend/.m2repo/
 *.jar
 !**/.mvn/wrapper/maven-wrapper.jar
 *.war
