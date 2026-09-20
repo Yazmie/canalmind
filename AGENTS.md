@@ -299,18 +299,37 @@ canalmind/                          ← git 仓库根（main 分支）
 两者都对了，`java -version` 才有输出。**报"'java' 不是内部或外部命令"时，
 先查 `PATH`，不要只盯着 `JAVA_HOME`。**
 
-**坑 2：本机 Machine PATH 曾被引号损坏（已定位，待用户修复）**
+**坑 2：本机 Machine PATH 曾被引号损坏（2026-09-20 已定位并修复）**
 
-实测 Machine `Path` 原始值中存在一对**不配对的引号**，把两条 Java 8 路径包成了一整条非法条目：
+实测 Machine `Path` 原始值中存在一对**引号**，把两条 Java 路径包成了一整条非法条目：
 
 ```
-...D:\APP\cursor\resources\app\bin;"C:\Users\夏目贵志\.jdks\corretto-1.8.0_482\bin;
-   C:\Users\夏目贵志\.jdks\corretto-1.8.0_482\jre\bin;";D:\Go\bin;
+...D:\APP\cursor\resources\app\bin;"%JAVA_HOME%\bin;%JAVA_HOME%\jre\bin;";%GOROOT%\bin;
+                              ↑                                            ↑
 ```
 
-⚠️ **修复时绝对不要用 `setx PATH`**：`setx` 在 1024 字符处截断，
-而本机 Machine `Path` 实测已有 **999 字符**——用 `setx` 会把 PATH 直接截断损坏。
-必须用「系统属性 → 环境变量」GUI，或 `[Environment]::SetEnvironmentVariable(...,'Machine')`（需管理员）。
+**后果**：Windows 解析出的不是两个目录，而是一个名叫
+`"%JAVA_HOME%\bin;%JAVA_HOME%\jre%\bin;"` 的**不存在的目录**，
+于是 `%JAVA_HOME%\bin` 永远轮不到被搜索——**这就是 `java` 报"不是内部或外部命令"的真正原因**。
+
+**为什么难发现（重要教训）**：引号附着在条目的**首尾边缘**，而人读的是中间有意义的文字。
+在「系统属性 → 环境变量」的 `Path` 列表里，它会显示成一条以 `"` 开头的行
+加一条只有孤零零 `"` 的行。**排查时要用注册表原生查询，不要只信界面里读到的文字**：
+
+```powershell
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path
+```
+
+⚠️ **修复时绝对不要用 `setx PATH`**：`setx` 在 1024 字符处静默截断。
+（修复前本机 Machine `Path` 实测 999 字符，离截断线只差 25 字符；修复后为 **911 字符**。）
+必须用 GUI，或 `[Environment]::SetEnvironmentVariable(...,'Machine')`（需管理员）。
+
+**修复后的正确状态（2026-09-20 实测复核）**：`Path` 引号 0 个，
+展开后 `java` 唯一解析到 `D:\JDKmove\ms-21.0.12.1\bin\java.exe`（无 Java 8 抢占）。
+
+**顺带确认：嵌套引用可用**。本机用 `JAVA_HOME = %JAVA21_HOME%` 做了一层间接：
+`JAVA_HOME`（`REG_EXPAND_SZ`）→ `%JAVA21_HOME%` → `D:\JDKmove\ms-21.0.12.1`，
+实测**能正确展开**。好处是切换 JDK 版本只改一处（`JAVA17_HOME` / `JAVA21_HOME` 已并存）。
 
 **坑 3：JDK 目录名会变，别把它写死**
 
