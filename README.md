@@ -132,9 +132,26 @@ cp .env.example .env   # 填入 DEEPSEEK_API_KEY
 ```
 
 > ⚠️ `.env` 里的 `DEEPSEEK_API_KEY` **不会**被 Spring AI 自动读取。
-> `application.yml` 中已用 `${DEEPSEEK_API_KEY:}` 显式桥接到 Spring AI 真正读取的
-> `spring.ai.deepseek.api-key`。若密钥留空，应用会**启动即失败**并提示
-> `DeepSeek API key must be set`——这是刻意设计，避免等到第一次问答才暴露问题。
+> **密钥是怎么进到应用里的**（这一步踩过坑，别删）：
+> Spring Boot **不会自动读取 `.env`**。仅写 `${DEEPSEEK_API_KEY:}` 占位符是不够的——
+> 占位符只从「进程环境变量 / JVM 系统属性 / 已加载的配置源」取值，而 `.env` 默认不在其中。
+> 因此 `application.yml` 里用 **`spring.config.import`** 把 `.env` 当 properties 文件**显式导入**：
+>
+> ```yaml
+> spring:
+>   config:
+>     import:
+>       - "optional:file:./.env[.properties]"    # 在仓库根跑 jar 时命中
+>       - "optional:file:../.env[.properties]"   # 在 backend/ 跑 mvn 时命中
+> ```
+>
+> 两个路径都写是因为**工作目录随启动方式变化**；`optional:` 让文件缺失时不报错。
+> 导进来的 `DEEPSEEK_API_KEY` 再由 `${}` 桥接到 Spring AI 真正读取的
+> `spring.ai.deepseek.api-key`。
+>
+> 若密钥仍为空，应用会**启动即失败**并提示 `DeepSeek API key must be set`——
+> 这是刻意设计，避免等到第一次问答才暴露问题。
+> 也可以完全不用 `.env`，直接用真实环境变量覆盖（环境变量优先级更高）。
 
 **2. 启动后端**（本项目未提供 `mvnw`，用本机 Maven；**须先让 `java` 命令可用**）
 
@@ -302,8 +319,11 @@ canalmind/
 > 它们证明"请求发得对、流式确实在流、换行转义在协议层成立"，
 > **不证明"回答是准的"**。后者要等第 4 周评测报告。
 >
-> ⚠️ **唯一未经我验证的一步**：到 DeepSeek 服务器的那一跳（需要有效密钥与外网）。
-> 请求的正确性已由桩服务器验证到网络边界；真实连通性请按上方 `curl` 步骤自行确认。
+> ✅ **真实 DeepSeek 调用已跑通（2026-09-20 实测）**：用有效密钥向真实 API 发起流式问答，
+> 返回 **182 个分片 / 3.7 秒**，`event:done` 报 `{"chunks":182,"elapsedMs":3712}`。
+> 同时验证：中文 UTF-8 在链路上**未乱码**、`data:` 与 `event:` **严格 1:1**、**零游离行**（事件边界未被换行破坏）、
+> 真实模型输出中的换行确实以**字面量 `\n`** 下发。
+> 这一跳此前被记为"未验证"，现已闭合。
 
 **已知建模缺口**（记录而非隐藏）：
 

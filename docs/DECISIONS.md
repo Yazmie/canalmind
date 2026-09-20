@@ -258,10 +258,15 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 且缺少 API Key 时才抛 `DeepSeek API key must be set`。
 **这说明 DeepSeek 自动配置在 Boot 3.5.9 上接线正确**，只差密钥与网络。
 
-> ✅ **后续已进一步验证（2026-09-19）**：`DeepSeekRequestShapeTest` 用本地桩服务器
-> 把请求形态也验了——路径、`Bearer` 鉴权头、请求体内容、流式增量均正确。
-> 现在**唯一未验证的只剩"到 DeepSeek 服务器的那一跳"**（需有效密钥与外网）。
-> 详见本文件变更日志与 README「已知未验证项」。
+> ✅ **后续已完全验证（2026-09-20）**：`DeepSeekRequestShapeTest` 用本地桩服务器把请求形态验了
+> （路径、`Bearer` 鉴权头、请求体内容、流式增量），**并且真实 DeepSeek 调用也已跑通**——
+> 182 个分片 / 3.7 秒，中文 UTF-8 未乱码、`data:` 与 `event:` 严格 1:1、零游离行、
+> 真实输出中的换行以字面量 `\n` 下发。详见本文件变更日志与 README。
+>
+> ⚠️ **更正我先前的错误结论**：我曾记「本环境出网 TLS 被封，无法验证真实调用」。
+> 该结论**只对 PowerShell / .NET 成立**（它们报"安全包中没有可用的凭证"），
+> **对 JVM 不成立**——Java 的 TLS 栈可正常连通 `api.deepseek.com`。
+> 教训：**不要把某一运行时的网络失败推广成"整个环境不能出网"**；换运行时（这里是 JVM）实测才是准的。
 
 ### P-06 详情：航线级「是否经运河」标记（2026-09-19 探针 7 实测发现）
 
@@ -477,6 +482,9 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 | 2026-09-20 | **勘误同步到文档** | 更正 `AGENTS.md` §5.1/§7 的 JDK 记录，新增 §7.3「本机 JDK 环境的两个坑」；`README.md` 启动步骤补充 `JAVA_HOME`/`PATH` 自检；`DECISIONS.md` C-11 行与 P-01 验证表同步标注勘误 |
 | 2026-09-20 | **✅ PATH 引号损坏已修复并复核通过** | 用户按 GUI 步骤修复后，我用**注册表原生查询**复核：`Path` 引号 **0 个**（修复前 2 个）；长度 999 → **911 字符**；展开后 java 相关条目 `D:\JDKmove\ms-21.0.12.1\bin` **目录存在**；模拟新终端沿展开后 Path 搜索，`java.exe` **唯一命中** `D:\JDKmove\ms-21.0.12.1\bin\java.exe`，版本 **21.0.12.1**，无 Java 8 抢占；`%MAVEN_HOME%\bin` 亦正常。**附带确认**：嵌套引用 `JAVA_HOME=%JAVA21_HOME%`（`REG_EXPAND_SZ`）**能正确展开**，故保留该间接层（切 JDK 只改一处）。另查明 `%JAVA_HOME%\jre\bin` 为**死条目**——JDK 9+ 已无内嵌 `jre` 子目录（实测 `ms-21.0.12.1` 下仅 `bin/conf/include/jmods/legal/lib`），留着无害但易误导 |
 | 2026-09-20 | **排查方法教训（已写入 AGENTS §7.3）** | 本次耗时最久的环节是**读数方式**：`.NET [Environment]::GetEnvironmentVariable(...,'Machine')` 返回了**旧快照**（让我一度误判），而 `reg query` 才反映真实注册表值。故结论：**排查环境变量一律以 `reg query` 为准**，并**逐字符检查 `"`**（引号附着在条目首尾边缘，人读中间文字时极易漏掉）。此外曾误以为 `JAVA_HOME` 指向不存在路径，实为用户正在编辑中——**读取时机**同样会影响判断 |
+| 2026-09-20 | **🐛 修复真实缺陷：`.env` 从未被 Spring Boot 读取（B 类，已告知）** | 用户填好密钥后启动仍报 `DeepSeek API key must be set`。**根因是我此前的设计缺陷**：`.env` 是**社区惯例而非 Spring 特性**，Spring Boot **不会自动读取它**；`application.yml` 里只写 `${DEEPSEEK_API_KEY:}` 占位符无效——占位符只从「进程环境变量 / JVM 系统属性 / 已加载的配置源」取值。**修复**：在 `application.yml` 增加 `spring.config.import`，把 `.env` 当 properties 文件显式导入，并**同时写 `./` 与 `../` 两个路径**（工作目录随启动方式变化：`cd backend && mvn spring-boot:run` 命中 `../`，仓库根跑 jar 命中 `./`），用 `optional:` 前缀保证文件缺失不报错。零新增依赖。**备选方案**（保留）：完全不用 `.env`，直接用真实环境变量（优先级更高）。**已验证**：修复后应用**启动成功**（`Started CanalMindApplication in 1.893 seconds`），无密钥报错 |
+| 2026-09-20 | **✅✅ 真实 DeepSeek 调用跑通 —— 第 1 周最后一项闭合** | 首次成功调用真实 API：**182 个分片 / 3712 毫秒**，`event:done` 报 `{"chunks":182,"elapsedMs":3712}`；返回为语义连贯的真实模型输出（助手自我介绍 + 业务能力列表）。**同时验证并留证**：①中文 UTF-8 在链路上**未乱码**（用 `curl -o` 落盘后以 UTF-8 解码校验）；②`data:` 与 `event:` **严格 1:1**（31/31）；③**零游离行**，事件边界未被换行破坏；④真实模型输出中的换行确实以**字面量 `\n`** 下发。至此 SSE 转义契约不再是"只在桩上成立"，而是在**真实输出**上成立 |
+| 2026-09-20 | **⚠️ 更正我的错误结论：并非"环境不能出网"** | 我曾记录「本环境出网 TLS 被封，无法验证真实调用，需用户自行确认」。该结论**只对 PowerShell / .NET 成立**（报"安全包中没有可用的凭证"），**对 JVM 不成立**——Java 的 TLS 栈可正常连通 `api.deepseek.com`。**教训**：不要把某个运行时的网络失败推广为"整个环境做不了"；**换运行时实测**才是准的。此更正已同步到 `AGENTS.md` §7.2、README 与 P-01 章 |
 
 ---
 

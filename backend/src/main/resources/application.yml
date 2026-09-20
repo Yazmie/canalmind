@@ -1,9 +1,15 @@
 # ============================================================
 # CanalMind 后端配置
 #
-# ⚠️ 关键：Spring AI 读的配置键是 `spring.ai.deepseek.*`，
-#    它**不会**自动读取 .env 里的 DEEPSEEK_API_KEY。
-#    因此下面用 ${} 占位符显式桥接。
+# ⚠️ 关键（踩过一次坑，务必先读）：
+#    Spring Boot **不会自动读取 .env 文件**。仅仅在下面写 `${DEEPSEEK_API_KEY:}`
+#    占位符是没用的——占位符只从「进程环境变量 / JVM 系统属性 / 已加载的配置源」
+#    取值，而仓库根目录那个 .env 默认不在其中。
+#    所以必须在 spring.config.import 里把它**显式导入**（见下），
+#    ${} 桥接才会有值。曾因缺这一步，启动直接报
+#    `DeepSeek API key must be set`，即使 .env 里密钥填得好好的。
+#
+#    Spring AI 读的配置键是 `spring.ai.deepseek.*`，
 #    属性名来源（非猜测）：spring-ai-autoconfigure-model-deepseek-1.1.2.jar
 #      → META-INF/spring-configuration-metadata.json（共 23 个属性）
 # ============================================================
@@ -11,11 +17,22 @@ spring:
   application:
     name: canalmind-api
 
+  config:
+    # 把 .env 当 properties 文件导入（.env 的 `KEY = VALUE` 语法与 properties 兼容）。
+    # 两个路径都写，因为「工作目录」会随启动方式变化：
+    #   - `cd backend && mvn spring-boot:run`  → 工作目录是 backend/，命中 ../
+    #   - 在仓库根跑 `java -jar backend/target/*.jar` → 命中 ./
+    # 用 optional: 前缀是刻意的：文件不存在时不报错（例如他人 clone 后还没建 .env），
+    # 而是让下面的密钥占位符留空——由 Spring AI 快速失败给出清晰报错。
+    import:
+      - "optional:file:./.env[.properties]"
+      - "optional:file:../.env[.properties]"
+
   ai:
     deepseek:
-      # 从 .env / 环境变量注入。留空时应用会**快速失败**并提示
-      # "DeepSeek API key must be set"，这是刻意的——宁可启动就报错，
-      # 也不要等到第一次问答才失败。
+      # 来自上一步导入的 .env；也可用真实环境变量覆盖（环境变量优先级更高）。
+      # 留空时应用会**快速失败**并提示 "DeepSeek API key must be set"，
+      # 这是刻意的——宁可启动就报错，也不要等到第一次问答才失败。
       api-key: ${DEEPSEEK_API_KEY:}
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
       chat:

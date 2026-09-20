@@ -283,6 +283,26 @@ canalmind/                          ← git 仓库根（main 分支）
 其 ByteBuddy agent 在受限沙箱内无法自附加。追加参数即可：
 `-DargLine=-javaagent:<本地仓库>/org/mockito/mockito-core/5.17.0/mockito-core-5.17.0.jar`
 
+**⚠️ Spring Boot 不会自动读取 `.env`（踩过，务必先读）**：`.env` 是**社区惯例，不是 Spring 特性**。
+仅写 `${DEEPSEEK_API_KEY:}` 占位符**完全无效**——占位符只从「进程环境变量 / JVM 系统属性 /
+已加载的配置源」取值，而仓库根的 `.env` 默认不在其中。表现是**密钥填得好好的，却仍报
+`DeepSeek API key must be set`**。正确写法是在 `application.yml` 里显式导入：
+
+```yaml
+spring:
+  config:
+    import:
+      - "optional:file:./.env[.properties]"    # 在仓库根跑 jar 时命中
+      - "optional:file:../.env[.properties]"   # 在 backend/ 跑 mvn spring-boot:run 时命中
+```
+
+两个路径都写，是因为**工作目录随启动方式变化**；`optional:` 使文件缺失时不报错。
+`.env` 的 `KEY = VALUE` 语法与 `.properties` 兼容，故可直接当 properties 导入。
+
+⚠️ **不要把某个运行时的网络失败当成"整个环境不能出网"**：实测 PowerShell / .NET 访问
+`https://api.deepseek.com` 报"安全包中没有可用的凭证"，但**JVM 可正常连通**，
+真实调用一次成功（182 分片 / 3.7 秒）。**换运行时实测才是准的**，别急着下"做不了"的结论。
+
 通过测试结果：`Tests run: 34, Failures: 0, Errors: 0`，`mvn` 退出码 0。
 
 **⚠️ 本项目不需要 Netty**（实测）：类路径上只有 `spring-webflux` + `reactor-core`，
