@@ -206,7 +206,7 @@ canalmind/                          ← git 仓库根（main 分支）
 
 | 项 | 实测结果 | 说明 |
 |---|---|---|
-| JDK | **21.0.1 LTS** @ `D:\JDKmove\JDK21` | 决策 C-11。默认 `JAVA_HOME` 仅 Java 8，**不可用** |
+| JDK | **21.0.12.1 LTS** @ `D:\JDKmove\ms-21.0.12.1` | 决策 C-11。原记录的 `D:\JDKmove\JDK21` **已不存在**，见 §7.3 |
 | Maven | 3.9.12 @ `D:\APP\apache-maven-3.9.12` | 本地 `.m2` 已缓存 Spring Boot 3.5.0 |
 | PostgreSQL | **18.4**，服务 `postgresql-x64-18` 运行于 5432 | 决策 C-12 |
 | pgvector | ❌ 未安装 → 需源码编译 **0.8.x**（PG18 不兼容 0.7 及以下） | 决策 C-15 |
@@ -231,7 +231,7 @@ canalmind/                          ← git 仓库根（main 分支）
 
 | 项 | 版本 | 确定日期 |
 |---|---|---|
-| JDK | **21.0.1 LTS**（`D:\JDKmove\JDK21`） | 2026-09-18 |
+| JDK | **21.0.12.1 LTS**（`D:\JDKmove\ms-21.0.12.1`） | 2026-09-20（更正，见 §7.3） |
 | PostgreSQL | **18.4**（本机服务，端口 5432） | 2026-09-18 |
 | pgvector | **0.8.x**（须源码编译；**禁止 0.7 及以下**，不兼容 PG18） | 2026-09-18 |
 | Redis | 5.0.14.1（本机） | 2026-09-18 |
@@ -290,6 +290,34 @@ canalmind/                          ← git 仓库根（main 分支）
 `WebClient` 借 Spring Boot 自动配置的 **JDK HttpClient 连接器**发请求，
 且增量**逐个到达**（非整体缓冲）。故**不要**为了"流式"去引入 `starter-webflux` 或 Netty。
 该结论由 `DeepSeekRequestShapeTest`（本地桩 DeepSeek）持续守护。
+
+### 7.3 ⚠️ 本机 JDK 环境的两个坑（2026-09-20 实测，务必先读）
+
+**坑 1：`JAVA_HOME` 与 `PATH` 是两件独立的事**
+
+设了 `JAVA_HOME` **不会**让 `java` 命令变得可用——`PATH` 里必须有 `%JAVA_HOME%\bin`。
+两者都对了，`java -version` 才有输出。**报"'java' 不是内部或外部命令"时，
+先查 `PATH`，不要只盯着 `JAVA_HOME`。**
+
+**坑 2：本机 Machine PATH 曾被引号损坏（已定位，待用户修复）**
+
+实测 Machine `Path` 原始值中存在一对**不配对的引号**，把两条 Java 8 路径包成了一整条非法条目：
+
+```
+...D:\APP\cursor\resources\app\bin;"C:\Users\夏目贵志\.jdks\corretto-1.8.0_482\bin;
+   C:\Users\夏目贵志\.jdks\corretto-1.8.0_482\jre\bin;";D:\Go\bin;
+```
+
+⚠️ **修复时绝对不要用 `setx PATH`**：`setx` 在 1024 字符处截断，
+而本机 Machine `Path` 实测已有 **999 字符**——用 `setx` 会把 PATH 直接截断损坏。
+必须用「系统属性 → 环境变量」GUI，或 `[Environment]::SetEnvironmentVariable(...,'Machine')`（需管理员）。
+
+**坑 3：JDK 目录名会变，别把它写死**
+
+本机 JDK 位于 `D:\JDKmove\` 下，目录名形如 `ms-21.0.12.1`（**带 `.intellij` 标记文件，
+说明由 IntelliJ 管理**）。原先记录的 `D:\JDKmove\JDK21` **已不存在**。
+⛔ **不要把 JDK 绝对路径硬编码进脚本或文档而不再复核**：
+每次用之前先 `Test-Path` 确认，或直接用 `JAVA_HOME` 引用。
 
 ---
 

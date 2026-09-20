@@ -136,11 +136,20 @@ cp .env.example .env   # 填入 DEEPSEEK_API_KEY
 > `spring.ai.deepseek.api-key`。若密钥留空，应用会**启动即失败**并提示
 > `DeepSeek API key must be set`——这是刻意设计，避免等到第一次问答才暴露问题。
 
-**2. 启动后端**（本项目未提供 `mvnw`，用本机 Maven；**须先将 `JAVA_HOME` 指向 JDK 21**）
+**2. 启动后端**（本项目未提供 `mvnw`，用本机 Maven；**须先让 `java` 命令可用**）
 
 ```bash
 cd backend && mvn spring-boot:run
 ```
+
+> ⚠️ **`JAVA_HOME` 与 `PATH` 是两件独立的事**——只设 `JAVA_HOME` 不会让 `java` 命令出现，
+> `PATH` 里还要有 `%JAVA_HOME%\bin`。本机实测踩过这个坑，排查过程见 `AGENTS.md` §7.3。
+> 快速自检：
+>
+> ```bash
+> echo %JAVA_HOME%     # 应指向 JDK 21 目录，且该目录必须真实存在
+> java -version        # 应输出 21.x；报"不是内部或外部命令"就是 PATH 没配好
+> ```
 
 **3. 验证流式接口**
 

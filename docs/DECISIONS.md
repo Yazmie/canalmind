@@ -33,7 +33,8 @@
 | C-08 | 2026-09-18 | Git 基础设置 | `main` 分支；`core.quotepath=false`（中文文件名正常）；`core.autocrlf=false` + `.gitattributes` 统一 LF | 原 `init.defaultBranch` 未设会默认 `master`；全文件原为 LF，若不锁会在 Windows 产生全仓库换行噪音 | 全局（提交干净度） |
 | C-09 | 2026-09-18 | 仿真数据入库方式 | 只提交 **schema migration + seed 生成脚本**，不提交 bulk dump | 3–5 万行数据可由脚本重现，仓库轻量且数据可版本化 | `backend/`、`data/` |
 | C-10 | 2026-09-18 | **规格书拆分（公开/私有边界）** | 规格书拆为「工程规格（公开）」+「求职备战笔记（本地私有）」；求职内容移入 `docs/求职备战笔记.md` 并加入 `.gitignore` | push 前审查发现：已提交的规格书含实习状态、秋招时间线、简历话术、面试问答（20 处"面试"/9 处"简历"），**与 C-07 决策冲突**；且引用了被 gitignore 的 `岗位介绍.txt`，形成悬空引用。拆分后公开仓库读起来是工程文档，且消除冲突 | 规格书全文、`.gitignore`、`README.md`、`AGENTS.md` §3 |
-| C-11 | 2026-09-18 | **JDK 版本** | **JDK 21**（`D:\JDKmove\JDK21`，实测 21.0.1 LTS） | 环境实测默认仅 Java 8（`JAVA_HOME` 指向 corretto-1.8.0_482），**不满足 Spring Boot 3+/Spring AI 的 Java 17+ 要求**；用户提供本机 JDK 21，已验证可用 | 全局（编译、Maven、IDEA 配置） |
+| C-11 | 2026-09-18 | **JDK 版本** | **JDK 21**（实测 **21.0.12.1 LTS** @ `D:\JDKmove\ms-21.0.12.1`）**⚠️ 路径已更正，见下方勘误** | 环境实测默认仅 Java 8（`JAVA_HOME` 指向 corretto-1.8.0_482），**不满足 Spring Boot 3+/Spring AI 的 Java 17+ 要求**；用户提供本机 JDK 21，已验证可用。**决策本身（用 JDK 21）未变**，仅路径与补丁版本随环境变化更正 | 全局（编译、Maven、IDEA 配置） |
+| ↳ **C-11 勘误** | 2026-09-20 | 同上 | 原记录 `D:\JDKmove\JDK21`（21.0.1）**已不存在**；实际为 `D:\JDKmove\ms-21.0.12.1`（21.0.12.1，含 `.intellij` 标记，由 IntelliJ 管理） | 用户报 `java -version` 报"不是内部或外部命令"。排查发现**三个叠加问题**：①`JAVA_HOME` 与 `PATH` 是独立设置，设了前者不会让 `java` 可用；②Machine `Path` 存在**不配对引号**，把两条 Java 8 路径包成一条非法条目（详见 `AGENTS.md` §7.3）；③记录的 JDK 路径已失效。已用真实路径 `D:\JDKmove\ms-21.0.12.1` **重跑全部 34 项测试通过**（`mvn` 退出码 0） | `AGENTS.md` §5.1/§7/§7.3、构建脚本引用 |
 | C-12 | 2026-09-18 | **运行环境不依赖 Docker** | 用**本机 PostgreSQL 18.4 + 本机 Redis**，弃用 Docker Compose | 环境实测**未安装 Docker**（命令不存在，WSL 受限）。而本机 PG18.4 已运行于 5432、Redis 5.0.14.1 已装。已写的 `docker-compose.yml` 保留作为可选方案（供他人 clone 后使用），但不作为本项目主路径 | `docker-compose.yml`、启动文档、`AGENTS.md` §5 |
 | C-13 | 2026-09-18 | **仿真数据时间窗（P-04）** | **通航后一年**：`2026-09-16 ~ 2027-09-15`，系统「今天」= 2027-09-15 | 运河 2026-09-16 才通航，真实今天仅 09-18。窗口截至今日时实测运河业务仅 0.92%、过闸费仅 0.30%，运河专项评测题无数据支撑。后移后过闸费占费用 29.05%（**C-18 后为 28.57%**，因非运河航次不再收过闸费）。**代价**：数据集为前瞻模拟而非历史真实数据，README 须主动交底 | `generate_seed_data.py`、`docs/数据模型-ER图.md`、README 数据声明 |
 | C-14 | 2026-09-18 | **仿真数据规模（P-03）** | 核心事实表 `waybill` **32,000 行**，全库 227,026 行（**C-18 后为 226,277 行**，`fee_record` 减少 749 行） | 落在规格书 §2.2「核心表 3–5 万行」区间内；其余表由 waybill 派生。数据量使索引与聚合查询具有真实意义 | `generate_seed_data.py`、`docs/数据模型-ER图.md` |
@@ -169,7 +170,7 @@ Spring AI **1.1.2** 在本机仓库中**没有 PgVector store**：
 | Spring Boot | **3.5.9**（缓存内最高；3.5.8/3.5.9 的 `starter-parent` 缺失，故用 `spring-boot-dependencies` 导入方式） |
 | Spring AI | **1.1.2**（`spring-ai-starter-model-deepseek` 可解析） |
 | Spring Framework | Boot 3.5.9 锁 **6.2.15**，而 Spring AI 1.1.2 的 POM 引用 **6.2.14**。实测**两者兼容**，构建与运行均正常（Spring AI 只用到稳定 API） |
-| JDK | 21.0.1 |
+| JDK | 21.0.1（**勘误 2026-09-20**：路径已变为 `D:\JDKmove\ms-21.0.12.1`，实测 **21.0.12.1**；见 C-11 勘误） |
 
 **2）⚠️ 两个必须先知道的依赖坑**
 
@@ -472,6 +473,8 @@ spring.ai.deepseek.chat.enabled     spring.ai.deepseek.chat.completions-path
 | 2026-09-19 | **⚠️ 重要实测结论：本项目不需要 Netty 也能流式** | 类路径实测 110 个构件，HTTP 客户端相关**只有** `reactor-core` 与 `spring-webflux`，**没有 Netty / Apache HttpClient / OkHttp**。而 Spring AI 流式走 `WebClient`——按常识"没有传输层实现会失败或退化为整体缓冲"，但实测**两者都不是**：Boot 自动配置的 **JDK HttpClient 连接器**接管，且增量**逐个 flush 到达**。故**不要**为流式引入 `starter-webflux`/Netty。该结论由测试持续守护，避免后续升级悄悄打断链路 |
 | 2026-09-19 | **观测事实记录：上游未声明 `Accept: text/event-stream`** | 实测 Spring AI 发的是 `Accept: */*`，**流式由请求体的 `stream:true` 决定**，不靠 Accept 协商。排障时看到 `*/*` 不必怀疑流式没开。已写入 README 与测试注释，避免下次重复排查 |
 | 2026-09-19 | **⛔ 阻塞记录：pgvector 安装需管理员权限（非沙箱限制）** | 用户已下载 pgvector **0.8.0** 源码到 `D:\Project_AI\downloads\pgvector`（版本已核验，满足 C-15）。但 `build_pgvector.ps1` 在写权限检查处**失败**：`D:\APP\PostgreSQL\18\share\extension` 的 ACL 仅授予 `TrustedInstaller` / `SYSTEM` / `Administrators`，当前用户无写权限。**这是真实的 Windows ACL 限制，不是工具沙箱限制**（已实测直写报 `Access to the path ... is denied`），故不能靠提权沙箱绕过，须由用户在**管理员终端**执行。pgvector 仅影响第 2 周向量入库，**不阻塞第 1 周** |
+| 2026-09-20 | **勘误：JDK 路径与版本（C-11）** | 用户报 `java -version` 报"不是内部或外部命令"，排查出**三个叠加问题**：①**`JAVA_HOME` ≠ `PATH`**——只设 `JAVA_HOME` 不会让 `java` 命令可用，`PATH` 里还要有 `%JAVA_HOME%\bin`；②**Machine `Path` 被引号损坏**——实测有一对**不配对引号**把两条 Java 8 路径包成一整条非法条目（`..."C:\...\corretto-1.8.0_482\bin;...\jre\bin;"...`），故连 Java 8 也解析不到；③**原记录的 `D:\JDKmove\JDK21` 已不存在**，真实路径为 `D:\JDKmove\ms-21.0.12.1`（21.0.12.1，IntelliJ 管理）。**决策不变（仍用 JDK 21）**，仅更正路径与补丁版本。⚠️ 已同时记录：**切勿用 `setx PATH` 修复**（1024 字符截断，本机 Machine `Path` 已 999 字符，会直接截断损坏）。已用真实路径**重跑 34 项测试全过**（`mvn` 退出码 0） |
+| 2026-09-20 | **勘误同步到文档** | 更正 `AGENTS.md` §5.1/§7 的 JDK 记录，新增 §7.3「本机 JDK 环境的两个坑」；`README.md` 启动步骤补充 `JAVA_HOME`/`PATH` 自检；`DECISIONS.md` C-11 行与 P-01 验证表同步标注勘误 |
 
 ---
 
