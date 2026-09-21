@@ -1,0 +1,341 @@
+{
+  "datasetId": "canalmind-golden-rewrite",
+  "datasetVersion": "v1",
+  "layer": "L2-RW",
+  "layerName": "多轮查询改写（Query Rewrite 消融专用）",
+  "createdAt": "2026-09-22",
+  "decision": "C-50",
+  "purpose": "回答 D8（检索类查询改写策略）：在真实多轮追问场景下，「把省略/指代问句改写成独立可检索问句」这一步对检索指标有多少增益。",
+  "design": {
+    "totalItems": 16,
+    "devItems": 16,
+    "holdoutItems": 0,
+    "split": "全部 dev",
+    "holdoutRule": "本子集**不含任何 holdout 条目**，也不得从 L2 的 holdout 里取题；第 4 周的改写调参与阈值选择只能用本文件的 16 条（知识库《AI 应用评测体系》第 88 行；AGENTS §6 第 4 条）。",
+    "arms": {
+      "A-noRewrite": "直接用 turns 最后一句（原始省略问句）去检索 —— 这是**不做改写**的基线",
+      "B-humanRewrite": "用 standaloneQuery（人工标注的独立可检索问句）去检索 —— **改写的上界**（不受 LLM 改写质量影响）",
+      "C-llmRewrite": "用 LLM 依据前文改写出的问句去检索 —— 真实方案；与 B 的差 = **改写器的损失**（付费臂，执行前另报预估）"
+    },
+    "metric": "严格口径（只算 goldChunkIds）：HitRate@k / MRR@k / Precision@m；⛔ 不与 L2 的 40 条混算，两套数据集的分母与口径必须分开报",
+    "whyTwoArmsFirst": "先把 A（无改写）与 B（人工改写上界）跑出来，就能**零付费**知道「这一层有没有可赚的增益」；⚠️ 若 A 与 B 无差，说明本项目的追问场景里改写没有价值，**就不必再花 C 臂的钱**。",
+    "goldSource": "**复用 `golden-l2-v2.json` 中已人工核验过的 goldChunkIds**（`goldFrom` 字段指明来源条目），⛔ 不手工另标 —— 本项目已因「gold 标错」把标注错误写成了系统的已知限制，故宁可用已验证的 gold。",
+    "relationToL2": "⚠️ **与被测查询的关系（如实声明）**：本子集的 **turns[0] / turns[1] 两句题面均为本轮自写**，⛔ **没有复用任何 L2 题面**（C-50 方案要求）。但 `standaloneQuery` 是对「省略问句补全后」的标注，它**在语义上与 L2 某条题面同指同一条款** —— 正因为同指，才能合法复用那条的已验证 gold。⇒ 被测对象是**自写的省略问句**，复用的只是**答案位置的标注**。",
+    "ellipsisKinds": {
+      "指代": "用「它 / 这两者 / 这种」等代词回指前文实体",
+      "省略": "承前省掉实体、版本、吨位、货类等关键限定词"
+    }
+  },
+  "items": [
+    {
+      "id": "RW-001",
+      "split": "dev",
+      "questionType": "T6-版本冲突",
+      "topicClass": "B",
+      "goldFrom": "L2-005",
+      "turns": [
+        {"turn": 1, "question": "我这边要运一批建材过闸，想按 2026 年那版费率表算钱，先跟你确认一下。"},
+        {"turn": 2, "question": "那 300 吨这一档呢？每吨收多少？"}
+      ],
+      "standaloneQuery": "建材类货物在 2026 年版费率表中，300 吨档位每吨收取的过闸费是多少？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["建材类货物", "2026 年版费率表"],
+        "mustRecover": "货类=建材 + 费率版本=2026 版 + 档位=300 吨"
+      },
+      "goldChunkIds": ["c5badd5949feccdb"],
+      "note": "两臂都缺「建材 + 2026 版」就无法定位到正确档位；⚠️ 与 RW-002 构成**同问法不同版本**对照，用来观察改写是否会把版本带错。"
+    },
+    {
+      "id": "RW-002",
+      "split": "dev",
+      "questionType": "T6-版本冲突",
+      "topicClass": "B",
+      "goldFrom": "L2-040",
+      "turns": [
+        {"turn": 1, "question": "同样还是这批建材，如果改成按 2027 年那版费率表算呢？"},
+        {"turn": 2, "question": "300 吨这档是多少？"}
+      ],
+      "standaloneQuery": "建材类货物在 2027 年版费率表中，300 吨档位每吨收取的过闸费是多少？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["建材类货物", "2027 年版费率表"],
+        "mustRecover": "货类=建材 + 费率版本=2027 版 + 档位=300 吨"
+      },
+      "goldChunkIds": ["1287a36aaae7400e"],
+      "note": "与 RW-001 的差异**只在版本**（2026 → 2027），是「改写必须把版本一起带过去」的最强探针。"
+    },
+    {
+      "id": "RW-003",
+      "split": "dev",
+      "questionType": "T1-精确数值",
+      "topicClass": "E",
+      "goldFrom": "L2-001",
+      "turns": [
+        {"turn": 1, "question": "我这条船是 3000 总吨的，准备靠码头。"},
+        {"turn": 2, "question": "缆绳至少要准备几根？对粗细有要求吗？"}
+      ],
+      "standaloneQuery": "3000 总吨的船舶靠码头时，缆绳至少需要准备几根，对缆绳粗细有什么要求？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["3000 总吨"],
+        "mustRecover": "吨位档=3000 总吨"
+      },
+      "goldChunkIds": ["174355c01152002a"],
+      "note": "省略的是**决定档位的吨位**；不带吨位检索容易落到别的吨位档。"
+    },
+    {
+      "id": "RW-004",
+      "split": "dev",
+      "questionType": "T1-精确数值",
+      "topicClass": "E",
+      "goldFrom": "L2-002",
+      "turns": [
+        {"turn": 1, "question": "另外一条船是 5000 总吨的，也要靠泊。"},
+        {"turn": 2, "question": "需要叫几艘拖轮？"}
+      ],
+      "standaloneQuery": "5000 总吨的船舶靠泊时，需要安排几艘拖轮协助？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["5000 总吨"],
+        "mustRecover": "吨位档=5000 总吨"
+      },
+      "goldChunkIds": ["57845177c9078fea"],
+      "note": "与 RW-003 同族（靠泊辅助），省略的都是吨位档。"
+    },
+    {
+      "id": "RW-005",
+      "split": "dev",
+      "questionType": "T1-精确数值",
+      "topicClass": "G",
+      "goldFrom": "L2-003",
+      "turns": [
+        {"turn": 1, "question": "我手上这批箱子都是 40 尺的。"},
+        {"turn": 2, "question": "折成 20 尺标准箱算几个？"}
+      ],
+      "standaloneQuery": "一个 40 尺集装箱折算成 20 尺标准箱是几个？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["40 尺"],
+        "mustRecover": "箱型=40 尺"
+      },
+      "goldChunkIds": ["478b4874ea637b9f"],
+      "note": "省略箱型后，「折算成标准箱」的倍数完全无从确定 ⇒ 改写是**必需**而非优化。"
+    },
+    {
+      "id": "RW-006",
+      "split": "dev",
+      "questionType": "T1-精确数值",
+      "topicClass": "B",
+      "goldFrom": "L2-006",
+      "turns": [
+        {"turn": 1, "question": "有船要在港区停几天，停泊费是按天收的。"},
+        {"turn": 2, "question": "如果不满一天呢？怎么算？"}
+      ],
+      "standaloneQuery": "停泊费按天计算时，船舶停泊不满一天应如何计费？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["停泊费", "船舶停泊场景"],
+        "mustRecover": "费用项=停泊费 + 计费规则=按天"
+      },
+      "goldChunkIds": ["17e9f565fab8e33a"],
+      "acceptableChunkIds": ["35d44beac402dec0"],
+      "note": "「不满一天」本身不含费用项名词 ⇒ 不带「停泊费」检索会漂到别的时限条款。"
+    },
+    {
+      "id": "RW-007",
+      "split": "dev",
+      "questionType": "T1-精确数值",
+      "topicClass": "D",
+      "goldFrom": "L2-007",
+      "turns": [
+        {"turn": 1, "question": "我这条是 800 总吨的机动货船。"},
+        {"turn": 2, "question": "船员最少配几个人？分别是什么岗位？"}
+      ],
+      "standaloneQuery": "800 总吨的机动货船，船员最低配备人数是多少，分别是什么岗位？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["800 总吨", "机动货船"],
+        "mustRecover": "吨位=800 总吨 + 船型=机动货船"
+      },
+      "goldChunkIds": ["ee85fc8e4f9f8e25"],
+      "note": "省略吨位与船型两个限定词；船员配备表按吨位分档，缺了档位就选不中行。"
+    },
+    {
+      "id": "RW-008",
+      "split": "dev",
+      "questionType": "T2-时效",
+      "topicClass": "A",
+      "goldFrom": "L2-008",
+      "turns": [
+        {"turn": 1, "question": "这趟装的是危险货物，得先办过闸申报。"},
+        {"turn": 2, "question": "最晚得提前多久交上去？"}
+      ],
+      "standaloneQuery": "装载危险货物的船舶，过闸申报最晚应提前多长时间提交？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["危险货物", "过闸申报"],
+        "mustRecover": "货物性质=危险货物 + 事项=过闸申报"
+      },
+      "goldChunkIds": ["e68438ba2724ceda"],
+      "acceptableChunkIds": ["3aca6c885fec32e5"],
+      "note": "⚠️ 该题是 **BM25 已实测的难点**（危险货物时限条目易被单证类长表压过）⇒ 对改写质量更敏感，两臂差异应更明显。"
+    },
+    {
+      "id": "RW-009",
+      "split": "dev",
+      "questionType": "T2-时效",
+      "topicClass": "C",
+      "goldFrom": "L2-010",
+      "turns": [
+        {"turn": 1, "question": "危险货物的申报材料我已经交齐了。"},
+        {"turn": 2, "question": "多久必须给审核结果？"}
+      ],
+      "standaloneQuery": "危险货物申报材料交齐后，多长时间内必须给出审核结果？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["危险货物申报"],
+        "mustRecover": "业务=危险货物申报 + 触发点=材料交齐"
+      },
+      "goldChunkIds": ["68cf9ddfc794f8fb"],
+      "note": "「材料交齐」这个起算点在多个时限条款里都出现 ⇒ 缺业务名会串到别的时限。"
+    },
+    {
+      "id": "RW-010",
+      "split": "dev",
+      "questionType": "T2-时效",
+      "topicClass": "C",
+      "goldFrom": "L2-011",
+      "turns": [
+        {"turn": 1, "question": "我们这票走的是超限过闸，申请已经报上去了。"},
+        {"turn": 2, "question": "材料交齐之后多久能拿审批结论？"}
+      ],
+      "standaloneQuery": "超限过闸申请材料交齐后，多长时间能取得审批结论？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["超限过闸"],
+        "mustRecover": "业务=超限过闸 + 触发点=材料交齐"
+      },
+      "goldChunkIds": ["e90e23cfa776f802"],
+      "acceptableChunkIds": ["6f801a69c6ebaa8d"],
+      "note": "与 RW-009 **同形不同业务**（都是「材料交齐后多久」）⇒ 是「改写必须带对业务名」的对照探针。"
+    },
+    {
+      "id": "RW-011",
+      "split": "dev",
+      "questionType": "T2-时效",
+      "topicClass": "F",
+      "goldFrom": "L2-013",
+      "turns": [
+        {"turn": 1, "question": "我们提交了一笔退费申请。"},
+        {"turn": 2, "question": "多少天能到账？从哪天开始算？"}
+      ],
+      "standaloneQuery": "退费申请提交后多少天能实际到账，该天数从哪一天起算？",
+      "ellipsis": {
+        "kind": "省略",
+        "dropped": ["退费申请"],
+        "mustRecover": "业务=退费 + 关注点=到账天数与起算点"
+      },
+      "goldChunkIds": ["2e424aa95a385a79"],
+      "acceptableChunkIds": ["9ff2f4f40062536f"],
+      "note": "⚠️ 与 L2-038（争议复核 15 个工作日）是**相近数字不同起算点**的易混对 ⇒ 改写若丢了业务名，极易串题。"
+    },
+    {
+      "id": "RW-012",
+      "split": "dev",
+      "questionType": "T3-条件组合",
+      "topicClass": "A",
+      "goldFrom": "L2-019",
+      "turns": [
+        {"turn": 1, "question": "我这条船船宽 33 米。"},
+        {"turn": 2, "question": "这算超限吗？过闸的时候该怎么走？"}
+      ],
+      "standaloneQuery": "船宽 33 米的船舶是否属于超限，若属于应如何安排过闸？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["船宽 33 米"],
+        "mustRecover": "判定条件=船宽 33 米"
+      },
+      "goldChunkIds": ["7f83bb32ecaf43ac"],
+      "acceptableChunkIds": ["5bb6009ef183a309"],
+      "note": "「这算超限吗」用「这」回指 33 米 ⇒ 典型指代型改写；⛔ 不带 33 米无法判定。"
+    },
+    {
+      "id": "RW-013",
+      "split": "dev",
+      "questionType": "T3-条件组合",
+      "topicClass": "E",
+      "goldFrom": "L2-021",
+      "turns": [
+        {"turn": 1, "question": "我们码头在安排靠离泊作业，气象和能见度这两个条件先不考虑。"},
+        {"turn": 2, "question": "除此之外还有哪些情况不能开工？"}
+      ],
+      "standaloneQuery": "除气象和能见度条件之外，还有哪些情形不允许开始靠泊或离泊作业？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["靠离泊作业", "气象与能见度条件"],
+        "mustRecover": "作业类型=靠离泊 + 已排除条件=气象/能见度"
+      },
+      "goldChunkIds": ["b2a96121d3e014ea"],
+      "note": "「除此之外」是**指代整段前文**的引用 ⇒ 不还原前文则完全无法检索。"
+    },
+    {
+      "id": "RW-014",
+      "split": "dev",
+      "questionType": "T4-术语定义",
+      "topicClass": "G",
+      "goldFrom": "L2-023",
+      "turns": [
+        {"turn": 1, "question": "费率文件里老提到「重点保供物资」这个说法。"},
+        {"turn": 2, "question": "它到底指什么？包含哪几类货？"}
+      ],
+      "standaloneQuery": "「重点保供物资」的定义是什么，范围包含哪几类货物？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["重点保供物资"],
+        "mustRecover": "术语=重点保供物资"
+      },
+      "goldChunkIds": ["1ae0c13a0e2e0226"],
+      "acceptableChunkIds": ["c4e6a1fc22ca9ced"],
+      "note": "「它」回指一个**长术语** ⇒ 改写必须把完整术语还原，否则术语定义类条款检索不到。"
+    },
+    {
+      "id": "RW-015",
+      "split": "dev",
+      "questionType": "T4-术语定义",
+      "topicClass": "G",
+      "goldFrom": "L2-028",
+      "turns": [
+        {"turn": 1, "question": "费率文件里同时出现了 GT 和 DWT 两个吨位口径。"},
+        {"turn": 2, "question": "这两者有什么区别？过闸费到底按哪个收？"}
+      ],
+      "standaloneQuery": "GT 与 DWT 的区别是什么，过闸费按哪一个吨位口径计收？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["GT", "DWT"],
+        "mustRecover": "待比较术语=GT 与 DWT"
+      },
+      "goldChunkIds": ["caea297390e5ebf9"],
+      "note": "「这两者」回指两个缩写词 ⇒ 缩写在省略后几乎不可能被检索命中。"
+    },
+    {
+      "id": "RW-016",
+      "split": "dev",
+      "questionType": "T5-出处与文号",
+      "topicClass": "D",
+      "goldFrom": "L2-033",
+      "turns": [
+        {"turn": 1, "question": "像费用结算单这类单证，我们归档时要按规矩来。"},
+        {"turn": 2, "question": "最少得保存多少年？"}
+      ],
+      "standaloneQuery": "费用结算单这类单证最少需要保存多少年？",
+      "ellipsis": {
+        "kind": "指代",
+        "dropped": ["费用结算单"],
+        "mustRecover": "单证类型=费用结算单"
+      },
+      "goldChunkIds": ["39f4d3c6300934b8"],
+      "note": "「这类单证」指代成本结算单 ⇒ 归档年限按单证种类分档，缺了种类选不中行。"
+    }
+  ]
+}
