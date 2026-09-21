@@ -87,13 +87,17 @@ class L4RunCliTest {
     }
 
     @Test
-    @DisplayName("压缩桩：一旦被调用必须抛，且计数可核对（本轮不允许它静默生效）")
+    @DisplayName("压缩桩：一旦被调用必须抛，且计数可核对（本运行器尚未接线，不允许它静默生效）")
     void forbiddenSummarizerThrowsLoudly() {
         L4RunCli.ForbiddenSummarizer s = new L4RunCli.ForbiddenSummarizer();
         assertEquals(0, s.calls());
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> s.summarize("", List.of(SessionTurn.of(1, "q", "a", "STRUCTURED"))));
-        assertTrue(e.getMessage().contains("D10"), "抛出信息必须指明是 D10 未决导致的，便于排查");
+        // ⚠️ 断言的理由文字随 C-53 更新：不再是「D10 未决」，而是「生产实现已就绪但本运行器尚未接线」。
+        //    判据本身没变——**抛出信息必须指明原因**，否则排查时只看到"不该触发"却不知为何。
+        assertTrue(e.getMessage().contains("C-53"),
+                "抛出信息必须指明原因（C-53：生产实现已就绪、本运行器尚未接线），便于排查");
+        assertTrue(e.getMessage().contains("尚未接线"), "理由要写清楚是「没接线」而不是「没实现」");
         assertEquals(1, s.calls(), "被调用过就必须计数，⛔ 不能静默");
     }
 
