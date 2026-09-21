@@ -42,11 +42,17 @@ import java.util.Map;
  * 其中 {@code 【最近原始参数】} 块正是 **C-38** 的落点——它保证"上一轮的原始参数"
  * 永不被摘要吃掉，因为改写本轮参数**必须以它为唯一出处**。
  *
- * <p>⚠️ **压缩路径在本轮刻意不启用**：{@link ContextSummarizer} 的生产实现就是决策 **D10**
- * （知识库 `上下文工程` 第 172 行给了滑动窗口 / Compaction / 结构化笔记三条路线，尚未定），
- * 故这里注入一个**一旦被调用就抛异常**的桩，并把"是否触发过"记进产物。
- * 好处：①不替用户预先拍定 D10；②把"2 轮对话不会触发压缩"这句话**变成可核对的实测**，
- * 而不是一句说法。若真触发了，运行器会**响亮地失败**，⛔ 不会静默换成某个没定的摘要口径。
+ * <p>⚠️ **压缩路径在本运行器里默认仍不启用**：{@link ContextSummarizer} 的生产实现已落地
+ * （{@code LlmContextSummarizer}），且 **D10 已由用户裁定**（决策 **C-53**：**做 Compaction**）。
+ * ⚠️ **但本运行器尚未接线**——用户裁定发生于第 19 轮的完成度审计，接线属于随后一步。
+ * 故此处仍然注入一个**一旦被调用就抛异常**的桩，并把"是否触发过"记进产物。
+ * 好处：①**不悄悄改变既有 L4 产物的口径**（切换摘要口径会让新旧产物不可比）；
+ * ②把"2 轮对话通常不会触发压缩"这句话**变成可核对的实测**，而不是一句说法。
+ * 若真触发了，运行器会**响亮地失败**，⛔ 不会静默换成某个未定口径。
+ *
+ * <p>⚠️ **待办（C-53 的收口条件）**：把本桩换成 {@code LlmContextSummarizer}，并以**显式开关**
+ * 控制（默认关＝保持既有行为）；且必须补上"**压缩真的折叠了轮次**"的证据
+ * （{@code AssembledContext.compacted == true} 且轮次数确实减少），⛔ 不能只看"跑成功了"。
  */
 public final class L4RunCli {
 
@@ -57,7 +63,13 @@ public final class L4RunCli {
     private static final int REPORT_WIDTH = 72;
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    /** 压缩桩：**被调用即抛**（理由见类注释：D10 未决，不替用户拍定摘要口径）。 */
+    /**
+     * 压缩桩：**被调用即抛**。
+     *
+     * <p>⚠️ 理由已随 **C-53** 更新：不再是"D10 未决"，而是"**本运行器尚未接线**"——
+     * 生产实现 {@code LlmContextSummarizer} 已就绪，接线时须以**显式开关**控制，
+     * 以免悄悄改变既有 L4 产物的口径（新旧摘要口径不同则产物不可比）。
+     */
     static final class ForbiddenSummarizer implements ContextSummarizer {
         private int calls;
 
@@ -65,7 +77,7 @@ public final class L4RunCli {
         public String summarize(String previousSummary, List<SessionTurn> toCompact) {
             calls++;
             throw new IllegalStateException("L4 上压缩路径不应被触发（触发即意味着窗口预算不足）；"
-                    + "D10（上下文超限处理）尚未决策，故本运行器不提供摘要口径。"
+                    + "生产实现已就绪（C-53），但本运行器**尚未接线**，故此处不提供摘要口径。"
                     + "待压缩轮次=" + toCompact.size());
         }
 
