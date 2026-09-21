@@ -96,4 +96,33 @@ public final class PromptVersions {
         byName(raw);
         return raw.trim();
     }
+
+    /**
+     * **v2 只对哪一层生效**——C-51 已确认的口径是「**只改 L5 一层**」。
+     *
+     * <p>⚠️ 把目标层写死在这里，是为了让"只改 L5"成为**代码里的机械保证**：
+     * 任何非 L5 的层**都不可能**取到 v2，于是这条纪律不再依赖调用方自觉。
+     * 本项目已经有过多处"注释里写了 ⛔，实现却仍按别的口径跑"的教训。
+     */
+    public static final String V2_TARGET_LAYER = "L5";
+
+    /**
+     * 取**某一层**实际应使用的系统提示词。
+     *
+     * <p>规则：未选 v2 ⇒ 一律 v1；选了 v2 ⇒ **只有 {@link #V2_TARGET_LAYER} 拿到 v2**，其余层仍是 v1。
+     * ⇒ L3 / L6 的既有产物**不会**因为这次实验而失去出处（它们跑的还是 v1）。
+     *
+     * @param layer 层名（L1…L6）；为 null 或非目标层时返回 v1
+     */
+    public static String forLayer(String layer, Map<String, String> env) {
+        if (!V2.equals(versionName(env))) {
+            return v1();
+        }
+        return V2_TARGET_LAYER.equals(layer) ? v2() : v1();
+    }
+
+    /** 该层实际生效的**版本名**（写进产物与报告，便于溯源）。 */
+    public static String versionNameForLayer(String layer, Map<String, String> env) {
+        return V2.equals(versionName(env)) && V2_TARGET_LAYER.equals(layer) ? V2 : V1;
+    }
 }

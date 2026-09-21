@@ -70,6 +70,30 @@ class PromptVersionsTest {
     }
 
     @Test
+    @DisplayName("⛔「只改 L5」必须是机械保证：选了 v2，非 L5 的层也**不可能**拿到 v2")
+    void v2IsScopedToL5() {
+        Map<String, String> v2sel = Map.of(PromptVersions.ENV_KEY, "v2");
+
+        // 目标层拿到 v2
+        assertEquals(PromptVersions.v2(), PromptVersions.forLayer("L5", v2sel));
+        assertEquals(PromptVersions.V2, PromptVersions.versionNameForLayer("L5", v2sel));
+
+        // ⚠️ 其余层**必须原样是 v1** —— 否则 L3/L6 的既有产物会因这次实验失去出处
+        for (String other : new String[] {"L1", "L2", "L3", "L4", "L6", "l5", "L5 ", null}) {
+            assertEquals(PromptVersions.v1(), PromptVersions.forLayer(other, v2sel),
+                    "层「" + other + "」不得拿到 v2——本轮口径是只改 L5");
+            assertEquals(PromptVersions.V1, PromptVersions.versionNameForLayer(other, v2sel));
+        }
+
+        // 未选 v2 时，**任何层**（含 L5）都是 v1
+        for (String any : new String[] {"L1", "L3", "L5", "L6"}) {
+            assertEquals(PromptVersions.v1(), PromptVersions.forLayer(any, Map.of()),
+                    "未选 v2 时不该有任何层被改动");
+            assertEquals(PromptVersions.V1, PromptVersions.versionNameForLayer(any, Map.of()));
+        }
+    }
+
+    @Test
     @DisplayName("⛔ 版本名拼错必须抛异常，不得静默回退成 v1")
     void unknownVersionThrows() {
         // 静默回退会让"v2 的结论"其实是 v1 的结果——正是本项目反复出现的「合法但错」
