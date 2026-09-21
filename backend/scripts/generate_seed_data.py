@@ -40,10 +40,18 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import random
+import sys
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+
+# 语料费率表解析器（C-31：费率的**唯一事实来源**）。
+# 同目录模块，故直接把脚本所在目录放进 sys.path——这样无论从哪个工作目录
+# 调用本脚本（setup_local_db.ps1 / 手工 python backend\scripts\…）都能导入。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import corpus_tariff  # noqa: E402  (必须在 sys.path 调整之后导入)
 
 # ---------------------------------------------------------------------------
 # 全局参数
@@ -180,42 +188,47 @@ VESSEL_DWT_RANGE = {
     "驳船":      (800, 2000),
 }
 
+# vessel 的列序（**唯一真源**：CSV 表头、TABLES 声明、按下标取值的代码都引它）。
+# 为什么要这样：gross_tonnage 是 C-31 新增的列，若各处各写一份列序，
+# 下标就会漂移——"取到 built_year 当总吨位"这种错误不会报错，只会静默算错费率。
+VESSEL_COLS = ["vessel_id", "name", "vessel_type", "deadweight_ton",
+               "gross_tonnage", "draft_m", "owner_id", "built_year"]
+VESSEL_IDX_GROSS_TON = VESSEL_COLS.index("gross_tonnage")
+
+# 船舶总吨位与载重吨的换算（**数据生成约定，不是语料规则**）
+# 语料 `25` 第十一条只规定"总吨位是容积指标、以检验证书载明为准、不等同于载重吨"，
+# 并未给出换算关系；仿真数据取固定系数 0.55（干散货船的量级），
+# 使总吨位与载重吨正相关但**不相等**——否则就与"不等同于载重吨"这一条相矛盾。
+GROSS_TON_FACTOR = Decimal("0.55")
+
 FEE_TYPES = ["过闸费", "港杂费", "装卸费", "引航费", "停泊费"]
 
-# 计费规则单价基准（元/吨），按费用类型
-BASE_UNIT_PRICE = {
-    "过闸费":  Decimal("1.20"),
-    "港杂费":  Decimal("3.50"),
-    "装卸费":  Decimal("8.00"),
-    "引航费":  Decimal("0.80"),
-    "停泊费":  Decimal("0.35"),
-}
+# ---------------------------------------------------------------------------
+# ⚠️ 费率取值不再在这里定义 —— 唯一来源是语料（决策 C-31，2026-09-22）
+# ---------------------------------------------------------------------------
+# 原先此处有 BASE_UNIT_PRICE / CATEGORY_FACTOR / RATE_CHANGE_DATES / TON_BANDS
+# 四组常量，用公式 `基准 × 货类系数 × 档位折扣 × 1.015^期数` **造**费率。
+# 实测它与语料费率表在**四个维度上同时不同**（档位 0/1000/3000 vs 0/500/2000/5000、
+# 建材 1.02 vs 2.55 元/吨、引航费按货类 vs 按船舶总吨位、港杂费 元/吨 vs 元/次），
+# 而 docs/规则语料/README.md §4 早就声称两者必须一致 —— 规则写了、检查没做。
+#
+# 现在费率一律来自 `backend/scripts/corpus_tariff.py`（解析语料费率表），
+# 并由 `backend/scripts/verify_corpus_db_rates.py` 独立复核，因此**结构上不可能再漂移**。
 
-# 货类调节系数（重货便宜、轻抛货/危险品贵）
-CATEGORY_FACTOR = {
-    "建材":   Decimal("0.85"),
-    "能源":   Decimal("1.00"),
-    "金属":   Decimal("0.95"),
-    "农资":   Decimal("1.10"),
-    "化工":   Decimal("1.60"),
-    "集装箱": Decimal("1.35"),
-    "其他":   Decimal("1.20"),
-}
+# 减免与附加（语料锚点，⛔ 不得凭记忆改动）
+RELIEF_CATEGORIES = frozenset({"能源", "农资", "化工"})
+#   重点保供物资 = 能源/农资/化工三个货类大类：`04-重点物资优先过闸规定` 第三条（完整枚举）
+RELIEF_FACTOR = Decimal("0.70")
+#   过闸费按 70% 计收：`06` 第十三条 / `07` 第十一条
+RELIEF_FEE_TYPES = frozenset({"过闸费"})     # 减免条款只出现在过闸费费率表内
+SURCHARGE_FACTOR = Decimal("1.30")
+#   危险货物加收 30%：`06` 第十四条、`07` 第十二条（过闸费）、`09` 第六条 1（港杂费）
+SURCHARGE_FEE_TYPES = frozenset({"过闸费", "港杂费"})
+#   ⚠️ 两条系数同为乘法且**末尾统一四舍五入到分**（`06` 第十五条 3 / `07` 第十三条、
+#      `09` 第六条 4），故"先减免后附加"与"先附加后减免"结果相同 —— 无顺序歧义。
 
-# 费率调整事件：每次调价形成一个新版费率（须落在业务窗口内）
-RATE_CHANGE_DATES = [
-    date(2026, 9, 16),   # 通航日起按新费率执行
-    date(2027, 1, 1),
-    date(2027, 4, 1),
-    date(2027, 7, 1),
-]
-
-# 吨位分段（防重叠：相邻段的 [min, max) 严格衔接）
-TON_BANDS = [
-    (Decimal("0"),    Decimal("1000"), "小吨位"),
-    (Decimal("1000"), Decimal("3000"), "中吨位"),
-    (Decimal("3000"), None,            "大吨位"),
-]
+# 弃用的旧常量（保留一行说明，避免后续会话"重新发明"）：
+#   BASE_UNIT_PRICE / CATEGORY_FACTOR / RATE_CHANGE_DATES / TON_BANDS  → 见 C-31
 
 SURNAMES = "赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜"
 COMPANY_SUFFIX = ["物流有限公司", "航运有限公司", "贸易有限公司", "供应链管理有限公司",
@@ -289,7 +302,11 @@ def gen_vessel():
         draft = Decimal(str(round(min(6.5, max(1.5, dwt / 1000 * 0.9 + rng.uniform(0.2, 0.9))), 2)))
         owner = rng.randint(1, N_CUSTOMER)
         year = rng.randint(2005, 2026)
-        rows.append([vid, name, vtype, str(dwt), q(draft), str(owner), str(year)])
+        # 船舶总吨位（C-31 新增）：语料规定引航费、停泊费按它分档
+        # （`25` 第十二条 / `08` 第二条），缺了它这两类费用算不出来。
+        gross_ton = int((Decimal(dwt) * GROSS_TON_FACTOR).to_integral_value(rounding=ROUND_HALF_UP))
+        rows.append([vid, name, vtype, str(dwt), str(max(1, gross_ton)),
+                     q(draft), str(owner), str(year)])
     return rows
 
 
@@ -376,58 +393,149 @@ def gen_waybill(voyages):
     return rows
 
 
-def gen_tariff_rule():
+def gen_tariff_rule(rules):
     """
-    费率规则：吨位段 × 生效期 双重切分，保证任意两条不重叠。
+    费率规则：**由语料费率表派生**（决策 C-31），不再由公式生成。
 
-    对每个 (fee_type, cargo_category)：
-      - 用 TON_BANDS 把 [0, ∞) 划成互不相交的吨位段
-      - 用 RATE_CHANGE_DATES 把时间划成互不相交的生效期
-      - 每个吨位段各生成一整串生效期
-    这样任意两条规则要么吨位段不相交、要么生效期不相交，
-    EXCLUDE 约束必然通过。
+    语料锚点：`docs/规则语料/06`、`07`（过闸费两版）、`08`（引航费/停泊费）、
+    `09`（港杂费/装卸费）。解析与断言见 `corpus_tariff.py`：
+      - 档位必须从 0 开始、严格衔接、末档不封顶；
+      - 生效期必须按左闭右开 `[from, to)` 首尾相接（C-36① 已把 `06` 统一到这条口径）；
+      - 计费单位与计费吨位口径必须符合 `25` 第二十七条 / 第十二条。
 
-    过闸费说明：运河 2026-09-16 才通航，而业务窗口起点即通航日，
-    因此所有费用类型（含过闸费）共用同一套调价日序列，无需特殊处理。
+    产出列顺序须与下面 TABLES 里的 tariff_rule 声明一致。
     """
     rows = []
-    seq = 0
-    categories = sorted({c[2] for c in CARGO_TYPES})
+    for r in rules:
+        rows.append([
+            r.rule_code, r.fee_type, r.cargo_category, r.min_ton,
+            r.max_ton if r.max_ton is not None else "",
+            r.unit_price, r.unit, r.effective_from,
+            r.effective_to if r.effective_to else "",
+            r.tonnage_basis,
+        ])
+    return rows
 
-    for fee_type in FEE_TYPES:
-        periods = list(RATE_CHANGE_DATES)
 
-        for cat in categories:
-            for band_i, (bmin, bmax, _bname) in enumerate(TON_BANDS):
-                for period_i, start in enumerate(periods):
-                    seq += 1
-                    rule_code = f"TR{fee_type[:2]}{cat[:1]}{band_i}{period_i}{seq:04d}"
+def _fee_amount(unit, unit_price, tonnage, days):
+    """按计费单位算金额（语料 `25` 第二十七条的三种单位）。
 
-                    eff_from = start
-                    # 生效期：从 start 到下个调价日前一天；最后一个开放
-                    if period_i + 1 < len(periods):
-                        eff_to = periods[period_i + 1] - timedelta(days=1)
-                    else:
-                        eff_to = None
-                    if eff_to is not None and eff_to < eff_from:
-                        continue
+    元/吨   ⇒ 吨位 × 单价          （过闸费、装卸费）
+    元/次   ⇒ 单价                 （引航费、港杂费）
+    元/吨天 ⇒ 吨位 × 单价 × 天数    （停泊费）
+    ⛔ 不用 float：金额是可审计字段，浮点误差会让"对账"失去意义。
+    """
+    if unit == "元/吨":
+        return tonnage * unit_price, "吨位 × 单价"
+    if unit == "元/次":
+        return unit_price, "固定单次费率"
+    if unit == "元/吨天":
+        return tonnage * unit_price * days, "吨位 × 单价 × 天数"
+    raise ValueError(f"未知计费单位：{unit}")
 
-                    # 单价：基准 × 货类系数 × 吨位折扣 × 期间调价系数
-                    price = BASE_UNIT_PRICE[fee_type] * CATEGORY_FACTOR[cat]
-                    if band_i == 1:
-                        price *= Decimal("0.95")
-                    elif band_i == 2:
-                        price *= Decimal("0.88")
-                    # 每期温和上涨 1.5%，模拟人工成本上升
-                    price *= Decimal(str(round(1.015 ** period_i, 4)))
-                    price = price.quantize(Decimal("0.0001"))
 
-                    unit = "元/次" if fee_type == "引航费" else "元/吨"
-                    rows.append([
-                        rule_code, fee_type, cat, q(bmin), q(bmax) if bmax is not None else "",
-                        q(price, 4), unit,
-                        eff_from.isoformat(), eff_to.isoformat() if eff_to else "",
-                    ])
+def gen_fee_record(rules, waybills, voyage_gross_ton, canal_voyage_ids):
+    """
+    费用明细：每条运单按语料口径生成 1~3 项费用。
+
+    与旧实现的差别（都是 C-31 的直接后果，不是顺手改的）：
+      1. **费率命中改为按语料的两套吨位口径**：
+         过闸费/港杂费/装卸费 按**载货吨位**；引航费/停泊费 按**船舶总吨位**
+         （`25` 第十二条）。旧实现一律用货重，故引航费/停泊费**从未按语料算过**。
+      2. **港杂费由"货重 × 单价"改为"固定单次费率"**：`09` 第二条规定其计费单位是
+         `元/次`（按进出港区次数），旧实现按 元/吨 × 货重，单位就错了。
+      3. **施加语料规定的附加与减免**：危险货物 +30%（过闸费、港杂费）、
+         重点保供物资（能源/农资/化工）过闸费 ×70%。
+      4. **舍入改为四舍五入到分**（`ROUND_HALF_UP`）：旧实现用 `Decimal.quantize`
+         的默认 `ROUND_HALF_EVEN`（银行家舍入），与语料"四舍五入"不符 —— 实测
+         **216 行**金额与 PostgreSQL `round()` 差 0.01 元（过闸费 19 / 装卸费 40 /
+         港杂费 157）。
+      5. **业务发生日 == 运单创建日**（沿用旧口径；`25` 第二十八条按费种区分业务
+         发生日，但仿真数据里各费种共用运单日期这一约定，属数据生成约定）。
+
+    ⛔ 未实现项（已在 README 与《评测报告》登记为"已实现/未实现清单"，不静默略过）：
+      - `06` 第十五条 2 / `07` 第十三条 2 的「核定最低计费吨位」：全语料无定义；
+      - `08` 第六条 引航中止按 50%、`09` 第九条 自备设备装卸费半价、各免收情形：
+        库内无相应记录字段，不可触发；
+      - `09` 第八条 2「装、卸各计一次」：`fee_record` 无作业类型列，本数据集每运单
+        只记 1 次装卸作业。
+
+    canal_voyage_ids：经运河的航次 id 集合（voyage 表 id 即插入顺序 1..N）。
+    """
+    rows = []
+    cargo_map = {c[0]: c for c in CARGO_TYPES}
+    # 航次 → 船舶总吨位由 main() 用 VESSEL_IDX_GROSS_TON 统一构造后传入
+    # （⛔ 不在本函数里按下标取 vessel 行：列序一变就会静默取错列）
+
+    # 建索引：rule_code -> 行号（行号即 id，因为 tariff_rule 按插入顺序编号）
+    rule_id_by_code = {r.rule_code: idx + 1 for idx, r in enumerate(rules)}
+    cents = Decimal("0.01")
+
+    for wb in waybills:
+        wno, voyage_id = wb[0], wb[1]
+        cargo_code, weight_str, created_str = wb[3], wb[4], wb[7]
+        weight = Decimal(weight_str)
+        created = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+        biz_date = created.date().isoformat()
+        cargo = cargo_map[cargo_code]
+        category = cargo[2]
+        is_dangerous = cargo[3]
+
+        # 基础费用组合（沿用旧约定，未在本轮改动）
+        fee_types = ["港杂费", "装卸费"]
+        if str(voyage_id) in canal_voyage_ids:
+            fee_types.insert(0, "过闸费")
+        if is_dangerous:
+            fee_types.append("停泊费")
+        if rng.random() < 0.25:
+            fee_types.append("引航费")
+
+        for ft in fee_types:
+            basis = corpus_tariff.TONNAGE_BASIS[ft]
+            if basis == "船舶总吨位":
+                tonnage = voyage_gross_ton[str(voyage_id)]
+                rule_category = corpus_tariff.NO_CATEGORY
+            else:
+                tonnage = weight
+                rule_category = category
+
+            rule = corpus_tariff.match_rule(
+                rules, ft, rule_category, tonnage, biz_date, basis)
+            unit_price = Decimal(rule.unit_price)
+
+            days = 1
+            if ft == "停泊费":
+                days = rng.randint(1, 4)
+
+            amount, formula = _fee_amount(rule.unit, unit_price, tonnage, days)
+
+            # 减免与附加（锚点见文件头常量区的注释）
+            relief = RELIEF_FACTOR if (ft in RELIEF_FEE_TYPES
+                                       and category in RELIEF_CATEGORIES) else Decimal("1")
+            surcharge = SURCHARGE_FACTOR if (ft in SURCHARGE_FEE_TYPES
+                                             and is_dangerous) else Decimal("1")
+            amount = (amount * relief * surcharge).quantize(cents, rounding=ROUND_HALF_UP)
+
+            basis_obj = {
+                "tonnage": str(tonnage),
+                "tonnage_basis": basis,
+                "weight": weight_str,
+                "unit_price": rule.unit_price,
+                "unit": rule.unit,
+                "formula": formula,
+                "days": days,
+                "as_of": biz_date,
+                "relief": "0.70" if relief != 1 else "1.00",
+                "surcharge": "1.30" if surcharge != 1 else "1.00",
+                "rule_code": rule.rule_code,
+                "rule_source": f"{rule.source_file}:{rule.source_line}",
+            }
+
+            rows.append([
+                wno, ft, str(rule_id_by_code[rule.rule_code]), q(amount),
+                json.dumps(basis_obj, ensure_ascii=False, sort_keys=True),
+                (created + timedelta(hours=rng.randint(2, 96))).strftime("%Y-%m-%d %H:%M:%S"),
+            ])
     return rows
 
 
@@ -472,99 +580,23 @@ def gen_documents(waybills):
 
 def _match_rule(rules_by_key, fee_type, category, weight, biz_date):
     """
-    按「费用类型 + 货类 + 吨位段 + 业务日期」命中唯一一条费率规则。
-    返回 (rule_code, unit_price, unit) 或 None。
+    ⛔ **已删除**（决策 C-31，2026-09-22）。
+
+    旧实现在这里按「费种 + 货类 + 货重 + 业务日」命中费率，存在两个真实缺陷：
+
+      1. **吨位口径只有一种**：引航费、停泊费在语料里是按**船舶总吨位**分档的
+         （`25` 第十二条），旧实现却拿**货重**去查，于是这两类费用的分档依据
+         与语料不符；
+      2. **生效期匹配含末日**（`biz_date <= effective_to`），而列注释与 EXCLUDE
+         约束用的都是左闭右开 `[from, to)` —— 同一个库里有**两套端点语义**，
+         且种子把 `effective_to` 写成"下期起始日前一天"，导致 EXCLUDE 区间
+         在每期边界留下**一天空隙**（2026-12-31 无规则覆盖）。
+
+    现在的实现是 `corpus_tariff.match_rule()`：左闭右开、带吨位口径维度、
+    命中数不等于 1 即抛错（不给"静默取第一条"的通道）。
     """
-    key = (fee_type, category)
-    for r in rules_by_key.get(key, []):
-        rcode, _ft, _cat, bmin, bmax, price, unit, eff_from, eff_to = r
-        bmin_d, bmax_d = Decimal(bmin), (Decimal(bmax) if bmax else None)
-        if not (weight >= bmin_d and (bmax_d is None or weight < bmax_d)):
-            continue
-        ef = date.fromisoformat(eff_from)
-        et = date.fromisoformat(eff_to) if eff_to else None
-        if biz_date >= ef and (et is None or biz_date <= et):
-            # 返回规则序号（1-based 行号），供 fee_record.rule_id 使用
-            return r
-    return None
-
-
-def gen_fee_record(tariff_rows, waybills, canal_voyage_ids):
-    """
-    费用明细：每条运单按货类生成 1~3 项费用。
-    金额 = 货重 × 单价（按业务日期命中的费率）。
-
-    过闸费说明（决策 C-18，**本函数的行为在 C-18 中已变更**）：
-      原先写死为必收项（"业务窗口中所有货流均经平陆运河"），这与航道事实矛盾——
-      实测有 56 个航次两端都不是运河节点。现在改为**只在所属航次的
-      voyage.via_canal 为真时收取**，与 voyage 表由同一口径驱动。
-
-      canal_voyage_ids：经运河的航次 id 集合（voyage 表 id 即插入顺序 1..N）。
-
-    ⚠️ 副作用：过闸费在 fee_record 中的占比会因此下降
-       （实测 29.05% → **28.57%**），相关文档数字须同步重算，不要沿用旧值。
-    """
-    rows = []
-    cargo_map = {c[0]: c for c in CARGO_TYPES}
-
-    # 建索引：rule_code -> 行号（行号即 id，因为 tariff_rule 按插入顺序编号）
-    rule_id_by_code = {r[0]: idx + 1 for idx, r in enumerate(tariff_rows)}
-    rules_by_key = {}
-    for r in tariff_rows:
-        rules_by_key.setdefault((r[1], r[2]), []).append(r)
-
-    for wb in waybills:
-        wno, voyage_id = wb[0], wb[1]
-        cargo_code, weight_str, created_str = wb[3], wb[4], wb[7]
-        weight = Decimal(weight_str)
-        created = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
-        biz_date = created.date()
-        category = cargo_map[cargo_code][2]
-        is_dangerous = cargo_map[cargo_code][3]
-
-        # 基础费用组合。
-        # C-18 只改了**一件事**：不经运河的航次不再收过闸费。
-        # 其余费用类型及其顺序与 C-18 之前完全一致——
-        # 刻意不新增任何费用类型，否则就超出用户确认的范围了。
-        fee_types = ["港杂费", "装卸费"]
-        if str(voyage_id) in canal_voyage_ids:
-            fee_types.insert(0, "过闸费")
-        if is_dangerous:
-            fee_types.append("停泊费")
-        if rng.random() < 0.25:
-            fee_types.append("引航费")
-
-        for ft in fee_types:
-            rule = _match_rule(rules_by_key, ft, category, weight, biz_date)
-            if rule is None:
-                continue
-            rcode, _ft, _cat, _bmin, _bmax, price_s, unit, _ef, _et = rule
-            unit_price = Decimal(price_s)
-
-            if unit == "元/次":
-                amount = unit_price
-                formula = "固定单次费率"
-            else:
-                amount = (weight * unit_price).quantize(Decimal("0.01"))
-                formula = "货重 × 单价"
-
-            # 停泊费按天数
-            days = 1
-            if ft == "停泊费":
-                days = rng.randint(1, 4)
-                amount = (amount * days).quantize(Decimal("0.01"))
-                formula = "货重 × 单价 × 停泊天数"
-
-            basis = ('{"weight": "%s", "unit_price": "%s", "formula": "%s", '
-                     '"as_of": "%s", "days": %d}') % (
-                weight_str, price_s, formula, biz_date.isoformat(), days)
-
-            rows.append([
-                wno, ft, str(rule_id_by_code[rcode]), q(amount),
-                basis,
-                (created + timedelta(hours=rng.randint(2, 96))).strftime("%Y-%m-%d %H:%M:%S"),
-            ])
-    return rows
+    raise AssertionError(
+        "已废弃：费率命中请用 corpus_tariff.match_rule（决策 C-31）")
 
 
 def fill_waybill_freight(waybills, fee_rows):
@@ -590,8 +622,7 @@ TABLES = [
               "latitude", "longitude"], "port.csv"),
     ("lock", ["lock_id", "name", "chamber_no", "capacity_ton", "chamber_length_m",
               "chamber_width_m", "operating_hours", "is_double_line"], "lock.csv"),
-    ("vessel", ["vessel_id", "name", "vessel_type", "deadweight_ton", "draft_m",
-                "owner_id", "built_year"], "vessel.csv"),
+    ("vessel", VESSEL_COLS, "vessel.csv"),
     ("cargo_type", ["cargo_code", "name", "category", "is_dangerous",
                     "hazard_class"], "cargo_type.csv"),
     ("customer", ["customer_id", "name", "type", "credit_level", "contact"],
@@ -604,7 +635,8 @@ TABLES = [
     ("documents", ["waybill_no", "doc_type", "status", "submit_time", "audit_time",
                    "remark"], "documents.csv"),
     ("tariff_rule", ["rule_code", "fee_type", "cargo_category", "min_ton", "max_ton",
-                     "unit_price", "unit", "effective_from", "effective_to"],
+                     "unit_price", "unit", "effective_from", "effective_to",
+                     "tonnage_basis"],
      "tariff_rule.csv"),
     ("fee_record", ["waybill_no", "fee_type", "rule_id", "amount", "calc_basis",
                     "created_at"], "fee_record.csv"),
@@ -714,13 +746,34 @@ def main():
     vessel_rows = gen_vessel()
     voyage_rows = gen_voyage()
     waybill_rows = gen_waybill(voyage_rows)
-    tariff_rows = gen_tariff_rule()
+
+    # ★ 费率：**解析语料费率表**（C-31 的唯一事实来源），不再由公式生成。
+    #   语料若与库侧结构不兼容，会在这一步直接抛错（如档位不衔接、单位不符），
+    #   而不是等到评测时才发现两个通道答案不同。
+    tariff_rules = corpus_tariff.load_rules()
+    tariff_rows = gen_tariff_rule(tariff_rules)
+    print(f"  费率来源 : docs/规则语料/06、07、08、09（解析出 {len(tariff_rows)} 条规则）")
+    print(f"  计费口径 : "
+          f"{len({r.cargo_category for r in tariff_rules})} 个货类键"
+          f"（含哨兵「不区分」）、"
+          f"{len({r.tonnage_basis for r in tariff_rules})} 种吨位口径")
+
     doc_rows = gen_documents(waybill_rows)
+
+    # 航次 → 船舶总吨位（引航费/停泊费的分档依据，语料 `25` 第十二条）。
+    # ⛔ 下标取自 VESSEL_COLS 的具名索引，避免列序变动后静默取错列。
+    # voyage 第 2 列是 vessel_id（1-based），vessel_rows 为其插入顺序。
+    voyage_gross_ton = {
+        str(idx + 1): Decimal(vessel_rows[int(voy[1]) - 1][VESSEL_IDX_GROSS_TON])
+        for idx, voy in enumerate(voyage_rows)
+    }
+
     # 过闸费的收取依据必须与 voyage.via_canal 同源，否则又会出现
     # 「两端非运河节点却收过闸费」的矛盾（C-18 要消除的正是这个）。
     # voyage 的 id 即插入顺序（1..N），与 gen_waybill 里的 voyage_id 口径一致。
     canal_voyage_ids = {str(idx + 1) for idx, v in enumerate(voyage_rows) if v[7]}
-    fee_rows = gen_fee_record(tariff_rows, waybill_rows, canal_voyage_ids)
+    fee_rows = gen_fee_record(tariff_rules, waybill_rows,
+                              voyage_gross_ton, canal_voyage_ids)
     fill_waybill_freight(waybill_rows, fee_rows)
 
     n_canal = len(canal_voyage_ids)

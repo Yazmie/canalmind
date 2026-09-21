@@ -204,8 +204,8 @@ canalmind/                          ← git 仓库根（main 分支）
 | D8 | **检索类查询改写策略** | 多种 Query Rewrite 策略 | `RAG 优化` 第 137 行 | 待决 |
 | D9 | **是否上 GraphRAG** | 向量 RAG(+混合检索+rerank) vs 图结构 | `GraphRAG` 第 89、230–232 行 | 待决 |
 | D10 | **上下文超限处理** | 滑动窗口 / Compaction 摘要压缩 / 结构化笔记 | `上下文工程` 第 172 行 | 待决 |
-| D11 | **Schema 约束强度** | JSON Mode / JSON Schema / Structured Outputs | `大模型结构化输出` 第 105 行 | 待决 |
-| D12 | **结构化查询形态** | 契约化受控工具集 / 模型自生成 SQL | 规格书 §0.3（两阶段设计） | 待决 |
+| D11 | **Schema 约束强度** | JSON Mode / JSON Schema / Structured Outputs | `大模型结构化输出` 第 105 行 | ✅ 已确认 → **C-32**（JSON Mode + 服务端 JSON Schema 校验 + 错误反馈重试 ≤2 + 降级；⛔ DeepSeek 无严格模式，**不得声称"已用 Structured Outputs"**） |
+| D12 | **结构化查询形态** | 契约化受控工具集 / 模型自生成 SQL | 规格书 §0.3（两阶段设计） | ✅ 已确认 → **C-33**（阶段一：受控工具集 3–5 个 + JSON Schema，**金额由纯代码算**；阶段二本轮不做） |
 | D13 | **评测样本规模与分层** | 知识库明示"没有固定答案"，需按风险与方差反推 | `AI 应用评测体系` 第 92–100 行 | ✅ 已确认 → **C-28**（L2 层：chunk 级人工标注 + 纯规则指标 `Recall@k`/`HitRate@k`/`MRR`/`Precision@k`；双维度分层；**保留集 8 条**；模板骨架 + LLM 改写 + 人工审核） |
 | D14 | **Judge 用法** | 规则评测 / LLM-as-Judge / Reference-guided Judge | 同上 第 120、196–198 行 | 待决 |
 | D15 | **观测平台选型** | 通用 APM / LLM Trace 平台 / 自建 OTLP 后端 | `AI 可观测性与 Trace` 第 488–497 行 | 待决 |
