@@ -1,14 +1,14 @@
 {
   "channel" : "bm25",
   "corpus" : {
-    "avgDocLength" : 64.782772,
+    "avgDocLength" : 64.910112,
     "chunkCountAtIngest" : 534,
     "chunks" : 534,
-    "distinctTerms" : 3303,
+    "distinctTerms" : 3307,
     "maxDocLength" : 264,
     "minDocLength" : 4,
-    "postings" : 23696,
-    "totalTokens" : 34594
+    "postings" : 23728,
+    "totalTokens" : 34662
   },
   "crossChecks" : {
     "invariantViolations" : 0,
@@ -27,9 +27,9 @@
   },
   "dfDistribution" : {
     "1" : 1338,
-    "21~100" : 262,
-    "2~5" : 1104,
-    "6~20" : 583,
+    "21~100" : 263,
+    "2~5" : 1105,
+    "6~20" : 585,
     ">100" : 16
   },
   "dictionary" : {
@@ -78,121 +78,121 @@
           "chunkId" : "3c58adb940ca3987",
           "matchedTerms" : 5,
           "rank" : 1,
-          "score" : 12.784017119
+          "score" : 12.79004604
         },
         {
           "chunkId" : "07dab81dbf2b8658",
           "matchedTerms" : 5,
           "rank" : 2,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "1287a36aaae7400e",
           "matchedTerms" : 5,
           "rank" : 3,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "562f5efc45b15a8b",
           "matchedTerms" : 5,
           "rank" : 4,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "6deee992027c7f3a",
           "matchedTerms" : 5,
           "rank" : 5,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "6ed1e07df15b8caf",
           "matchedTerms" : 5,
           "rank" : 6,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "84cd20c4adab69f9",
           "matchedTerms" : 5,
           "rank" : 7,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "c5badd5949feccdb",
           "matchedTerms" : 5,
           "rank" : 8,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "c5f34e345db865a6",
           "matchedTerms" : 5,
           "rank" : 9,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "cda2572291329831",
           "matchedTerms" : 5,
           "rank" : 10,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "ea7e95d91ae5120c",
           "matchedTerms" : 5,
           "rank" : 11,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "f91bf8647b1ce7ab",
           "matchedTerms" : 5,
           "rank" : 12,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "f94a87a9fcdef2e7",
           "matchedTerms" : 5,
           "rank" : 13,
-          "score" : 12.520429602
+          "score" : 12.526436952
         },
         {
           "chunkId" : "96605245bd8808ee",
           "matchedTerms" : 5,
           "rank" : 14,
-          "score" : 12.505320146
+          "score" : 12.510905261
         },
         {
           "chunkId" : "20f6bd271c9d5e3e",
           "matchedTerms" : 5,
           "rank" : 15,
-          "score" : 12.386849705
+          "score" : 12.392772157
         },
         {
           "chunkId" : "069d0280e6904fa5",
           "matchedTerms" : 5,
           "rank" : 16,
-          "score" : 12.023573996
+          "score" : 12.029970889
         },
         {
           "chunkId" : "d014416b35d9ea35",
           "matchedTerms" : 5,
           "rank" : 17,
-          "score" : 12.023573996
+          "score" : 12.029970889
         },
         {
           "chunkId" : "a77347575798ecca",
           "matchedTerms" : 5,
           "rank" : 18,
-          "score" : 10.638692482
+          "score" : 10.64623919
         },
         {
           "chunkId" : "1c879189ed5a475d",
           "matchedTerms" : 5,
           "rank" : 19,
-          "score" : 9.88139123
+          "score" : 9.888699004
         },
         {
           "chunkId" : "3f3c3d76094aa1cf",
           "matchedTerms" : 5,
           "rank" : 20,
-          "score" : 9.811519151
+          "score" : 9.818875479
         }
       ]
     },
@@ -217,121 +217,121 @@
           "chunkId" : "eabd61d2998ec396",
           "matchedTerms" : 6,
           "rank" : 1,
-          "score" : 13.180385487
+          "score" : 13.18888112
         },
         {
           "chunkId" : "41a70955847c5345",
           "matchedTerms" : 4,
           "rank" : 2,
-          "score" : 12.603887891
+          "score" : 12.610114964
         },
         {
           "chunkId" : "3aca6c885fec32e5",
           "matchedTerms" : 6,
           "rank" : 3,
-          "score" : 12.522908933
+          "score" : 12.530803551
         },
         {
           "chunkId" : "fb37246f7edebdfe",
           "matchedTerms" : 5,
           "rank" : 4,
-          "score" : 12.504941471
+          "score" : 12.509664811
         },
         {
           "chunkId" : "8a19d5700335d578",
           "matchedTerms" : 5,
           "rank" : 5,
-          "score" : 12.388875299
+          "score" : 12.394052696
         },
         {
           "chunkId" : "67aec01d199064a6",
           "matchedTerms" : 5,
           "rank" : 6,
-          "score" : 11.309836123
+          "score" : 11.31738033
         },
         {
           "chunkId" : "9b31abd0335d49aa",
           "matchedTerms" : 5,
           "rank" : 7,
-          "score" : 11.134431845
-        },
-        {
-          "chunkId" : "9d367f7b300773c0",
-          "matchedTerms" : 4,
-          "rank" : 8,
-          "score" : 10.95048659
+          "score" : 11.139779255
         },
         {
           "chunkId" : "57a96bb50310e677",
           "matchedTerms" : 4,
+          "rank" : 8,
+          "score" : 10.950519889
+        },
+        {
+          "chunkId" : "9d367f7b300773c0",
+          "matchedTerms" : 4,
           "rank" : 9,
-          "score" : 10.945350561
+          "score" : 10.511538599
         },
         {
           "chunkId" : "7cd1ae80238b90f2",
           "matchedTerms" : 4,
           "rank" : 10,
-          "score" : 10.450776086
+          "score" : 10.455943251
         },
         {
           "chunkId" : "39f4d3c6300934b8",
           "matchedTerms" : 5,
           "rank" : 11,
-          "score" : 10.256523853
+          "score" : 10.261907293
         },
         {
           "chunkId" : "a148f7a8bdbd1653",
           "matchedTerms" : 5,
           "rank" : 12,
-          "score" : 10.027331455
+          "score" : 10.033444883
         },
         {
           "chunkId" : "1a99b35f300f9703",
           "matchedTerms" : 4,
           "rank" : 13,
-          "score" : 10.016950963
+          "score" : 10.021923746
         },
         {
           "chunkId" : "484e655b51a99d4b",
           "matchedTerms" : 5,
           "rank" : 14,
-          "score" : 9.97384758
+          "score" : 9.980259516
         },
         {
           "chunkId" : "5a7026e96c06f3b8",
           "matchedTerms" : 5,
           "rank" : 15,
-          "score" : 9.797909027
+          "score" : 9.804324306
         },
         {
           "chunkId" : "c8f373b1e155f2c2",
           "matchedTerms" : 4,
           "rank" : 16,
-          "score" : 9.733373931
+          "score" : 9.738002978
         },
         {
           "chunkId" : "93b649444bebde08",
           "matchedTerms" : 4,
           "rank" : 17,
-          "score" : 9.711672585
+          "score" : 9.715326292
         },
         {
           "chunkId" : "7ae1d5b04bb48bd8",
           "matchedTerms" : 4,
           "rank" : 18,
-          "score" : 9.54794603
+          "score" : 9.552767304
         },
         {
           "chunkId" : "d000bf614f43e6b7",
           "matchedTerms" : 4,
           "rank" : 19,
-          "score" : 9.488802851
+          "score" : 9.493599943
         },
         {
           "chunkId" : "bca351334a9167a0",
           "matchedTerms" : 4,
           "rank" : 20,
-          "score" : 9.430912329
+          "score" : 9.436403499
         }
       ]
     },
@@ -358,121 +358,121 @@
           "chunkId" : "174355c01152002a",
           "matchedTerms" : 8,
           "rank" : 1,
-          "score" : 30.037471418
+          "score" : 30.05324962
         },
         {
           "chunkId" : "57845177c9078fea",
           "matchedTerms" : 6,
           "rank" : 2,
-          "score" : 18.0850676
+          "score" : 18.094938682
         },
         {
           "chunkId" : "fe51e31f5b4d14c7",
           "matchedTerms" : 6,
           "rank" : 3,
-          "score" : 17.74111815
+          "score" : 17.751267193
         },
         {
           "chunkId" : "d314f2f51d0b2a02",
           "matchedTerms" : 4,
           "rank" : 4,
-          "score" : 17.227988829
+          "score" : 17.23355974
         },
         {
           "chunkId" : "a5073828fee205b5",
           "matchedTerms" : 5,
           "rank" : 5,
-          "score" : 16.333843348
+          "score" : 16.339836251
         },
         {
           "chunkId" : "b5e1663f8e1d44a3",
           "matchedTerms" : 5,
           "rank" : 6,
-          "score" : 15.958005831
+          "score" : 15.963481669
         },
         {
           "chunkId" : "f853634a7852b7cf",
           "matchedTerms" : 5,
           "rank" : 7,
-          "score" : 14.954891406
+          "score" : 14.962767217
         },
         {
           "chunkId" : "be0ccbd5403216c5",
           "matchedTerms" : 5,
           "rank" : 8,
-          "score" : 13.962791112
+          "score" : 13.972472886
         },
         {
           "chunkId" : "ee85fc8e4f9f8e25",
           "matchedTerms" : 5,
           "rank" : 9,
-          "score" : 13.941785655
+          "score" : 13.951146809
         },
         {
           "chunkId" : "22bd07a7f3f07502",
           "matchedTerms" : 4,
           "rank" : 10,
-          "score" : 13.330292591
+          "score" : 13.333714101
         },
         {
           "chunkId" : "84fa83db4b8cec63",
           "matchedTerms" : 2,
           "rank" : 11,
-          "score" : 13.28113535
+          "score" : 13.286488733
         },
         {
           "chunkId" : "35d44beac402dec0",
           "matchedTerms" : 5,
           "rank" : 12,
-          "score" : 13.128757367
+          "score" : 13.135769757
         },
         {
           "chunkId" : "3256dbc439844098",
           "matchedTerms" : 3,
           "rank" : 13,
-          "score" : 13.069960623
+          "score" : 13.076538748
         },
         {
           "chunkId" : "3f16956262a342f8",
           "matchedTerms" : 4,
           "rank" : 14,
-          "score" : 12.8906757
+          "score" : 12.894612212
         },
         {
           "chunkId" : "a132138b14dd29a9",
           "matchedTerms" : 5,
           "rank" : 15,
-          "score" : 12.873938858
-        },
-        {
-          "chunkId" : "ea252159540072b2",
-          "matchedTerms" : 4,
-          "rank" : 16,
-          "score" : 12.67574083
+          "score" : 12.881631473
         },
         {
           "chunkId" : "2f0f9e2af9b65c67",
           "matchedTerms" : 3,
+          "rank" : 16,
+          "score" : 12.681601815
+        },
+        {
+          "chunkId" : "ea252159540072b2",
+          "matchedTerms" : 4,
           "rank" : 17,
-          "score" : 12.674733379
+          "score" : 12.680677717
         },
         {
           "chunkId" : "a95c9cff6f04a222",
           "matchedTerms" : 5,
           "rank" : 18,
-          "score" : 12.45246147
+          "score" : 12.460439035
         },
         {
           "chunkId" : "17e9f565fab8e33a",
           "matchedTerms" : 4,
           "rank" : 19,
-          "score" : 11.933877977
+          "score" : 11.93902941
         },
         {
           "chunkId" : "4230624b96bbe4b9",
           "matchedTerms" : 5,
           "rank" : 20,
-          "score" : 11.756380576
+          "score" : 11.766013615
         }
       ]
     },
@@ -496,121 +496,121 @@
           "chunkId" : "47e68f09b312a686",
           "matchedTerms" : 6,
           "rank" : 1,
-          "score" : 16.948342084
+          "score" : 16.961276514
         },
         {
           "chunkId" : "fa1bed0064ff3c1f",
           "matchedTerms" : 5,
           "rank" : 2,
-          "score" : 15.79158461
+          "score" : 15.803381075
         },
         {
           "chunkId" : "04d3ea4e3e8f448b",
           "matchedTerms" : 6,
           "rank" : 3,
-          "score" : 15.604890807
+          "score" : 15.617695595
         },
         {
           "chunkId" : "9c2e4442313c8686",
           "matchedTerms" : 6,
           "rank" : 4,
-          "score" : 11.20490443
+          "score" : 11.217659142
         },
         {
           "chunkId" : "63cbf420478d17b7",
           "matchedTerms" : 4,
           "rank" : 5,
-          "score" : 9.67588972
+          "score" : 9.680836024
         },
         {
           "chunkId" : "baa6f37595618c2c",
           "matchedTerms" : 4,
           "rank" : 6,
-          "score" : 9.603081871
+          "score" : 9.60763963
         },
         {
           "chunkId" : "5e0c5bc4332d3cd7",
           "matchedTerms" : 4,
           "rank" : 7,
-          "score" : 9.492583495
+          "score" : 9.497451554
         },
         {
           "chunkId" : "cf049b2ad31e6782",
           "matchedTerms" : 4,
           "rank" : 8,
-          "score" : 9.286909443
+          "score" : 9.291768982
         },
         {
           "chunkId" : "9a93e9cd693fcf38",
           "matchedTerms" : 4,
           "rank" : 9,
-          "score" : 9.048725503
+          "score" : 9.053792075
         },
         {
           "chunkId" : "42453555a1939329",
           "matchedTerms" : 4,
           "rank" : 10,
-          "score" : 8.980557199
+          "score" : 8.985332832
         },
         {
           "chunkId" : "227bfe6bfecfe815",
           "matchedTerms" : 4,
           "rank" : 11,
-          "score" : 8.913772611
+          "score" : 8.916853058
         },
         {
           "chunkId" : "f9f61f84780adbd0",
           "matchedTerms" : 2,
           "rank" : 12,
-          "score" : 8.906592493
+          "score" : 8.91012346
         },
         {
           "chunkId" : "0885635c9ba13cb6",
           "matchedTerms" : 4,
           "rank" : 13,
-          "score" : 8.878030103
+          "score" : 8.88323432
         },
         {
           "chunkId" : "1f7bb131e8193d09",
           "matchedTerms" : 4,
           "rank" : 14,
-          "score" : 8.866632655
+          "score" : 8.871967936
         },
         {
           "chunkId" : "2788842ebed4fbfe",
           "matchedTerms" : 4,
           "rank" : 15,
-          "score" : 8.455686808
+          "score" : 8.460825041
         },
         {
           "chunkId" : "57a96bb50310e677",
           "matchedTerms" : 4,
           "rank" : 16,
-          "score" : 8.410579012
+          "score" : 8.415431116
         },
         {
           "chunkId" : "d848ff235ef8ca39",
           "matchedTerms" : 4,
           "rank" : 17,
-          "score" : 8.328567967
+          "score" : 8.334154502
         },
         {
           "chunkId" : "7ae1d5b04bb48bd8",
           "matchedTerms" : 4,
           "rank" : 18,
-          "score" : 8.277005038
+          "score" : 8.282321709
         },
         {
           "chunkId" : "5a7026e96c06f3b8",
           "matchedTerms" : 4,
           "rank" : 19,
-          "score" : 8.104894592
+          "score" : 8.110330853
         },
         {
           "chunkId" : "ab7ae33f3caedd95",
           "matchedTerms" : 4,
           "rank" : 20,
-          "score" : 7.985477428
+          "score" : 7.990918204
         }
       ]
     },
@@ -631,121 +631,121 @@
           "chunkId" : "0e40ccf26d6016f4",
           "matchedTerms" : 3,
           "rank" : 1,
-          "score" : 9.922693997
+          "score" : 9.926954441
         },
         {
           "chunkId" : "2e424aa95a385a79",
           "matchedTerms" : 3,
           "rank" : 2,
-          "score" : 9.786819658
+          "score" : 9.792047279
         },
         {
           "chunkId" : "b5bfd05cc56b401c",
           "matchedTerms" : 3,
           "rank" : 3,
-          "score" : 8.971956247
+          "score" : 8.977347666
         },
         {
           "chunkId" : "5e0c5bc4332d3cd7",
           "matchedTerms" : 3,
           "rank" : 4,
-          "score" : 8.506102023
+          "score" : 8.512066969
         },
         {
           "chunkId" : "71e42dddebdb4e20",
           "matchedTerms" : 3,
           "rank" : 5,
-          "score" : 7.809293944
+          "score" : 7.81482574
         },
         {
           "chunkId" : "8d6f77cf1c2fb13f",
           "matchedTerms" : 2,
           "rank" : 6,
-          "score" : 7.476966381
+          "score" : 7.478312667
         },
         {
           "chunkId" : "419803d5097233b1",
           "matchedTerms" : 2,
           "rank" : 7,
-          "score" : 7.456615312
+          "score" : 7.459624115
         },
         {
           "chunkId" : "0885635c9ba13cb6",
           "matchedTerms" : 3,
           "rank" : 8,
-          "score" : 7.440319785
+          "score" : 7.445707939
         },
         {
           "chunkId" : "d848ff235ef8ca39",
           "matchedTerms" : 3,
           "rank" : 9,
-          "score" : 7.428561259
+          "score" : 7.4345786
         },
         {
           "chunkId" : "42453555a1939329",
           "matchedTerms" : 3,
           "rank" : 10,
-          "score" : 6.864470627
+          "score" : 6.87004497
         },
         {
           "chunkId" : "768be0ac00b27d48",
           "matchedTerms" : 3,
           "rank" : 11,
-          "score" : 6.590247172
+          "score" : 6.596150517
         },
         {
           "chunkId" : "9ff2f4f40062536f",
           "matchedTerms" : 3,
           "rank" : 12,
-          "score" : 6.561468828
+          "score" : 6.5673758
         },
         {
           "chunkId" : "0ca0de91f4403cb3",
           "matchedTerms" : 2,
           "rank" : 13,
-          "score" : 6.19744263
+          "score" : 6.201026196
         },
         {
           "chunkId" : "1ce47bad28b9e9fa",
           "matchedTerms" : 2,
           "rank" : 14,
-          "score" : 6.122391861
+          "score" : 6.126026181
         },
         {
           "chunkId" : "a91fc68c1d1b2c69",
           "matchedTerms" : 2,
           "rank" : 15,
-          "score" : 5.751355994
+          "score" : 5.755554509
         },
         {
           "chunkId" : "769020815e3440ed",
           "matchedTerms" : 2,
           "rank" : 16,
-          "score" : 5.677071738
+          "score" : 5.679824475
         },
         {
           "chunkId" : "bc8a3f89d315e433",
           "matchedTerms" : 2,
           "rank" : 17,
-          "score" : 5.571910855
+          "score" : 5.576712786
         },
         {
           "chunkId" : "9a93e9cd693fcf38",
           "matchedTerms" : 2,
           "rank" : 18,
-          "score" : 5.206695266
+          "score" : 5.210735342
         },
         {
           "chunkId" : "b32b456193a424e5",
           "matchedTerms" : 2,
           "rank" : 19,
-          "score" : 5.149780261
+          "score" : 5.152415572
         },
         {
           "chunkId" : "54dab5743cb9d5f9",
           "matchedTerms" : 2,
           "rank" : 20,
-          "score" : 5.101137642
+          "score" : 5.104844914
         }
       ]
     },
@@ -771,129 +771,129 @@
           "chunkId" : "11796883019365d9",
           "matchedTerms" : 7,
           "rank" : 1,
-          "score" : 31.447475858
+          "score" : 31.457080708
         },
         {
           "chunkId" : "1ae0c13a0e2e0226",
           "matchedTerms" : 7,
           "rank" : 2,
-          "score" : 30.938430639
+          "score" : 30.949554265
         },
         {
           "chunkId" : "f10c0cbf25542521",
           "matchedTerms" : 7,
           "rank" : 3,
-          "score" : 30.62770454
+          "score" : 30.638333361
         },
         {
           "chunkId" : "9783d0f0642ccc9f",
           "matchedTerms" : 7,
           "rank" : 4,
-          "score" : 29.077179753
+          "score" : 29.089757106
         },
         {
           "chunkId" : "47e68f09b312a686",
           "matchedTerms" : 8,
           "rank" : 5,
-          "score" : 25.849780223
+          "score" : 25.867883829
         },
         {
           "chunkId" : "034064c69709379c",
           "matchedTerms" : 7,
           "rank" : 6,
-          "score" : 24.7823232
+          "score" : 24.795969574
         },
         {
           "chunkId" : "ab7ae33f3caedd95",
           "matchedTerms" : 8,
           "rank" : 7,
-          "score" : 24.564902861
+          "score" : 24.582971854
         },
         {
           "chunkId" : "69819888d17c680c",
           "matchedTerms" : 7,
           "rank" : 8,
-          "score" : 23.413485599
+          "score" : 23.428977604
         },
         {
           "chunkId" : "c4e6a1fc22ca9ced",
           "matchedTerms" : 5,
           "rank" : 9,
-          "score" : 19.300978086
+          "score" : 19.314326343
         },
         {
           "chunkId" : "ebac13ac76400224",
           "matchedTerms" : 7,
           "rank" : 10,
-          "score" : 18.568964012
+          "score" : 18.585604495
         },
         {
           "chunkId" : "a577758b2eef2d50",
           "matchedTerms" : 5,
           "rank" : 11,
-          "score" : 17.53445957
+          "score" : 17.543632071
         },
         {
           "chunkId" : "2788842ebed4fbfe",
           "matchedTerms" : 5,
           "rank" : 12,
-          "score" : 16.682327302
+          "score" : 16.693445883
         },
         {
           "chunkId" : "3399d74b2cf2438f",
           "matchedTerms" : 4,
           "rank" : 13,
-          "score" : 14.729513005
+          "score" : 14.739042599
         },
         {
           "chunkId" : "0ffff1a3fbf4ec28",
           "matchedTerms" : 5,
           "rank" : 14,
-          "score" : 14.234524646
+          "score" : 14.245579234
         },
         {
           "chunkId" : "56f35639c43d576a",
           "matchedTerms" : 6,
           "rank" : 15,
-          "score" : 13.7380913
+          "score" : 13.750998612
         },
         {
           "chunkId" : "17e3033ef50034bf",
           "matchedTerms" : 7,
           "rank" : 16,
-          "score" : 13.579866957
+          "score" : 13.59417337
         },
         {
           "chunkId" : "baa6f37595618c2c",
           "matchedTerms" : 5,
           "rank" : 17,
-          "score" : 13.121133255
+          "score" : 13.131852863
         },
         {
           "chunkId" : "10c6f53c72a351e9",
           "matchedTerms" : 4,
           "rank" : 18,
-          "score" : 12.999453491
+          "score" : 13.006469318
         },
         {
           "chunkId" : "234fab4691944fc1",
           "matchedTerms" : 4,
           "rank" : 19,
-          "score" : 12.723948675
+          "score" : 12.734462733
         },
         {
           "chunkId" : "7feb3856ac3653d0",
           "matchedTerms" : 4,
           "rank" : 20,
-          "score" : 11.693693742
+          "score" : 11.701426921
         }
       ]
     }
   ],
   "schemaVersion" : "1.0",
   "structureMarkers" : {
-    "listMarkerTokenDelta" : 1170,
-    "listMarkersInCorpus" : 1170,
+    "listMarkerTokenDelta" : 1102,
+    "listMarkersInCorpus" : 1171,
     "markerOnlyChunks" : 7,
     "tableMarkersInCorpus" : 87
   },

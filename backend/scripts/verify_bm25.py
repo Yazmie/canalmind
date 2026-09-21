@@ -87,6 +87,20 @@ errors: list[str] = []
 warnings: list[str] = []
 
 
+def _shown(path: Path) -> Path | str:
+    """打印用路径：在仓库内就显示相对路径，否则原样显示。
+
+    ⚠️ 不能直接 `path.relative_to(ROOT)`：调用方传**相对路径**（如
+    `--json backend\\target\\eval\\x.json`）时它是相对 CWD 的，`relative_to` 会抛
+    `ValueError`——而且是在**所有比对都做完、结论即将打印时**才抛，
+    于是"复核通过"会被表现成退出码 1 的崩溃（本项目 2026-09-22 实测踩到）。
+    """
+    try:
+        return path.resolve().relative_to(ROOT)
+    except (ValueError, OSError):
+        return path
+
+
 def err(msg: str) -> None:
     errors.append(msg)
 
@@ -435,16 +449,37 @@ def main() -> int:
     v1 = db.rows(
         "SELECT\n"
         "  (SELECT sum(term_freq) FROM rag_chunk_term WHERE profile_name = 'jieba:shipping-dict-v1:INDEX') AS tokens,\n"
-        "  (SELECT count(*) FROM rag_chunk_term WHERE profile_name = 'jieba:shipping-dict-v1:INDEX') AS postings;",
+        "  (SELECT count(*) FROM rag_chunk_term WHERE profile_name = 'jieba:shipping-dict-v1:INDEX') AS postings,\n"
+        "  (SELECT created_at::text FROM rag_token_profile "
+        "    WHERE profile_name = 'jieba:shipping-dict-v1:INDEX') AS v1_created_at,\n"
+        "  (SELECT max(updated_at)::text FROM rag_chunk) AS chunks_last_written,\n"
+        "  (SELECT (SELECT max(updated_at) FROM rag_chunk) > "
+        "          (SELECT created_at FROM rag_token_profile "
+        "            WHERE profile_name = 'jieba:shipping-dict-v1:INDEX')) AS corpus_changed_after_v1;",
         "rules_v1_scale")
     if v1 and v1[0]["tokens"] not in (None, ""):
         v1_tokens = int(v1[0]["tokens"])
         token_delta = v1_tokens - total_tokens
-        print(f"剥离列表编号的量化自证：rules-v1 词元 {v1_tokens} → 本次 {total_tokens}"
-              f"（减少 {token_delta}）｜ 语料里实测编号 {list_markers} 处")
-        if token_delta != list_markers:
-            err(f"词元减少量 {token_delta} ≠ 语料里实测的列表编号数 {list_markers}"
-                "（两边不是同一个口径，或规则改动影响了别的词元）")
+        # ⚠️ 这条自证的前提是「两个档案吃的是同一份语料」——它比的是
+        #    「v1 的词元数 − 本次词元数 == 本份语料的列表编号数」。
+        #    语料在两次入库之间被改过时，等式两端就不再是同一份输入，**会假 FAIL**
+        #    （2026-09-22 实测：差额 1102 vs 编号 1171，差 69 = 语料改动带入的词元变化）。
+        #    故先用可观测信号判断世代：chunk 行被改写的时间晚于 v1 档案的建立时间 ⇒ 跳过并说明。
+        changed = str(v1[0].get("corpus_changed_after_v1", "")).strip().lower() in ("t", "true", "1")
+        if changed:
+            warn("跨语料世代，跳过「剥离列表编号的量化自证」：rules-v1 档案建于 "
+                 f"{v1[0].get('v1_created_at')}，而 rag_chunk 最后改写于 "
+                 f"{v1[0].get('chunks_last_written')} ⇒ 两个档案吃的不是同一份语料，"
+                 f"「v1 词元 − 本次词元」不再等于本份语料的编号数"
+                 f"（实测 {token_delta} vs 编号 {list_markers}，差额 "
+                 f"{list_markers - token_delta} 即语料改动带入的词元变化）。"
+                 "要在同语料下复核该等式，需用建立 rules-v1 时的代码版本重灌 v1 档案")
+        else:
+            print(f"剥离列表编号的量化自证：rules-v1 词元 {v1_tokens} → 本次 {total_tokens}"
+                  f"（减少 {token_delta}）｜ 语料里实测编号 {list_markers} 处")
+            if token_delta != list_markers:
+                err(f"词元减少量 {token_delta} ≠ 语料里实测的列表编号数 {list_markers}"
+                    "（两边不是同一个口径，或规则改动影响了别的词元）")
     else:
         warn("库里没有 rules-v1 档案（jieba:shipping-dict-v1:INDEX），跳过「量化自证」这一项")
 
@@ -563,7 +598,7 @@ def main() -> int:
                       separators=(",", " : "))
     # ⛔ 自己钉死换行：不用平台的默认值（AGENTS.md §7.2）
     args.json.write_bytes((text + "\n").encode("utf-8"))
-    print(f"产物已写入：{args.json.relative_to(ROOT)}")
+    print(f"产物已写入：{_shown(args.json)}")
 
     # ── 10. 结论 ────────────────────────────────────────────────────────────
     print("-" * 72)

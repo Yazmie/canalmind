@@ -11,11 +11,11 @@
   },
   "statistics" : {
     "chunkCount" : 541,
-    "totalChars" : 85058,
-    "meanChars" : 157.22,
+    "totalChars" : 85217,
+    "meanChars" : 157.52,
     "minChars" : 33,
     "maxChars" : 591,
-    "stdDevChars" : 73.37,
+    "stdDevChars" : 73.61,
     "tableChunkCount" : 87,
     "bodyChunkCount" : 454,
     "docsWithNoChunk" : 0,
@@ -96,7 +96,7 @@
       "title" : "过闸费费率表（2026版）",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "superseded" : true,
       "articleCount" : 16,
       "bodyChunkCount" : 16,
@@ -3127,8 +3127,8 @@
       "strategy" : "structure-article-v1",
       "splitterVersion" : "1.0.0",
       "embeddingModel" : null,
-      "content" : "危险货物的计费遵循下列规定：\n\n1. 危险货物按其**物理化学性质对应的货类大类**计费，不单独设立\"危险品\"货类。\n2. 危险货物另需缴纳危险货物作业附加费，附加费按相应费种费率的**百分之三十**计收。\n3. 危险货物的类别与申报要求，按危险货物运输管理的专项规定执行。",
-      "charCount" : 130,
+      "content" : "危险货物的计费遵循下列规定：\n\n1. 危险货物按其**物理化学性质对应的货类大类**计费，不单独设立\"危险品\"货类。\n2. 危险货物的费用，在对应费种费率的基础上**加收百分之三十**，**不单独设立费种、货类或费率条目**；费种仍以第四条列明的五类为限。\n3. 危险货物的类别与申报要求，按危险货物运输管理的专项规定执行。",
+      "charCount" : 155,
       "sourceLines" : "121-128",
       "extra" : { }
     },
@@ -3280,7 +3280,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3308,7 +3308,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3336,7 +3336,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3364,7 +3364,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3432,7 +3432,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3460,7 +3460,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3528,7 +3528,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3556,7 +3556,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3624,7 +3624,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3652,7 +3652,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3720,7 +3720,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3748,7 +3748,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3816,7 +3816,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3844,7 +3844,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3912,7 +3912,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -3940,7 +3940,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4008,7 +4008,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4036,7 +4036,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4051,8 +4051,8 @@
       "strategy" : "structure-article-v1",
       "splitterVersion" : "1.0.0",
       "embeddingModel" : null,
-      "content" : "1. **本费率表自 2027 年 1 月 1 日起废止，由《过闸费费率表（2027版）》（文号 PLYH-FL-2026-007）替代。**\n2. 本费率表自 2026 年 9 月 16 日起施行，施行期限至 2026 年 12 月 31 日止。\n3. **2026 年 12 月 31 日（含）之前发生的过闸业务，仍按本费率表执行**，不因本费率表其后废止而改按新费率表重新计费。\n4. 自 2027 年 1 月 1 日起发生的过闸业务，一律按《过闸费费率表（2027版）》执行，**不得再援引本费率表**。\n\n⚠️ 援引已废止的费率表计算 2027 年 1 月 1 日之后发生的过闸费，属计费差错。",
-      "charCount" : 256,
+      "content" : "1. **本费率表自 2027 年 1 月 1 日起废止，由《过闸费费率表（2027版）》（文号 PLYH-FL-2026-007）替代。**\n2. 本费率表自 2026 年 9 月 16 日起施行，施行期限至 2027 年 1 月 1 日止（**终止日不含**，即 2026 年 12 月 31 日为最后一日）。\n3. **2026 年 12 月 31 日（含）之前发生的过闸业务，仍按本费率表执行**，不因本费率表其后废止而改按新费率表重新计费。\n4. 自 2027 年 1 月 1 日起发生的过闸业务，一律按《过闸费费率表（2027版）》执行，**不得再援引本费率表**。\n\n⚠️ 援引已废止的费率表计算 2027 年 1 月 1 日之后发生的过闸费，属计费差错。",
+      "charCount" : 283,
       "sourceLines" : "121-129",
       "extra" : { }
     },
@@ -4064,7 +4064,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4081,7 +4081,7 @@
       ],
       "tableRows" : [
         [
-          "2026-09-16 至 2026-12-31（含）",
+          "2026-09-16 至 2027-01-01（终止日不含；业务末日为 2026-12-31，含当日）",
           "过闸费费率表（2026版）",
           "PLYH-FL-2026-006"
         ],
@@ -4094,8 +4094,8 @@
       "strategy" : "structure-article-v1",
       "splitterVersion" : "1.0.0",
       "embeddingModel" : null,
-      "content" : "| 业务发生日 | 适用费率表 | 文号 |\n| --- | --- | --- |\n| 2026-09-16 至 2026-12-31（含） | 过闸费费率表（2026版） | PLYH-FL-2026-006 |\n| 2027-01-01 起 | 过闸费费率表（2027版） | PLYH-FL-2026-007 |",
-      "charCount" : 130,
+      "content" : "| 业务发生日 | 适用费率表 | 文号 |\n| --- | --- | --- |\n| 2026-09-16 至 2027-01-01（终止日不含；业务末日为 2026-12-31，含当日） | 过闸费费率表（2026版） | PLYH-FL-2026-006 |\n| 2027-01-01 起 | 过闸费费率表（2027版） | PLYH-FL-2026-007 |",
+      "charCount" : 154,
       "sourceLines" : "138-141",
       "extra" : { }
     },
@@ -4107,7 +4107,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4135,7 +4135,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4163,7 +4163,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4191,7 +4191,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4219,7 +4219,7 @@
       "docNo" : "PLYH-FL-2026-006",
       "version" : "V1.0",
       "effectiveFrom" : "2026-09-16",
-      "effectiveTo" : "2026-12-31",
+      "effectiveTo" : "2027-01-01",
       "supersedes" : "无",
       "docCategoryNo" : "06",
       "chapterPath" : [
@@ -4234,8 +4234,8 @@
       "strategy" : "structure-article-v1",
       "splitterVersion" : "1.0.0",
       "embeddingModel" : null,
-      "content" : "本费率表由平陆运河航运服务中心负责解释，自 2026 年 9 月 16 日起施行，至 2026 年 12 月 31 日止，其后由《过闸费费率表（2027版）》（PLYH-FL-2026-007）替代。\n\n> **【仿真语料声明】** 本文为 CanalMind 项目自建仿真语料，非官方文件，不具法律效力，仅用于技术评测。",
-      "charCount" : 143,
+      "content" : "本费率表由平陆运河航运服务中心负责解释，自 2026 年 9 月 16 日起施行，至 2027 年 1 月 1 日止（终止日不含），其后由《过闸费费率表（2027版）》（PLYH-FL-2026-007）替代。\n\n> **【仿真语料声明】** 本文为 CanalMind 项目自建仿真语料，非官方文件，不具法律效力，仅用于技术评测。",
+      "charCount" : 148,
       "sourceLines" : "161-166",
       "extra" : { }
     },
@@ -4290,9 +4290,9 @@
       "strategy" : "structure-article-v1",
       "splitterVersion" : "1.0.0",
       "embeddingModel" : null,
-      "content" : "1. 本费率表自 2027 年 1 月 1 日起施行，**同时废止**《过闸费费率表（2026版）》（文号 PLYH-FL-2026-006）。\n2. 2026 年 12 月 31 日（含）之前发生的过闸业务，仍按 2026 版费率执行。\n3. 自 2027 年 1 月 1 日起发生的过闸业务，**一律**按本费率表执行，不得再援引 2026 版费率。\n\n⚠️ 查询过闸费费率时，**必须先确定业务发生日**，再据此选择适用版本。援引已废止版本计算 2027 年业务费用，属计费差错。",
-      "charCount" : 211,
-      "sourceLines" : "23-30",
+      "content" : "1. 本费率表自 2027 年 1 月 1 日起施行，**同时废止**《过闸费费率表（2026版）》（文号 PLYH-FL-2026-006）。\n2. 2026 年 12 月 31 日（含）之前发生的过闸业务，仍按 2026 版费率执行。\n3. 自 2027 年 1 月 1 日起发生的过闸业务，**一律**按本费率表执行，不得再援引 2026 版费率。\n4. 本费率表的生效期为 2027 年 1 月 1 日起长期有效；与 2026 版费率表的生效期（终止日 2027 年 1 月 1 日，**不含**）**无缝衔接，既无空档亦无重叠**。\n\n⚠️ 查询过闸费费率时，**必须先确定业务发生日**，再据此选择适用版本。援引已废止版本计算 2027 年业务费用，属计费差错。",
+      "charCount" : 289,
+      "sourceLines" : "23-31",
       "extra" : { }
     },
     {
@@ -4320,7 +4320,7 @@
       "embeddingModel" : null,
       "content" : "1. 过闸费计费单位为**元/吨**，按船舶载货吨位计收。\n2. 吨位分段为**左闭右开**区间，即 `[下限, 上限)`。\n3. 船舶载货吨位恰好等于某段上限时，计入**下一段**。\n4. 空载航次不计收过闸费。",
       "charCount" : 98,
-      "sourceLines" : "31-37",
+      "sourceLines" : "32-38",
       "extra" : { }
     },
     {
@@ -4388,7 +4388,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 建材 | 0 | 500 | 2.80 | 元/吨 |\n| 过闸费 | 建材 | 500 | 2000 | 3.20 | 元/吨 |\n| 过闸费 | 建材 | 2000 | 5000 | 3.60 | 元/吨 |\n| 过闸费 | 建材 | 5000 | （不封顶） | 4.00 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "44-49",
+      "sourceLines" : "45-50",
       "extra" : { }
     },
     {
@@ -4416,7 +4416,7 @@
       "embeddingModel" : null,
       "content" : "建材类货物过闸费费率如下：\n\n[TABLE:1287a36aaae7400e rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "40-50",
+      "sourceLines" : "41-51",
       "extra" : { }
     },
     {
@@ -4484,7 +4484,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 能源 | 0 | 500 | 2.50 | 元/吨 |\n| 过闸费 | 能源 | 500 | 2000 | 2.90 | 元/吨 |\n| 过闸费 | 能源 | 2000 | 5000 | 3.20 | 元/吨 |\n| 过闸费 | 能源 | 5000 | （不封顶） | 3.50 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "55-60",
+      "sourceLines" : "56-61",
       "extra" : { }
     },
     {
@@ -4512,7 +4512,7 @@
       "embeddingModel" : null,
       "content" : "能源类货物过闸费费率如下：\n\n[TABLE:f91bf8647b1ce7ab rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "51-61",
+      "sourceLines" : "52-62",
       "extra" : { }
     },
     {
@@ -4580,7 +4580,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 金属 | 0 | 500 | 3.20 | 元/吨 |\n| 过闸费 | 金属 | 500 | 2000 | 3.60 | 元/吨 |\n| 过闸费 | 金属 | 2000 | 5000 | 4.00 | 元/吨 |\n| 过闸费 | 金属 | 5000 | （不封顶） | 4.40 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "66-71",
+      "sourceLines" : "67-72",
       "extra" : { }
     },
     {
@@ -4608,7 +4608,7 @@
       "embeddingModel" : null,
       "content" : "金属类货物过闸费费率如下：\n\n[TABLE:cda2572291329831 rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "62-72",
+      "sourceLines" : "63-73",
       "extra" : { }
     },
     {
@@ -4676,7 +4676,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 农资 | 0 | 500 | 3.00 | 元/吨 |\n| 过闸费 | 农资 | 500 | 2000 | 3.40 | 元/吨 |\n| 过闸费 | 农资 | 2000 | 5000 | 3.80 | 元/吨 |\n| 过闸费 | 农资 | 5000 | （不封顶） | 4.20 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "77-82",
+      "sourceLines" : "78-83",
       "extra" : { }
     },
     {
@@ -4704,7 +4704,7 @@
       "embeddingModel" : null,
       "content" : "农资类货物过闸费费率如下：\n\n[TABLE:6ed1e07df15b8caf rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "73-83",
+      "sourceLines" : "74-84",
       "extra" : { }
     },
     {
@@ -4772,7 +4772,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 化工 | 0 | 500 | 4.20 | 元/吨 |\n| 过闸费 | 化工 | 500 | 2000 | 4.70 | 元/吨 |\n| 过闸费 | 化工 | 2000 | 5000 | 5.20 | 元/吨 |\n| 过闸费 | 化工 | 5000 | （不封顶） | 5.80 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "88-93",
+      "sourceLines" : "89-94",
       "extra" : { }
     },
     {
@@ -4800,7 +4800,7 @@
       "embeddingModel" : null,
       "content" : "化工类货物过闸费费率如下：\n\n[TABLE:f94a87a9fcdef2e7 rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "84-94",
+      "sourceLines" : "85-95",
       "extra" : { }
     },
     {
@@ -4868,7 +4868,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 集装箱 | 0 | 500 | 4.50 | 元/吨 |\n| 过闸费 | 集装箱 | 500 | 2000 | 5.00 | 元/吨 |\n| 过闸费 | 集装箱 | 2000 | 5000 | 5.50 | 元/吨 |\n| 过闸费 | 集装箱 | 5000 | （不封顶） | 6.00 | 元/吨 |",
       "charCount" : 164,
-      "sourceLines" : "99-104",
+      "sourceLines" : "100-105",
       "extra" : { }
     },
     {
@@ -4896,7 +4896,7 @@
       "embeddingModel" : null,
       "content" : "集装箱类货物过闸费费率如下：\n\n[TABLE:d014416b35d9ea35 rows=4 cols=6]",
       "charCount" : 50,
-      "sourceLines" : "95-105",
+      "sourceLines" : "96-106",
       "extra" : { }
     },
     {
@@ -4964,7 +4964,7 @@
       "embeddingModel" : null,
       "content" : "| 费种 | 货类 | 吨位下限（吨） | 吨位上限（吨） | 费率 | 计费单位 |\n| --- | --- | --- | --- | --- | --- |\n| 过闸费 | 其他 | 0 | 500 | 2.60 | 元/吨 |\n| 过闸费 | 其他 | 500 | 2000 | 3.00 | 元/吨 |\n| 过闸费 | 其他 | 2000 | 5000 | 3.40 | 元/吨 |\n| 过闸费 | 其他 | 5000 | （不封顶） | 3.80 | 元/吨 |",
       "charCount" : 160,
-      "sourceLines" : "110-115",
+      "sourceLines" : "111-116",
       "extra" : { }
     },
     {
@@ -4992,7 +4992,7 @@
       "embeddingModel" : null,
       "content" : "其他类货物过闸费费率如下：\n\n[TABLE:84cd20c4adab69f9 rows=4 cols=6]",
       "charCount" : 49,
-      "sourceLines" : "106-116",
+      "sourceLines" : "107-117",
       "extra" : { }
     },
     {
@@ -5020,7 +5020,7 @@
       "embeddingModel" : null,
       "content" : "列入重点保供物资范围的货物，过闸费按**百分之七十**计收。重点保供物资的范围按《重点物资优先过闸规定》执行。",
       "charCount" : 55,
-      "sourceLines" : "119-122",
+      "sourceLines" : "120-123",
       "extra" : { }
     },
     {
@@ -5048,7 +5048,7 @@
       "embeddingModel" : null,
       "content" : "危险货物的过闸费，在对应货类费率基础上**加收百分之三十**，不单独设立费率条目。",
       "charCount" : 41,
-      "sourceLines" : "123-126",
+      "sourceLines" : "124-127",
       "extra" : { }
     },
     {
@@ -5076,7 +5076,7 @@
       "embeddingModel" : null,
       "content" : "1. 空载航次不计收过闸费。\n2. 船舶载货吨位低于该航次核定最低计费吨位的，按核定最低计费吨位计收。",
       "charCount" : 48,
-      "sourceLines" : "127-131",
+      "sourceLines" : "128-132",
       "extra" : { }
     },
     {
@@ -5104,7 +5104,7 @@
       "embeddingModel" : null,
       "content" : "本费率表由平陆运河航运服务中心负责解释，自 2027 年 1 月 1 日起施行。\n\n> **【仿真语料声明】** 本文为 CanalMind 项目自建仿真语料，非官方文件，不具法律效力，仅用于技术评测。",
       "charCount" : 89,
-      "sourceLines" : "132-137",
+      "sourceLines" : "133-138",
       "extra" : { }
     },
     {
@@ -18830,19 +18830,19 @@
     }
   ],
   "baseline" : {
-    "chunkCount" : 385,
-    "totalChars" : 109626,
-    "meanChars" : 284.74,
+    "chunkCount" : 386,
+    "totalChars" : 109788,
+    "meanChars" : 284.42,
     "minChars" : 62,
     "maxChars" : 315,
-    "stdDevChars" : 38.62,
+    "stdDevChars" : 39.14,
     "tableChunkCount" : 0,
-    "bodyChunkCount" : 385,
+    "bodyChunkCount" : 386,
     "docsWithNoChunk" : 0,
     "sizeHistogram" : {
       "50" : 0,
       "100" : 4,
-      "200" : 11,
+      "200" : 12,
       "400" : 370,
       "800" : 0,
       "2147483647" : 0

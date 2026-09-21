@@ -12,14 +12,14 @@
     2
   ],
   "hitsFile": "vector-l2-v2-hits.json",
-  "hitsFileSha256": "fef8a355fe7192dd91b3ce2b3352ad38959ec4d738fe3382dd739c12280b5e40",
+  "hitsFileSha256": "3212aa67b3fc63975f983321f57eb091f0d22163c159e847af79361bce514682",
   "kValues": [
     5,
     10,
     20,
     30
   ],
-  "label": "vector-baseline-v2-topk30",
+  "label": "vector-baseline-v2-topk30-corpus-2026-09-21",
   "metricDefinitions": {
     "HitRate@k": "至少命中一个 gold chunk 的题占比",
     "MRR@k": "首个 gold 命中排名倒数的均值（无命中记 0）",
@@ -152,7 +152,7 @@
       },
       {
         "goldTableChunkId": "054aa6350ae39ea0",
-        "goldTableRank": 3,
+        "goldTableRank": 4,
         "itemId": "L2-031",
         "placeholderChunkId": "5e50898288330b6a",
         "placeholderRank": 7,
@@ -182,8 +182,8 @@
     "1": 27,
     "12": 1,
     "2": 4,
-    "3": 4,
-    "4": 2,
+    "3": 3,
+    "4": 3,
     "7": 1,
     "未命中": 1
   },
@@ -194,10 +194,10 @@
       "HitRate@20": 0.975,
       "HitRate@30": 0.975,
       "HitRate@5": 0.925,
-      "MRR@10": 0.774405,
-      "MRR@20": 0.776488,
-      "MRR@30": 0.776488,
-      "MRR@5": 0.770833,
+      "MRR@10": 0.772321,
+      "MRR@20": 0.774405,
+      "MRR@30": 0.774405,
+      "MRR@5": 0.76875,
       "Precision@10": 0.0975,
       "Precision@20": 0.05,
       "Precision@30": 0.033333,
@@ -345,10 +345,10 @@
         "HitRate@20": 0.833333,
         "HitRate@30": 0.833333,
         "HitRate@5": 0.833333,
-        "MRR@10": 0.722222,
-        "MRR@20": 0.722222,
-        "MRR@30": 0.722222,
-        "MRR@5": 0.722222,
+        "MRR@10": 0.708333,
+        "MRR@20": 0.708333,
+        "MRR@30": 0.708333,
+        "MRR@5": 0.708333,
         "Precision@10": 0.083333,
         "Precision@20": 0.041667,
         "Precision@30": 0.027778,
@@ -407,10 +407,10 @@
         "HitRate@20": 0.96875,
         "HitRate@30": 0.96875,
         "HitRate@5": 0.9375,
-        "MRR@10": 0.764881,
-        "MRR@20": 0.764881,
-        "MRR@30": 0.764881,
-        "MRR@5": 0.760417,
+        "MRR@10": 0.762277,
+        "MRR@20": 0.762277,
+        "MRR@30": 0.762277,
+        "MRR@5": 0.757812,
         "Precision@10": 0.1,
         "Precision@20": 0.05,
         "Precision@30": 0.033333,
@@ -499,10 +499,10 @@
         "HitRate@20": 1.0,
         "HitRate@30": 1.0,
         "HitRate@5": 1.0,
-        "MRR@10": 0.630952,
-        "MRR@20": 0.630952,
-        "MRR@30": 0.630952,
-        "MRR@5": 0.630952,
+        "MRR@10": 0.619048,
+        "MRR@20": 0.619048,
+        "MRR@30": 0.619048,
+        "MRR@5": 0.619048,
         "Precision@10": 0.1,
         "Precision@20": 0.05,
         "Precision@30": 0.033333,
@@ -681,10 +681,10 @@
       "HitRate@20": 1.0,
       "HitRate@30": 1.0,
       "HitRate@5": 0.948718,
-      "MRR@10": 0.794261,
-      "MRR@20": 0.796398,
-      "MRR@30": 0.796398,
-      "MRR@5": 0.790598,
+      "MRR@10": 0.792125,
+      "MRR@20": 0.794261,
+      "MRR@30": 0.794261,
+      "MRR@5": 0.788462,
       "Precision@10": 0.1,
       "Precision@20": 0.051282,
       "Precision@30": 0.034188,
@@ -705,6 +705,22 @@
       "siblingExemptPrecision@20": 0.088462,
       "siblingExemptPrecision@30": 0.061538,
       "siblingExemptPrecision@5": 0.312821
+    },
+    "subset": {
+      "evaluatedBySplit": {
+        "dev": 32,
+        "holdout": 8
+      },
+      "evaluatedQueries": 40,
+      "goldenQueries": 40,
+      "missingBySplit": {
+        "dev": 0,
+        "holdout": 0
+      },
+      "missingQueries": [],
+      "missingQueryCount": 0,
+      "note": "全量出分：金标集全部题目到齐（缺席任何一题即失败）",
+      "subset": false
     }
   },
   "scoreMarginAnalysis": {
@@ -980,13 +996,13 @@
         "top1Margin": 0.1964112247079456
       },
       {
-        "bestNonGoldScore": 0.7780920067861413,
-        "goldRank": 3,
-        "goldScore": 0.7551582710614809,
+        "bestNonGoldScore": 0.7743114771100558,
+        "goldRank": 4,
+        "goldScore": 0.7258160287265778,
         "id": "L2-031",
-        "margin": -0.022933735724660398,
+        "margin": -0.04849544838347797,
         "nearTie": false,
-        "top1Margin": 0.015150538147292947
+        "top1Margin": 0.016786688730300425
       },
       {
         "bestNonGoldScore": 0.6737892822152816,
@@ -1016,22 +1032,22 @@
         "top1Margin": 0.12689763668133647
       },
       {
-        "bestNonGoldScore": 0.7342960955434029,
+        "bestNonGoldScore": 0.7298015033962186,
         "goldRank": 2,
-        "goldScore": 0.7211664279003,
+        "goldScore": 0.7217081982045934,
         "id": "L2-035",
-        "margin": -0.01312966764310286,
-        "nearTie": false,
-        "top1Margin": 0.01312966764310286
+        "margin": -0.00809330519162521,
+        "nearTie": true,
+        "top1Margin": 0.00809330519162521
       },
       {
-        "bestNonGoldScore": 0.6506145747349352,
+        "bestNonGoldScore": 0.6553283929825574,
         "goldRank": 1,
-        "goldScore": 0.665103733819085,
+        "goldScore": 0.6681971745021117,
         "id": "L2-036",
-        "margin": 0.014489159084149827,
+        "margin": 0.012868781519554284,
         "nearTie": false,
-        "top1Margin": 0.014489159084149827
+        "top1Margin": 0.012868781519554284
       },
       {
         "bestNonGoldScore": 0.7262318996631912,
@@ -1073,9 +1089,25 @@
     "maxMargin": 0.1964112247079456,
     "medianMargin": 0.014596535433372915,
     "minMargin": -0.0732296983725571,
-    "nearTieCount": 4,
+    "nearTieCount": 5,
     "nearTieThreshold": 0.01,
     "nearTieThresholdNote": "启发式阈值，只为把值得人工复核的脆弱命中捞出来，不具备统计含义"
+  },
+  "subset": {
+    "evaluatedBySplit": {
+      "dev": 32,
+      "holdout": 8
+    },
+    "evaluatedQueries": 40,
+    "goldenQueries": 40,
+    "missingBySplit": {
+      "dev": 0,
+      "holdout": 0
+    },
+    "missingQueries": [],
+    "missingQueryCount": 0,
+    "note": "全量出分：金标集全部题目到齐（缺席任何一题即失败）",
+    "subset": false
   },
   "topK": 30
 }
