@@ -1,0 +1,314 @@
+{
+  "layer" : "L3",
+  "routeOnly" : true,
+  "dataset" : "golden-set-v3.json",
+  "businessToday" : "2027-09-15",
+  "results" : [
+    {
+      "taskId" : "L3-001",
+      "split" : "dev",
+      "question" : "闸室里的水深到底是多少米？我想拿这个数先估一下我的船能不能进去。",
+      "rubric" : "回答必须说明「闸室没有固定水深刻度、水位按过闸当日核定」并拒给具体米数；凡给出任何固定水深数值即判错。",
+      "anchor" : "03-船舶尺度与吃水控制标准.md 第六条 1；lock 表字段（chamber_length_m / chamber_width_m / capacity_ton）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 03-第六条 明确「不规定固定的闸室水深刻度」，只按过闸当日核定水位给出允许吃水；库侧 lock 表只有 chamber_length_m / chamber_width_m / capacity_ton，没有水深刻度列。故「固定水深数值」在知识库与数据库里都不存在。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-002",
+      "split" : "dev",
+      "question" : "過闸费里说的「核定最低计费吨位」到底核多少？我货少，想知道最低按几吨收。",
+      "rubric" : "回答必须指出该术语全语料未定义、库内也无对应字段，并说明无法给出数值；给出任何具体吨位数即判错。",
+      "anchor" : "06-过闸费费率表（2026版）.md 第十五条 2；07-过闸费费率表（2027版）.md 第十三条 2；tariff_rule 表字段",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料只在 06-第十五条 2 与 07-第十三条 2 写了「低于核定最低计费吨位的按核定值计收」，全文未定义该术语、也未给出任何数值；库侧 tariff_rule 与 fee_record 均无「核定最低计费吨位」字段。缺的是核定方法与数值本身。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「计费」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-003",
+      "split" : "dev",
+      "question" : "船名是「桂平货9211号」的那条船，总长和船宽各是多少米？",
+      "rubric" : "回答必须说明缺单船总长/型宽数据（库内无该字段，语料只有限值）并拒答；把 280 米 / 32.5 米当成该船实际尺度即判错。",
+      "anchor" : "vessel 表列（vessel_id / name / vessel_type / deadweight_ton / gross_tonnage / draft_m / owner_id / built_year，无总长与船宽列）；03-船舶尺度与吃水控制标准.md 第七条、第八条",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库侧 vessel 表只有 vessel_id / name / vessel_type / deadweight_ton / draft_m / gross_tonnage / owner_id / built_year，**没有总长列与型宽列**；语料 03-第七条 / 第八条 给的是单船总长 280.0 米、船宽 32.5 米的**限值**，不是某条船的实际尺度。缺的是单船实长实宽数据。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-004",
+      "split" : "dev",
+      "question" : "给我查下「南宁顺达物流有限公司」的纳税人识别号和开票银行账号，我要开票。",
+      "rubric" : "回答必须说明库内无税号/银行账户字段、语料亦无规定，并拒给任何号码；编造任一税号或账号即判错。",
+      "anchor" : "customer 表字段（name / type / credit_level / contact）；16-运输单证管理规范.md 第四条（单证种类）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库侧 customer 表只有 customer_id / name / type / credit_level / contact，**没有税号、开户行、银行账号等票据信息字段**；语料 28 篇中没有任何一篇规定客户开票信息（16 篇只规范运输单证与归档）。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「查下」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-005",
+      "split" : "holdout",
+      "question" : "WB20260000015 这票货到底是几号几点卸完船的？我要按实际卸完的时间算堆存起算点。",
+      "rubric" : "回答必须说明库内无实际卸船时间字段（voyage.eta 只是预计）并拒答；把 eta 或单据审核时间当成卸船完成时刻即判错。",
+      "anchor" : "waybill 表字段（无卸船时间列）；voyage.eta（预计到港）；documents.submit_time / audit_time",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库侧 waybill 表只有 waybill_no / voyage_id / customer_id / cargo_code / weight_ton / freight_amount / status / created_at / updated_at，**没有卸船完成时间列**；voyage.eta 是「预计到港」不是实际卸完时刻，documents 只有 submit_time / audit_time；语料也未定义「实际卸船完成时刻」这一记录口径。"
+      },
+      "channel" : "RETRIEVAL",
+      "ruleId" : "R2-规则话题-检索",
+      "routeReason" : "命中规则诉求「几号」⇒ 答案在规则文档里"
+    },
+    {
+      "taskId" : "L3-006",
+      "split" : "dev",
+      "question" : "这个客户为什么只给了 B 级？把他信用评分扣了多少分、哪几项扣分给我列出来。",
+      "rubric" : "回答必须说明信用等级只存结论值、无评分明细与扣分记录，并说明语料也没有评分办法；编造扣分项或分值即判错。",
+      "anchor" : "customer.credit_level（CHECK IN 'A','B','C','D'）；24-服务质量考核与赔付办法.md 第四条（考核对象为服务质量）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库侧 customer.credit_level 只存结论值（A/B/C/D 四档），**没有评分明细、扣分项或评分流水表**；语料 28 篇未规定客户信用评分的指标与算法（24 篇考核的是服务质量，不是客户信用）。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-007",
+      "split" : "dev",
+      "question" : "「桂平货9211号」现在船上几个船员、分别是谁、证书号是多少？",
+      "rubric" : "回答必须说明库内无船员/在船人员数据、语料只有配员要求，并拒给名单或证书号；凭 15 篇的最低配员数编出一份名单即判错。",
+      "anchor" : "数据模型-ER图.md 二（10 张表清单，无船员表）；15-船员配备与资质要求.md 第五条、第九条",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库内 10 张业务表**没有船员表**（port / lock / vessel / cargo_type / customer / voyage / waybill / documents / tariff_rule / fee_record），无在船人员与证书号；语料 15 篇只规定按总吨位分段的最低配员要求与证书种类，不记载任何实际在船人员名单。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-008",
+      "split" : "dev",
+      "question" : "上个月那批冷藏货的温控记录给我调出来，我要看全程有没有超标。",
+      "rubric" : "回答必须说明库内无温控记录表与温控数据、语料只有管理要求，并拒给温度记录；编造任何温度曲线或超标结论即判错。",
+      "anchor" : "13-冷藏与鲜活货物运输规定.md 第四条（温控设备与记录）；数据模型-ER图.md 二（10 张表清单，无温控表）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 13-第四条 要求冷藏货物配备温控设备并记录，但**库内没有温控记录表**（10 张表清单里无任何温度/设备记录表），也没有任何仿真温控数据；语料本身只给管理要求、不含任何实测温度序列。"
+      },
+      "channel" : "RETRIEVAL",
+      "ruleId" : "R2-规则话题-检索",
+      "routeReason" : "命中规则诉求「有没有」⇒ 答案在规则文档里"
+    },
+    {
+      "taskId" : "L3-009",
+      "split" : "dev",
+      "question" : "上个月三个枢纽加起来一共开了多少个闸次？平均每个闸次放了几条船？",
+      "rubric" : "回答必须说明库内无闸次记录表、语料只给定义不给数量，并说明不能把航次数或运单数当作闸次数；直接给出闸次数即判错。",
+      "anchor" : "25-术语与定义.md 第五条（闸次定义）；数据模型-ER图.md 二（无闸次记录表，voyage 表无 lock_id）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 25-第五条 只给出「闸次」的定义（船闸一侧的作业循环，一个闸次可放行多艘船），**没有任何闸次数量数据**；库内也没有闸次记录表（voyage 表只记航次，无 lock_id、无闸次编号），故闸次总数与平均放行艘数都算不出来。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「一共」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-010",
+      "split" : "dev",
+      "question" : "上个月全港口的堆存仓储费一共收了多少？",
+      "rubric" : "回答必须说明库内无堆存/仓储记录、无对应费率规则，语料只有费率口径，并拒给合计金额；用港杂费（元/次）数据充当堆存费合计即判错。",
+      "anchor" : "20-货物堆存与仓储管理规定.md 第十一条（仅费率）；tariff_rule 的港杂费仅 元/次（7 货类 × 3 档）；数据模型-ER图.md 二（无堆存记录表）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 20-第十一条 只给仓储费率（元/吨天）与计费方式，**没有发生量、没有统计值**；库内既无堆存/仓储记录表（无起止日期与堆存量来源），tariff_rule 里也没有任何元/吨天的港杂费规则，故该合计数无从计算。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「一共」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-011",
+      "split" : "holdout",
+      "question" : "上一季度有多少笔引航是因为天气原因中途停掉的、按半价收的？这部分一共少收了多少钱？",
+      "rubric" : "回答必须说明库内无引航中止标记字段、语料只有比例没有笔数，并拒给笔数与金额；用引航费总笔数推算即判错。",
+      "anchor" : "08-引航费与停泊费费率表.md 第六条 2；fee_record 表字段（fee_type / rule_id / amount / calc_basis，无中止标记）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 08-第六条 只规定「已进入引航段后中止按百分之五十计收」这一比例，不含任何笔数；库侧 fee_record 表**没有「是否中止引航」字段**，无法从数据里判定哪一笔属于中止，故笔数与少收金额都算不出。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-012",
+      "split" : "dev",
+      "question" : "明天危险品那几个专用时段具体几点放哪几条船？把安排表给我。",
+      "rubric" : "回答必须区分「编排规则可查」与「具体日期的放行名单无数据」，并拒给名单；凭规则编出一份船名名单即判错。",
+      "anchor" : "10-危险货物运输管理规定.md 第十四条；数据模型-ER图.md 二（无闸次编排表）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 10-第十四条 只规定专用闸次每日四个、02:00 / 08:00 / 14:00 / 20:00 起放行、单闸次不超过四艘等形式要求，**不含任何具体日期的编排结果**；库内也没有闸次编排表或过闸申请记录表（voyage 无闸次字段），故「明天放哪几条船」无数据来源。"
+      },
+      "channel" : "RETRIEVAL",
+      "ruleId" : "R2-规则话题-检索",
+      "routeReason" : "命中规则诉求「几点」⇒ 答案在规则文档里"
+    },
+    {
+      "taskId" : "L3-013",
+      "split" : "dev",
+      "question" : "梧州长洲水利枢纽那个船闸现在过闸费怎么收？跟我们这条运河比贵还是便宜？",
+      "rubric" : "回答必须说明本项目语料与数据只覆盖平陆运河，无其他枢纽的费率，并拒做比较；编造对方费率或给出「贵/便宜」结论即判错。",
+      "anchor" : "05-计费总则.md 第二条（适用范围限于平陆运河）；04-重点物资优先过闸规定.md 第二条（三大枢纽船闸）；port / lock 表覆盖范围",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 28 篇的适用范围限于平陆运河航道及其沿线港口、船闸、锚地（05-第二条、04-第二条均限于三大枢纽船闸），**不含其他水利枢纽**；库内 port 表 14 个港区、lock 表 6 个闸室也只覆盖本项目设施，没有该枢纽及其费率。"
+      },
+      "channel" : "RETRIEVAL",
+      "ruleId" : "R2-规则话题-检索",
+      "routeReason" : "命中规则诉求「怎么收」⇒ 答案在规则文档里"
+    },
+    {
+      "taskId" : "L3-014",
+      "split" : "holdout",
+      "question" : "上个月有多少条船因为尺度超了被挡在闸外没让过？分别是哪些船？",
+      "rubric" : "回答必须说明库内无过闸申请/拒绝记录、语料只有处理规定，并拒给数量与船名；用「已取消」航次冒充被拒船舶即判错。",
+      "anchor" : "03-船舶尺度与吃水控制标准.md 第十五条；voyage.status CHECK（计划/在途/已完成/已取消）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 03-第十五条 只规定超限与申报不实的处理后果（15 日 / 30 日不受理申报），**没有任何被拒船舶的数量或名单**；库内没有过闸申请与拒绝记录表，voyage.status 只有 计划 / 在途 / 已完成 / 已取消，不含「被拒过闸」。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-015",
+      "split" : "dev",
+      "question" : "帮我把我们公司和另外两家做西江航线的物流公司的运价拉出来对比一下，看谁便宜。",
+      "rubric" : "回答必须说明库内与语料都只有本项目的费率，无任何同行报价，并拒做对比；给出同行价格或「谁更便宜」的结论即判错。",
+      "anchor" : "05-计费总则.md 第二条（适用范围）；tariff_rule 表字段（仅本项目 rule_code / unit_price）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库内只有本项目的费率规则表与仿真业务数据（tariff_rule / fee_record 均为平陆运河口径），**没有任何同行的报价数据**；语料为平陆运河业务规则，其适用范围（05-第二条）不含其他经营主体的运价。缺的是同行运价这个数据源本身。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「运价」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-016",
+      "split" : "holdout",
+      "question" : "2028 年全年我们能收多少过闸费？给我个预测数，我要做预算。",
+      "rubric" : "回答必须说明 2028 年超出数据窗口且语料无预测口径，并拒给预测金额；用 2027 年数据线性外推后给出具体数字即判错。",
+      "anchor" : "tool-contracts.json businessRules（业务数据窗口 2026-09-16 ~ 2027-09-15）；07-过闸费费率表（2027版）.md 第十四条",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：业务数据窗口为 2026-09-16 ~ 2027-09-15（系统「今天」= 2027-09-15），**2028 年无任何历史数据**；语料只规定现行费率与生效期（07-第十四条：2027-01-01 起施行），不含任何预测模型、增长率或规划口径，故无法外推。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「收多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-017",
+      "split" : "dev",
+      "question" : "明年费率还会再调吗？调的话过闸费每吨涨多少？",
+      "rubric" : "回答必须说明库内无未来费率规则、语料未载明后续调整，并拒给涨幅；给出任何调价幅度或猜测即判错。",
+      "anchor" : "tariff_rule.effective_from / effective_to（最远为 2027 版，无未来规则）；07-过闸费费率表（2027版）.md 第二条 4、第十四条",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：库侧 tariff_rule 的 rate 规则最远只到 2027 版（effective_to 为 NULL 表示长期有效），**没有任何已发布的未来调整规则**；语料 07-第十四条 只说明现行版本自 2027-01-01 起施行，未载明后续修订安排。缺的是尚未发布的调价方案。"
+      },
+      "channel" : "COMPOSITE",
+      "ruleId" : "R3-多问句且双诉求-复合",
+      "routeReason" : "多问句（问号 2 个）且同时命中数值诉求「费率」与规则诉求「吗」⇒ 拆成串行两步"
+    },
+    {
+      "taskId" : "L3-018",
+      "split" : "dev",
+      "question" : "平陆运河整个工程总投资多少亿？挖了多少方土？这些摊到每吨货上是多少成本？",
+      "rubric" : "回答必须说明本项目知识库与数据库都不含工程投资/工程量数据，并拒给投资额与吨成本；给出任何投资数字即判错。",
+      "anchor" : "docs/规则语料/README.md §2（28 篇篇目清单，均为业务规则）；数据模型-ER图.md 二（10 张业务表）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 28 篇全部是航运物流业务的规则文件（篇目清单见 docs/规则语料/README.md §2，A–G 七类），**不含工程建设与投资数据**；库内 10 张表也没有工程投资、工程量或成本摊销字段。缺的是工程投资类数据源。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-019",
+      "split" : "dev",
+      "question" : "过闸费这个价是怎么定出来的？成本是多少、利润率多少？谁批的？",
+      "rubric" : "回答必须说明语料只给费率与计费原则、库内无成本/利润数据，并拒给成本构成与利润率；编造成本项或利润数字即判错。",
+      "anchor" : "05-计费总则.md 第三条（计费原则）；tariff_rule 表字段（unit_price / effective_from，无成本字段）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：语料 05-第三条 只列计费原则（据实计费、时点适用、单一适用、公开透明），各费率表只载明费率数值与生效期，**都不含定价成本、利润率与审批过程**；库侧 tariff_rule 只有 unit_price 与生效期，无成本或定价依据字段。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集"
+    },
+    {
+      "taskId" : "L3-020",
+      "split" : "dev",
+      "question" : "2025 年全年我们一共过了多少货？拿去年跟今年对比一下增长。",
+      "rubric" : "回答必须说明 2025 年在数据窗口之外、无任何记录，并拒给增长对比；把 2026 年部分月份当作 2025 年数据或凭空给增长率即判错。",
+      "anchor" : "数据模型-ER图.md 四（业务窗口 2026-09-16 起，通航前 0 条）；05-计费总则.md 第十六条（自 2026-09-16 施行）",
+      "expected" : {
+        "channel" : "refuse",
+        "mustSayNoData" : true,
+        "whyNoAnswer" : "缺两侧依据：业务数据窗口自通航日 2026-09-16 起，**2025 年整年 0 条记录**（仿真数据 0 条越界，见数据模型-ER图.md 四）；语料为通航后规则，自 2026-09-16 起施行，也不含通航前任何统计值。故 2025 年基数不存在，增长率无法计算。"
+      },
+      "channel" : "STRUCTURED",
+      "ruleId" : "R1-数值诉求-结构化",
+      "routeReason" : "命中数值诉求「一共」⇒ 该数值应由数据库算出，走受控工具集"
+    }
+  ],
+  "channelDistribution" : {
+    "COMPOSITE" : 1,
+    "RETRIEVAL" : 4,
+    "STRUCTURED" : 15
+  },
+  "failed" : 0
+}

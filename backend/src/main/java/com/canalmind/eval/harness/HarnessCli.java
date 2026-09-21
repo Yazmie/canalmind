@@ -337,7 +337,7 @@ public final class HarnessCli {
     }
 
     // ------------------------------------------------------------------ 工具
-    static DriverManagerDataSource dataSource(Map<String, String> env) {
+    public static DriverManagerDataSource dataSource(Map<String, String> env) {
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("org.postgresql.Driver");
         // ⚠️ 优先整条 POSTGRES_URL：`.env` 里已有它，且它与 application.yml 第 56 行的默认值不同
@@ -377,7 +377,7 @@ public final class HarnessCli {
      * 这已被记为本项目一条环境坑（`工程复盘/环境坑/同一个相对路径解析到两个目录.md`）。
      * ⛔ 找不到时**返回原路径让调用方报"不存在"**，而不是静默换成别的文件。
      */
-    static Path resolve(String path) {
+    public static Path resolve(String path) {
         Path direct = Path.of(path);
         if (Files.exists(direct)) {
             return direct;
