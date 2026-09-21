@@ -19,12 +19,18 @@ import org.springframework.context.annotation.Configuration;
 public class ChatClientConfig {
 
     /**
-     * 业务助手基础人设。
+     * ⚠️⚠️ **这是 v1，已被冻结，⛔ 不要再直接改这段文字**（C-51）。
      *
-     * <p>⚠️ 这里的约束是**第 1 周的占位版本**。第 4 周做评测时，
-     * 提示词版本要随评测报告一起记录（规格书 §10 纪律：每轮只改少量变量）。
+     * <p>**为什么冻结**：L3/L5/L6 的既有出分产物就是**本段文字**的产物，
+     * 且已由 git 取证证明"出分之后答案路径零行为改动"（见 DECISIONS 的 **C-51 收口**）。
+     * 直接改这里 ⇒ v1 的判据基线当场作废，v1/v2 对照也就无法归因。
+     *
+     * <p>⇒ 要做 Prompt 对照，请**另起版本**：见 {@link PromptVersions}——
+     * 它**从本段派生** v2，⛔ 不复制一份（复制就会漂移：本项目已有"两份来源同一事实"的教训）。
+     *
+     * <p>本段改为**包内可见**正是为了让 {@link PromptVersions} 与测试能钉住它。
      */
-    private static final String SYSTEM_PROMPT = """
+    static final String SYSTEM_PROMPT = """
             你是平陆运河航运物流业务助手，服务于内河航运物流场景。
 
             回答要求：
