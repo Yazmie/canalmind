@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import io
 import json
 import os
@@ -53,21 +54,48 @@ FEE_TYPES = ["过闸费", "港杂费", "装卸费", "引航费", "停泊费"]
 CONTRACT_PATH = ROOT / "backend" / "src" / "main" / "resources" / "structured" / "tool-contracts.json"
 
 
-def _load_contract() -> tuple[set, dict]:
-    """工具名与参数名**从契约读**，不在这里再写一份——
+def _load_contract() -> tuple[set, dict, dict]:
+    """工具名、参数名、参数约束**从契约读**，不在这里再写一份——
     否则契约加了参数而评测集脚本不知道，会得到"评测集自己报错、被测代码其实没问题"的假失败。
     """
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     names = set()
     args: dict = {}
+    schemas: dict = {}
     for tool in contract["tools"]:
         names.add(tool["name"])
-        args[tool["name"]] = set(tool["parameters"]["properties"].keys())
-    return names, args
+        props = tool["parameters"]["properties"]
+        args[tool["name"]] = set(props.keys())
+        schemas[tool["name"]] = props          # 用于反向校验枚举值与日期格式
+    return names, args, schemas
 
 
-TOOLS, TOOL_ARGS = _load_contract()
+TOOLS, TOOL_ARGS, TOOL_SCHEMAS = _load_contract()
 PER_TIME_FEE_TYPES = {"引航费", "停泊费"}
+
+
+def _check_args_against_contract(item_id: str, tool: str, values: dict, errors: list) -> None:
+    """把参数值**反向校验回契约**：枚举必须在 enum 内、日期必须真能解析。
+
+    ⚠️ 为什么要有这一步：L3–L6 是人工构造的题，参数写错**不会报错**，
+    只会让"评测集自己错了"伪装成"系统答错了"（本项目已有一次同类教训：
+    `数据一致性/评测集自身的错误不会报错`）。日期尤其危险——
+    `2027-02-30` 这种手写笔误只有真去 parse 才发现。
+    """
+    props = TOOL_SCHEMAS.get(tool, {})
+    for key, value in values.items():
+        spec = props.get(key)
+        if spec is None:
+            continue                            # 参数名合法性由调用方另行检查
+        enum = spec.get("enum")
+        if enum is not None and isinstance(value, str) and value not in enum:
+            errors.append(f"{item_id}：{tool}.{key} 的值「{value}」不在契约枚举内")
+        if spec.get("pattern", "").startswith("^\\d{4}-\\d{2}-\\d{2}$") or "date" in key:
+            if isinstance(value, str):
+                try:
+                    datetime.date.fromisoformat(value)
+                except ValueError:
+                    errors.append(f"{item_id}：{tool}.{key} 的日期「{value}」无法解析")
 
 
 # ── L1 题面表 ────────────────────────────────────────────────────────────────
@@ -541,6 +569,7 @@ def check(doc: dict, errors: list, warnings: list, l1_only: bool = False) -> Non
                 bad = set(exp.get("args", {})) - TOOL_ARGS[tool]
                 if bad:
                     errors.append(f"{it['id']}：{tool} 不支持参数 {sorted(bad)}")
+                _check_args_against_contract(it["id"], tool, exp.get("args", {}), errors)
             if not exp.get("gold"):
                 errors.append(f"{it['id']}：缺金标准 gold")
         elif layer == "L3":
@@ -553,15 +582,26 @@ def check(doc: dict, errors: list, warnings: list, l1_only: bool = False) -> Non
             for turn in dlg:
                 if turn.get("expectTool") not in TOOLS:
                     errors.append(f"{it['id']}：第 {turn.get('turn')} 轮工具非法")
+                    continue
                 bad = set(turn.get("expectArgs", {})) - TOOL_ARGS.get(turn.get("expectTool"), set())
                 if bad:
                     errors.append(f"{it['id']}：第 {turn.get('turn')} 轮参数非法 {sorted(bad)}")
+                _check_args_against_contract(
+                    f"{it['id']}(第{turn.get('turn')}轮)", turn["expectTool"],
+                    turn.get("expectArgs", {}), errors)
         elif layer == "L5":
             if not exp.get("needStructured") or not exp.get("needRetrieval"):
                 errors.append(f"{it['id']}：L5 必须同时声明结构化与检索需求")
         elif layer == "L6":
             if exp.get("expectStatus") not in ("NEEDS_CLARIFICATION", "REJECTED", "DEGRADED"):
                 errors.append(f"{it['id']}：L6 的 expectStatus 非法 {exp.get('expectStatus')}")
+            # L6 的 missingParams 语义 = 「应向用户追问的参数」，故只校验它确实是**某个工具的合法参数名**，
+            # ⛔ 不要求它落在该工具的 schema required 里（query_waybill 的 required 为空数组，
+            # 靠 notes 做业务层约束——把它读成 schema required 会判错，见 进度看板 §0.3 口径问题 2）。
+            known = set().union(*TOOL_ARGS.values()) if TOOL_ARGS else set()
+            for p in exp.get("missingParams") or []:
+                if p not in known:
+                    errors.append(f"{it['id']}：missingParams 里的「{p}」不是任何工具的合法参数名")
 
     # 反照抄：题面不得直接出现语料条款标题式措辞（会让检索指标虚高）
     for it in items:

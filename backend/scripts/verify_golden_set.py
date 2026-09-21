@@ -517,6 +517,46 @@ def main() -> int:
             return 1
         ok(f"v3 校验通过：{v3['counts']['total']} 条新增（层分布 {v3['counts']['byLayer']}，"
            f"保留集 {v3['counts']['holdoutTotal']} 条）")
+
+        # ── v3 校验器的"有效性自证"：注入已知错误，证明 check_v3 真会拦 ──────────
+        # 依据：`工程方法/检查有效性必须被验证`——每个新校验都要做注入错误测试，
+        # 否则"绿"只说明它没报错，不说明它有检查能力。
+        import copy                                          # noqa: E402
+        probes: list[tuple[str, object]] = []
+
+        def _first(layer: str) -> dict:
+            return next(it for it in v3["items"] if it["layer"] == layer)
+
+        b1 = copy.deepcopy(v3)
+        _first_of = lambda lay: next(it for it in b1["items"] if it["layer"] == lay)  # noqa: E731
+        _first_of("L1")["expected"]["args"]["fee_type"] = "过路费"      # 枚举越界
+        probes.append(("L1 参数枚举越界（过路费）", b1))
+
+        b2 = copy.deepcopy(v3)
+        t = next(turn for it in b2["items"] if it["layer"] == "L4"
+                 for turn in it["expected"]["dialogue"] if "biz_date" in turn.get("expectArgs", {}))
+        t["expectArgs"]["biz_date"] = "2027-02-30"                     # 不存在的日期
+        probes.append(("L4 日期 2027-02-30", b2))
+
+        b3 = copy.deepcopy(v3)
+        _first3 = next(it for it in b3["items"] if it["layer"] == "L6")
+        _first3["expected"]["expectStatus"] = "OK"                     # L6 状态非法
+        probes.append(("L6 expectStatus 非法（OK）", b3))
+
+        b4 = copy.deepcopy(v3)
+        next(it for it in b4["items"] if it["layer"] == "L1")["expected"]["tool"] = "query_nothing"
+        probes.append(("L1 工具不存在（query_nothing）", b4))
+
+        missed = []
+        for name, doc in probes:
+            e2: list = []
+            check_v3(doc, e2, [])
+            if not e2:
+                missed.append(name)
+        if missed:
+            err(f"[FAIL] v3 校验器自证失败：注入的 {len(missed)} 类错误未被拦下 → {missed}")
+            return 1
+        ok(f"v3 校验器自证通过：注入的 {len(probes)} 类错误（枚举越界/非法日期/状态非法/工具不存在）全部被拦")
     return 0
 
 
