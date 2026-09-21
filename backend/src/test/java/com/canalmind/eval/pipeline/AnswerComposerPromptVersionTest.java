@@ -3,10 +3,23 @@ package com.canalmind.eval.pipeline;
 import com.canalmind.config.PromptVersions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * C-51：**评测侧**系统提示词的 v1 / v2 组合契约（零付费）。
@@ -53,5 +66,53 @@ class AnswerComposerPromptVersionTest {
     void blockIsAbsentFromV1() {
         assertFalse(AnswerComposer.systemPrompt().contains("逐条引用"),
                 "v1 里出现 v2 的追加块，说明版本判断失效了");
+    }
+
+    // ── 以下两条是**端到端（除网络外）**的核对：桩住 ChatModel，抓**真正发出去的那个 Prompt** ──
+    // ⚠️ 为什么非要抓到"发出去的"而不是只看 systemPrompt(true)：本项目的教训是
+    //    「代码看起来接线了」与「东西真的发出去了」是两件事。上一轮我正是因此差点白跑 40 次调用。
+
+    @Test
+    @DisplayName("按层选版本：L5 + v2 才启用；其它层与环境变量缺省都不启用")
+    void resolvesByLayerAndEnv() {
+        ChatModel stub = mock(ChatModel.class);
+        Map<String, String> v2sel = Map.of(PromptVersions.ENV_KEY, "v2");
+
+        assertTrue(new AnswerComposer(stub, "L5", v2sel).citationV2Enabled(),
+                "L5 + v2 应当启用");
+        assertFalse(new AnswerComposer(stub, "L3", v2sel).citationV2Enabled(),
+                "⛔ 非 L5 绝不能启用 v2，否则 L3/L6 的既有产物失去出处");
+        assertFalse(new AnswerComposer(stub, "L5", Map.of()).citationV2Enabled(),
+                "未设环境变量时必须是 v1（既有行为零变化）");
+        assertFalse(new AnswerComposer(stub).citationV2Enabled(),
+                "既有构造器必须走 v1");
+    }
+
+    @Test
+    @DisplayName("⛔ 真正发出去的 System 消息里必须含 v2 追加块（端到端核对）")
+    void v2BlockActuallyReachesTheModel() {
+        ChatModel stub = mock(ChatModel.class);
+        ChatResponse resp = mock(ChatResponse.class);
+        Generation gen = mock(Generation.class);
+        when(resp.getResult()).thenReturn(gen);
+        when(gen.getOutput()).thenReturn(new AssistantMessage("已按依据逐条作答。"));
+        when(stub.call(any(Prompt.class))).thenReturn(resp);
+
+        AnswerComposer composer = new AnswerComposer(stub, "L5",
+                Map.of(PromptVersions.ENV_KEY, "v2"));
+        composer.compose("过闸费按哪个版本收？", null, null, "");
+
+        ArgumentCaptor<Prompt> cap = ArgumentCaptor.forClass(Prompt.class);
+        org.mockito.Mockito.verify(stub).call(cap.capture());
+        List<Message> msgs = cap.getValue().getInstructions();
+        Message system = msgs.stream()
+                .filter(m -> m.getMessageType() == org.springframework.ai.chat.messages.MessageType.SYSTEM)
+                .findFirst().orElseThrow(() -> new AssertionError("没有 System 消息"));
+
+        assertTrue(system.getText().contains(PromptVersions.citationBlock()),
+                "v2 被判定为启用，但追加块**没有出现在真正发出去的 System 消息里** —— "
+                        + "这正是上一轮那种「改了但其实没生效」的错误");
+        assertTrue(system.getText().contains(AnswerComposer.NO_FABRICATION_RULE),
+                "v1 的既有约束不得因为加了 v2 而丢失");
     }
 }
