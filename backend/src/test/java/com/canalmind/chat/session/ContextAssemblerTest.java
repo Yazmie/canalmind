@@ -452,4 +452,48 @@ class ContextAssemblerTest {
             return lastPreviousSummary;
         }
     }
+
+    @Test
+    @DisplayName("★ C-53 证据：换成**生产摘要器**后，压缩真的折叠了轮次，且它的摘要真的进了上下文")
+    void productionSummarizerActuallyFolds() throws Exception {
+        InMemorySessionStore store = new InMemorySessionStore();
+        store.save(new SessionState("s-c53", List.of(
+                SessionTurn.of(1, "费率表放哪了？", "在规则语料里。", "retrieval"),
+                SessionTurn.of(2, "引航费按什么分档？", "按船舶总吨位。", "retrieval"),
+                turn(3, "GX00042 是条什么船？总吨位多少？", "多用途船。",
+                        "query_vessel(vessel_id=GX00042,gross_tonnage=1520)")), "", 0));
+
+        // ⚠️ 生产摘要器（桩住 invoker ⇒ **零付费**）——这正是 C-53 要交付的那条路径。
+        //    上面那些用例用的是测试桩 SummarizerStub；本用例刻意换**真实现**，
+        //    因为"桩能折叠"与"生产实现能折叠"是两件事。
+        java.util.concurrent.atomic.AtomicReference<String> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        LlmContextSummarizer production =
+                new LlmContextSummarizer(new com.canalmind.structured.JsonChatInvoker() {
+                    @Override
+                    public String invoke(String systemPrompt, String userPrompt) {
+                        seen.set(userPrompt);
+                        return "{\"summary\":\"更早：用户问过费率位置与引航费分档口径。\"}";
+                    }
+                });
+
+        ContextAssembler assembler = assembler(store, production, FORCE_COMPACT_TOKENS, 1);
+        ContextAssembler.AssembledContext ctx =
+                assembler.assemble("s-c53", "还有哪些跟它一个船型、但比它大的？");
+
+        // ① 压缩**真的发生**了（⛔ 不是"跑成功了"——这条断言看的就是折叠标志）
+        assertThat(ctx.compacted()).as("预算被压到 1，压缩必须真的发生").isTrue();
+        // ② 生产摘要器**自己产出的那段摘要**真的被用进了上下文
+        assertThat(ctx.summaryUsed())
+                .as("生产摘要器的输出必须真的进入上下文，否则等于没接上")
+                .contains("引航费分档口径");
+        // ③ 它确实收到了待折叠轮次，且**结构化参数原文**在里面（C-38③ 不许被吃掉）
+        assertThat(seen.get()).as("生产摘要器实际收到的提示词＝[%s]", seen.get()).contains("费率表放哪了？");
+        // ④ ⚠️ 而**近期轮（第 3 轮）不得进摘要器**：它的原始参数由 C-38③ 的「最近原始参数」块
+        //    **原样保留**在上下文里，⛔ 不靠摘要传递。若它出现在这里，说明
+        //    "近期轮不被摘要"这条被破坏了——而那正是"参数被摘要改写掉"的入口。
+        //    （本条我一开始写反了：我断言参数**应当**出现在摘要器输入里；实测打印出真实提示词后
+        //      才看清 keepRecentTurns=1 时第 3 轮根本不会被折叠 ⇒ **错的期望，对的实现**。）
+        assertThat(seen.get()).as("近期轮的原始参数不该进摘要器")
+                .doesNotContain("gross_tonnage=1520");
+    }
 }
