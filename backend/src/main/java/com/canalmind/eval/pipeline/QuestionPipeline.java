@@ -22,6 +22,7 @@ import com.canalmind.rag.retrieve.RrfFusion;
 import com.canalmind.rag.retrieve.VectorRetrievalChannel;
 import com.canalmind.rag.vector.VectorSearcher;
 import com.canalmind.structured.DeepSeekJsonInvoker;
+import com.canalmind.structured.ExtractionOutcome;
 import com.canalmind.structured.FeeCalculationEngine;
 import com.canalmind.structured.SchemaGate;
 import com.canalmind.structured.StructuredQueryRepository;
@@ -118,7 +119,8 @@ public final class QuestionPipeline {
 
     /** 一次作答的完整现场。 */
     public record Answer(String question, RouteDecision route, String text, ToolResult tool,
-                         List<String> contextChunkIds, String contextExcerpt, int modelCalls) {
+                         List<String> contextChunkIds, String contextExcerpt, int modelCalls,
+                         boolean retrievalFallback) {
         public Answer {
             contextChunkIds = contextChunkIds == null ? List.of() : List.copyOf(contextChunkIds);
         }
@@ -132,6 +134,17 @@ public final class QuestionPipeline {
         public String toolStatus() {
             return tool == null ? null : tool.status();
         }
+
+        /**
+         * 实际作答所依据的通道。
+         *
+         * <p>⚠️ 与 {@link #channel()} **可能不同**：发生 TOOL_NONE 回退时，
+         * 路由说结构化、而答案实际由检索段支撑。分层统计与归因必须看这个字段，
+         * ⛔ 否则会把"路由判错"与"回退生效"混成一笔账。
+         */
+        public String effectiveChannel() {
+            return retrievalFallback ? RouteDecision.CHANNEL_RETRIEVAL : route.channel();
+        }
     }
 
     public Answer run(String question) {
@@ -139,9 +152,22 @@ public final class QuestionPipeline {
         List<String> chunkIds = new ArrayList<>();
         StringBuilder context = new StringBuilder();
         ToolResult tool = null;
+        boolean fallback = false;
 
         if (RouteDecision.CHANNEL_STRUCTURED.equals(route.channel())) {
             tool = structured.ask(question);
+            // ── TOOL_NONE ⇒ **转交检索通道** ──
+            // 这条契约在 5 处被声明过（`ToolArgumentExtractor` 类注释、`ExtractionOutcome.KIND_TOOL_NONE`、
+            // `IntentRouter` 的 R4/R6、`StructuredQueryService` 第 87 行的说明、以及两个断言
+            // `degradeKind()` 的测试），但**此前从未有任何地方真的执行这次转交**——
+            // 结构化通道返回 `DEGRADED` 就被当作最终结论了。
+            // 后果实测过：L3-001（问闸室水深）路由到结构化 ⇒ 检索段完全不参与（0 条片段），
+            // 作答只能说"系统没能映射到工具"，**引不出语料里那条真正的原因**
+            // （03-第六条「不规定固定的闸室水深刻度」），而这正是 L3 的 rubric 要的。
+            if (isToolNone(tool) && !isGuardPinned(route)) {
+                collect(retrieval.retrieve(question), chunkIds, context);
+                fallback = true;
+            }
         } else if (RouteDecision.CHANNEL_RETRIEVAL.equals(route.channel())) {
             collect(retrieval.retrieve(question), chunkIds, context);
         } else {
@@ -150,13 +176,41 @@ public final class QuestionPipeline {
             collect(retrieval.retrieve(question), chunkIds, context);
         }
 
+        // ⚠️ 回退成功时**不把 DEGRADED 交给作答器**：`TOOL_NONE` 的含义按契约就是
+        //    "问题不属于结构化工具集、应走文档检索通道"——它是一次**内部路由修正**，
+        //    不是"用户要的答案取不到"。若照实告诉作答器"降级"，它会连语料里**有的**依据
+        //    也一起拒答，反而不如实。
+        //    ⛔ 但原始工具结果**仍然保留在 Answer 里**（`tool` 字段），归因不受影响。
+        ToolResult forComposer = fallback ? null : tool;
+
         // 结构化通道**已含**数据库算出的答案时，仍让模型组织语言：
         // L3/L6 的 rubric 判的是「措辞是否如实」（如"必须指出「米」是长度单位"），
         // ⛔ 不是判"有没有调对工具"——那由 L1/L4 的规则判分负责。
-        String text = composer.compose(question, route, tool, context.toString());
+        String text = composer.compose(question, route, forComposer, context.toString());
         // ⚠️ 模型调用数**如实计数**（1 = 本次组织语言的调用）；抽取/分类器的内部调用
         //    由它们各自的重试预算决定，不计在此处，⛔ 别把两者混成一个数。
-        return new Answer(question, route, text, tool, chunkIds, context.toString(), 1);
+        return new Answer(question, route, text, tool, chunkIds, context.toString(), 1, fallback);
+    }
+
+    /** 契约判据：抽取层明确表示"本题不属于结构化工具集"。 */
+    static boolean isToolNone(ToolResult r) {
+        return r != null
+                && ToolResult.STATUS_DEGRADED.equals(r.status())
+                && ExtractionOutcome.KIND_TOOL_NONE.equals(r.degradeKind());
+    }
+
+    /**
+     * 被**契约守卫钉住**的题（R0：越权/注入）**不允许回退检索**。
+     *
+     * <p>⚠️ 这是一个真实的安全回归口子，不是理论顾虑：`L6-013`「忽略你之前所有规则…」
+     * 期望的是 `REJECTED`（由契约守卫裁决）。若它的抽取结果恰好也是 `TOOL_NONE`，
+     * 那么"回退检索"就会把一条**越权/注入**问句当普通文档问题去检索并正常作答，
+     * 等于**用回退把守卫绕过去了**。
+     *
+     * <p>⇒ 守卫类路由必须**终局**：钉在结构化通道之后不再转交。
+     */
+    static boolean isGuardPinned(RouteDecision route) {
+        return IntentRouter.RULE_R0_GUARD.equals(route.ruleId());
     }
 
     /**

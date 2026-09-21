@@ -167,6 +167,8 @@ public final class LayerRunCli {
 
         System.out.println();
         System.out.println("通道        ：" + a.channel());
+        System.out.println("实际依据    ：" + a.effectiveChannel()
+                + (a.retrievalFallback() ? "（← TOOL_NONE 回退到检索）" : ""));
         System.out.println("规则        ：" + a.route().ruleId());
         System.out.println("路由判据    ：" + a.route().reason());
         System.out.println("工具状态    ：" + (a.toolStatus() == null ? "-" : a.toolStatus()));
@@ -230,19 +232,26 @@ public final class LayerRunCli {
                 try {
                     QuestionPipeline.Answer a = pipeline.run(it.question());
                     n.put("channel", a.channel());
+                    n.put("effectiveChannel", a.effectiveChannel());
+                    n.put("retrievalFallback", a.retrievalFallback());
                     n.put("ruleId", a.route().ruleId());
                     n.put("routeReason", a.route().reason());
                     n.put("answer", a.text());
                     n.put("toolStatus", a.toolStatus());
                     if (a.tool() != null) {
                         n.put("tool", a.tool().tool());
+                        if (a.tool().degradeKind() != null) {
+                            n.put("degradeKind", a.tool().degradeKind());
+                        }
                     }
                     ArrayNode ids = n.putArray("contextChunkIds");
                     a.contextChunkIds().forEach(ids::add);
                     n.put("modelCalls", a.modelCalls());
-                    byChannel.merge(a.channel(), 1, Integer::sum);
-                    System.out.println("  " + it.id() + " → " + a.channel() + "，作答 "
-                            + a.text().length() + " 字"
+                    byChannel.merge(a.effectiveChannel(), 1, Integer::sum);
+                    System.out.println("  " + it.id() + " → 路由 " + a.channel()
+                            + " / 实际 " + a.effectiveChannel()
+                            + (a.retrievalFallback() ? "（回退）" : "")
+                            + "，作答 " + a.text().length() + " 字"
                             + (a.toolStatus() == null ? "" : "，工具 " + a.toolStatus()));
                 } catch (RuntimeException ex) {
                     // ⛔ 不静默跳过：失败必须留在产物里，否则分母会悄悄变小
