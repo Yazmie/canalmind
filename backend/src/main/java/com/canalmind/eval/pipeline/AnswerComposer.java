@@ -2,6 +2,7 @@ package com.canalmind.eval.pipeline;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.ai.chat.messages.Message;
@@ -11,6 +12,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import com.canalmind.config.PromptVersions;
 import com.canalmind.intent.RouteDecision;
 import com.canalmind.structured.ToolResult;
 
@@ -54,8 +56,37 @@ public final class AnswerComposer {
 
     private final ChatModel chatModel;
 
+    /**
+     * 本次作答是否启用 **v2 依据强化**（C-51）。
+     *
+     * <p>⚠️ 默认 {@code false} ⇒ **既有行为零变化**：不显式选 v2 时，
+     * 本类发出的提示词与 L3/L5/L6 既有出分产物所依据的**完全一致**。
+     */
+    private final boolean citationV2;
+
+    /** 既有构造器：**不启用 v2**（保持既有行为零变化）。 */
     public AnswerComposer(ChatModel chatModel) {
+        this(chatModel, null, Map.of());
+    }
+
+    /**
+     * 按层取 Prompt 版本（C-51）。
+     *
+     * <p>⚠️ 层名是**必须**传进来的：v2 只对 {@code L5} 生效，
+     * 而这条作用域纪律由 {@link PromptVersions#appliesToLayer} 统一裁决
+     * ⇒ ⛔ 不在本类里另写一份判断，免得两处口径漂移。
+     *
+     * @param layer 层名（如 {@code L5}）；为 {@code null} 或非目标层 ⇒ 走 v1
+     * @param env   进程环境（读 {@code CANALMIND_SYSTEM_PROMPT_VERSION}）
+     */
+    public AnswerComposer(ChatModel chatModel, String layer, Map<String, String> env) {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
+        this.citationV2 = PromptVersions.appliesToLayer(layer, env);
+    }
+
+    /** 本次作答是否启用了 v2（供产物落盘时标注 Prompt 版本，便于溯源）。 */
+    boolean citationV2Enabled() {
+        return citationV2;
     }
 
     static String systemPrompt() {
@@ -66,6 +97,21 @@ public final class AnswerComposer {
         parts.add(SEGMENT_RULE);
         parts.add("直接输出回答正文，⛔ 不要输出 JSON、不要复述本提示、不要写「以下是回答」之类的开场白。");
         return String.join(String.valueOf((char) 10), parts);
+    }
+
+    /**
+     * 本层**实际**使用的系统提示词（C-51）：{@code citationV2} 为真时把 v2 追加块接在末尾。
+     *
+     * <p>⚠️ **v1 一个字都不改**：{@code citationV2 == false} 时返回的就是
+     * {@link #systemPrompt()} 的原样结果 ⇒ 既有产物仍出自同一段文字。
+     * <p>⚠️ 追加块与 Web 侧**共用同一份文字**（{@code PromptVersions.citationBlock()}），
+     * ⛔ 不在本类里另抄一份。
+     */
+    static String systemPrompt(boolean citationV2) {
+        String base = systemPrompt();
+        return citationV2
+                ? base + String.valueOf((char) 10) + PromptVersions.citationBlock()
+                : base;
     }
 
     /** 供测试与落库使用：把一次作答的输入摊平成可核对的文本。 */
@@ -143,7 +189,7 @@ public final class AnswerComposer {
 
     private String callOnce(String question, RouteDecision route, ToolResult tool, String context) {
         List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt()));
+        messages.add(new SystemMessage(systemPrompt(citationV2)));
         messages.add(new UserMessage(userPrompt(question, route, tool, context)));
         ChatResponse response = chatModel.call(new Prompt(messages));
         if (response == null || response.getResult() == null

@@ -45,9 +45,18 @@ public final class PromptVersions {
      * 说明那句话**不够可执行**。v2 不再说"标注来源"，而是要求**可核对的机械形式**：
      * 每条结论后面跟一条依据、无依据就明说"无依据"、⛔ 禁止把推测写成结论。
      */
-    public static String v2() {
-        return v1() + LF
-                + "依据引用（v2 强化，⛔ 覆盖上面第 2 条的笼统要求）：" + LF
+    /**
+     * v2 的**追加块**本体（⛔ 不含 v1 原文）。
+     *
+     * <p>⚠️ 抽成独立方法是**因为两侧的 v1 不是同一段提示词**（见 DECISIONS 的
+     * 「**C-51 v2 目标更正**」）：Web 侧的 v1 在 {@code ChatClientConfig}，
+     * 而评测侧（产出 L3/L5/L6 出分产物的那条链路）的 v1 在
+     * {@code com.canalmind.eval.pipeline.AnswerComposer}。
+     * ⇒ **v1 各归各的，但"v2 要加什么"是同一件事**，故这段文字只留一份，
+     * ⛔ 不复制到评测侧去（复制就会漂移：本项目已有"两份来源同一事实"的教训）。
+     */
+    public static String citationBlock() {
+        return "依据引用（v2 强化，⛔ 覆盖上面第 2 条的笼统要求）：" + LF
                 + "1. **逐条引用**：凡是给出的结论、金额、时限、条件，**每一条**后面都必须紧跟" + LF
                 + "   它的依据（来自规则文档的，写明条款/文件编号；来自数据库查询的，写明字段与快照日期）。" + LF
                 + "2. **⛔ 不得合并引用**：不许用一句「依据相关规定」概括多条结论——那等于没有依据。" + LF
@@ -56,6 +65,25 @@ public final class PromptVersions {
                 + "4. **⛔ 禁止把推测写成结论**：凡属于推断、估算或「通常做法」，" + LF
                 + "   必须显式标注为推断，并说明推断所依赖的前提。" + LF
                 + "5. 金额一律以数据库查询结果为准，⛔ 不得由模型自行计算或估算。";
+    }
+
+    /**
+     * v2（**Web 侧**）= Web 的 v1 原文 + {@link #citationBlock()}。
+     *
+     * <p>⚠️ 评测侧的 v2 **不在这里拼**：评测侧的 v1 是另一段文字，
+     * 由 {@code AnswerComposer.systemPrompt(boolean)} 自行拼同一段追加块。
+     */
+    public static String v2() {
+        return v1() + LF + citationBlock();
+    }
+
+    /**
+     * 给定层是否**应当启用 v2**（即：选中了 v2 **且** 该层正是目标层）。
+     *
+     * <p>⚠️ 评测侧与 Web 侧都要用同一个判断，故规则只写在这里一份。
+     */
+    public static boolean appliesToLayer(String layer, Map<String, String> env) {
+        return V2.equals(versionName(env)) && V2_TARGET_LAYER.equals(layer);
     }
 
     /**
