@@ -49,7 +49,15 @@ public final class LayerRunCli {
     private static final String LF = String.valueOf((char) 10);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String BUSINESS_TODAY = "2027-09-15";
-    private static final int ANSWER_MAX_TOKENS = 1024;
+    /**
+     * 作答的 token 预算。
+     *
+     * <p>⚠️ 第一次批量用 1024，20 道 L5 复合题里**有 7 道返回空内容**。
+     * 复合题的提示词最长（数据表 + 5 条片段 + 事实），预算很可能被**推理**吃掉、
+     * 正文没剩额度，而接口此时返回的是"内容为空但非错误"的响应。
+     * ⇒ 提到 2048，并让 {@link AnswerComposer} 对空内容**重试一次再抛**（⛔ 不静默接受空串）。
+     */
+    private static final int ANSWER_MAX_TOKENS = 2048;
 
     private LayerRunCli() {
     }

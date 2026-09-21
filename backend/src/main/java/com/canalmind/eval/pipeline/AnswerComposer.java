@@ -120,16 +120,36 @@ public final class AnswerComposer {
     }
 
     public String compose(String question, RouteDecision route, ToolResult tool, String context) {
+        // ⚠️ 空作答**必须重试一次、再不行就抛**，⛔ 绝不允许返回空串。
+        //    实测踩到（第 4 周 L5 首次批量）：20 题里 **7 题返回了空串**，
+        //    而作答运行器把它当成"成功作答"，于是 `failed=0` 报 PASS——
+        //    空答案随后会被判分器记成"答错"，**归因就全错了**（这是"模型不会答"还是"链路没发出请求"？）。
+        //    这类"静默成功"正是 `工程复盘/工程方法/验证工具本身也要被验证/` 那一类。
+        //    最可能的原因：长提示词（数据表 + 5 条片段）把 token 预算吃在推理上，
+        //    正文没剩额度 ⇒ 接口返回了**内容为空但并非错误**的响应。
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            String text = callOnce(question, route, tool, context);
+            if (text != null && !text.isBlank()) {
+                return text.strip();
+            }            System.err.println("  [WARN] 作答第 " + attempt + " 次返回空内容，"
+                    + (attempt == 1 ? "重试一次" : "放弃并抛错") + "（prompt 长度 "
+                    + userPrompt(question, route, tool, context).length() + " 字符）");
+        }
+        throw new IllegalStateException(
+                "作答模型连续两次返回空内容（question=" + question + "）。"
+                        + "⛔ 这**不是**答错，是链路未能产出作答：请先查 token 预算与提示词长度，"
+                        + "别把空答案当成「模型答错」记进评测。");
+    }
+
+    private String callOnce(String question, RouteDecision route, ToolResult tool, String context) {
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemPrompt()));
         messages.add(new UserMessage(userPrompt(question, route, tool, context)));
         ChatResponse response = chatModel.call(new Prompt(messages));
         if (response == null || response.getResult() == null
                 || response.getResult().getOutput() == null) {
-            // ⛔ 不返回空串假装成功：空答案会让判分器把"没答"记成"答错"，归因就错了
             throw new IllegalStateException("作答模型没有返回内容（question=" + question + "）");
         }
-        String text = response.getResult().getOutput().getText();
-        return text == null ? "" : text.strip();
+        return response.getResult().getOutput().getText();
     }
 }
