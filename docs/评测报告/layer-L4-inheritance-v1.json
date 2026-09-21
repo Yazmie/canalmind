@@ -1,0 +1,1566 @@
+{
+  "layer" : "L4",
+  "dataset" : "golden-set-v3.json",
+  "businessToday" : "2027-09-15",
+  "startedAt" : "20:51:15",
+  "note" : "L4 判据=工具+实参（规则判分、零付费）；上下文由 ContextAssembler 装配",
+  "results" : [
+    {
+      "taskId" : "L4-001",
+      "split" : "dev",
+      "question" : "建材过闸费，1200 吨，2026 年 12 月 10 号过闸，一吨多少钱？",
+      "rubric" : "第二轮必须把 biz_date 改写为 2027-01-05、其余三项参数原样继承，并命中 2027 版费率；沿用上一轮日期或漏掉任一继承参数即判错。",
+      "anchor" : "tool-contracts.json query_tariff.parameters（fee_type / cargo_category / tonnage / biz_date）；06-过闸费费率表（2026版）.md 第十二条 3；07-过闸费费率表（2027版）.md 第二条 4",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "建材过闸费，1200 吨，2026 年 12 月 10 号过闸，一吨多少钱？",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-12-10",
+            "cargo_category" : "建材",
+            "fee_type" : "过闸费",
+            "tonnage" : "1200"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_category" : "建材",
+            "tonnage" : "1200",
+            "biz_date" : "2026-12-10"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那要是推到明年 1 月 5 号才过闸呢？同样的货和吨数。",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-01-05",
+            "cargo_category" : "建材",
+            "fee_type" : "过闸费",
+            "tonnage" : "1200"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_category" : "建材",
+            "tonnage" : "1200",
+            "biz_date" : "2027-01-05"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:21"
+    },
+    {
+      "taskId" : "L4-002",
+      "split" : "dev",
+      "question" : "算一下 800 吨机制砂的过闸费，2027 年 3 月 8 号过闸。",
+      "rubric" : "第二轮必须只改 tonnage 为 2600、其余参数继承，且按新档位取单价重算；仍用 800 吨档单价或漏继承货种/日期即判错。",
+      "anchor" : "tool-contracts.json quote_fee.parameters；07-过闸费费率表（2027版）.md 第四条（建材 [500,2000) 3.20 / [2000,5000) 3.60）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "算一下 800 吨机制砂的过闸费，2027 年 3 月 8 号过闸。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-03-08",
+            "cargo_name" : "机制砂",
+            "fee_type" : "过闸费",
+            "tonnage" : "800"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "机制砂",
+            "tonnage" : "800",
+            "biz_date" : "2027-03-08"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "要是同一批货装到 2600 吨呢？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-03-08",
+            "cargo_name" : "机制砂",
+            "fee_type" : "过闸费",
+            "tonnage" : "2600"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "机制砂",
+            "tonnage" : "2600",
+            "biz_date" : "2027-03-08"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:25"
+    },
+    {
+      "taskId" : "L4-003",
+      "split" : "dev",
+      "question" : "停泊费帮我算下，船是 2200 总吨，2026 年 11 月 3 号靠的泊位，停一天。",
+      "rubric" : "第二轮必须把 days 改为 5 并保留 2200 总吨与同一天；天数未改（仍按 1 天）或把吨位改成载货吨即判错。",
+      "anchor" : "tool-contracts.json quote_fee.parameters.days（仅停泊费需要，不传按 1 天）；08-引航费与停泊费费率表.md 第八条 2、3",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "停泊费帮我算下，船是 2200 总吨，2026 年 11 月 3 号靠的泊位，停一天。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-11-03",
+            "days" : "1",
+            "fee_type" : "停泊费",
+            "tonnage" : "2200"
+          },
+          "actualArgs" : {
+            "fee_type" : "停泊费",
+            "tonnage" : "2200",
+            "biz_date" : "2026-11-03",
+            "days" : "1"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "要是停了 5 天才离泊呢？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-11-03",
+            "days" : "5",
+            "fee_type" : "停泊费",
+            "tonnage" : "2200"
+          },
+          "actualArgs" : {
+            "fee_type" : "停泊费",
+            "tonnage" : "2200",
+            "biz_date" : "2026-11-03",
+            "days" : "5"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:30"
+    },
+    {
+      "taskId" : "L4-004",
+      "split" : "dev",
+      "question" : "2027 年第一季度一共运了多少吨货？",
+      "rubric" : "第二轮必须把 group_by 由「无」改为「货类」并保留同一时间窗与 metric=吨位；丢掉时间窗或把 metric 改成运单数即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters（group_by 枚举含「货类」「无」；top_n 1–50）；25-术语与定义.md 第十八条（货类七类完整枚举）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2027 年第一季度一共运了多少吨货？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "group_by" : "无",
+            "metric" : "吨位"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "metric" : "吨位",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "按货类拆开看看，哪些货占得多。",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "group_by" : "货类",
+            "metric" : "吨位",
+            "top_n" : "7"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "metric" : "吨位",
+            "group_by" : "货类"
+          },
+          "argFails" : [
+            "参数 top_n：期望 7，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:35"
+    },
+    {
+      "taskId" : "L4-005",
+      "split" : "holdout",
+      "question" : "2026 年 10 月到 12 月一共收了多少过闸费？",
+      "rubric" : "第二轮必须在保留原四项参数的基础上追加 via_canal_only=true；把它当成 group_by 或丢掉 fee_type 限定即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.via_canal_only；25-术语与定义.md 第九条（运河节点口径）；05-计费总则.md 第五条 1",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2026 年 10 月到 12 月一共收了多少过闸费？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "fee_type" : "过闸费",
+            "group_by" : "无",
+            "metric" : "费用金额"
+          },
+          "actualArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "metric" : "费用金额",
+            "fee_type" : "过闸费",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "只算真正穿过运河的那些航次呢？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "fee_type" : "过闸费",
+            "group_by" : "无",
+            "metric" : "费用金额",
+            "via_canal_only" : "true"
+          },
+          "actualArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "metric" : "费用金额",
+            "fee_type" : "过闸费",
+            "group_by" : "无",
+            "via_canal_only" : "true"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:40"
+    },
+    {
+      "taskId" : "L4-006",
+      "split" : "dev",
+      "question" : "2026 年 12 月哪个港口运量最大？",
+      "rubric" : "第二轮必须只改 top_n=10 并保留 group_by=目的港 与同一时间窗；把分组维度丢掉（变成只要合计值）即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.top_n（1–50，不传默认 10）、group_by 枚举含「目的港」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2026 年 12 月哪个港口运量最大？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2026-12-01",
+            "date_to" : "2026-12-31",
+            "group_by" : "目的港",
+            "metric" : "吨位",
+            "top_n" : "1"
+          },
+          "actualArgs" : {
+            "date_from" : "2026-12-01",
+            "date_to" : "2026-12-31",
+            "metric" : "吨位",
+            "group_by" : "起运港",
+            "top_n" : "1"
+          },
+          "argFails" : [
+            "参数 group_by：期望 目的港，实际 起运港"
+          ]
+        },
+        {
+          "turn" : 2,
+          "question" : "前十名都列出来。",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2026-12-01",
+            "date_to" : "2026-12-31",
+            "group_by" : "目的港",
+            "metric" : "吨位",
+            "top_n" : "10"
+          },
+          "actualArgs" : {
+            "date_from" : "2026-12-01",
+            "date_to" : "2026-12-31",
+            "metric" : "吨位",
+            "group_by" : "起运港",
+            "top_n" : "10"
+          },
+          "argFails" : [
+            "参数 group_by：期望 目的港，实际 起运港"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 0,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:51:54"
+    },
+    {
+      "taskId" : "L4-007",
+      "split" : "dev",
+      "question" : "查一下 WB20260000015 这票货。",
+      "rubric" : "第二轮必须把单号查询改写成 2026-09 整月窗口 + status=已取消，且保留 limit；仍只传 waybill_no、或凭空指定与原单号无关的月份即判错。",
+      "anchor" : "tool-contracts.json query_waybill.parameters（waybill_no / date_from / date_to / status / limit）；waybill 表 status 取值含「已取消」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "查一下 WB20260000015 这票货。",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "actualArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "跟它同一个月里、被取消的运单还有哪些？",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "NEEDS_CLARIFICATION",
+          "degraded" : false,
+          "needsClarification" : true,
+          "toolStatus" : "NEEDS_CLARIFICATION",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2026-09-01",
+            "date_to" : "2026-09-30",
+            "limit" : "20",
+            "status" : "已取消"
+          },
+          "actualArgs" : {
+            "status" : "已取消"
+          },
+          "argFails" : [
+            "参数 date_from：期望 2026-09-01，实际 （缺失）",
+            "参数 date_to：期望 2026-09-30，实际 （缺失）",
+            "参数 limit：期望 20，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:00"
+    },
+    {
+      "taskId" : "L4-008",
+      "split" : "dev",
+      "question" : "GX00042 是条什么船？总吨位多少？",
+      "rubric" : "第二轮必须以 vessel_type + min_gross_tonnage 两个条件查询，且船型与吨位下限均取自上一轮结果；把「比它大」理解成载重吨或另取船型即判错。",
+      "anchor" : "tool-contracts.json query_vessel.parameters（vessel_type 枚举、min_gross_tonnage）；25-术语与定义.md 第十一条（船舶总吨位）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "GX00042 是条什么船？总吨位多少？",
+          "expectTool" : "query_vessel",
+          "actualTool" : "query_vessel",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "vessel_id" : "GX00042"
+          },
+          "actualArgs" : {
+            "vessel_id" : "GX00042"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "还有哪些跟它一个船型、但比它大的？",
+          "expectTool" : "query_vessel",
+          "actualTool" : "query_vessel",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "min_gross_tonnage" : "1520",
+            "vessel_type" : "多用途船"
+          },
+          "actualArgs" : {
+            "vessel_id" : "GX00042"
+          },
+          "argFails" : [
+            "参数 min_gross_tonnage：期望 1520，实际 （缺失）",
+            "参数 vessel_type：期望 多用途船，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:07"
+    },
+    {
+      "taskId" : "L4-009",
+      "split" : "dev",
+      "question" : "2027 年化工类的过闸费，3000 吨的，单价多少？",
+      "rubric" : "第二轮必须改用 quote_fee 且 cargo_name=液体化工品（不得传 cargo_category），并继承 3000 吨与上一轮业务日；把货类当货种传、或漏掉日期即判错。",
+      "anchor" : "tool-contracts.json quote_fee.parameters.cargo_name（21 种枚举）与 notes（危险属性由货种推导）；07-过闸费费率表（2027版）.md 第十二条",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2027 年化工类的过闸费，3000 吨的，单价多少？",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "NEEDS_CLARIFICATION",
+          "degraded" : false,
+          "needsClarification" : true,
+          "toolStatus" : "NEEDS_CLARIFICATION",
+          "turnPass" : false,
+          "expectArgs" : {
+            "biz_date" : "2027-05-20",
+            "cargo_category" : "化工",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_category" : "化工",
+            "tonnage" : "3000"
+          },
+          "argFails" : [
+            "参数 biz_date：期望 2027-05-20，实际 （缺失）"
+          ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那就这批 3000 吨液体化工品，实际要交多少钱？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "biz_date" : "2027-05-20",
+            "cargo_name" : "液体化工品",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "液体化工品",
+            "tonnage" : "3000",
+            "biz_date" : "2027-09-15"
+          },
+          "argFails" : [
+            "参数 biz_date：期望 2027-05-20，实际 2027-09-15"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 0,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:14"
+    },
+    {
+      "taskId" : "L4-010",
+      "split" : "holdout",
+      "question" : "1800 总吨的船引航一次要多少钱？2027 年 2 月 14 号引航。",
+      "rubric" : "第二轮必须只改吨位为 5200 总吨并按新档位计价，且两轮均不传 cargo_name；沿用上一轮单价或给引航费附加货类即判错。",
+      "anchor" : "08-引航费与停泊费费率表.md 第四条（引航费 [1000,5000) 1500 元/次、[5000,10000) 2800 元/次）、第二条（与货类无关）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "1800 总吨的船引航一次要多少钱？2027 年 2 月 14 号引航。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-02-14",
+            "fee_type" : "引航费",
+            "tonnage" : "1800"
+          },
+          "actualArgs" : {
+            "fee_type" : "引航费",
+            "tonnage" : "1800",
+            "biz_date" : "2027-02-14"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那换条 5200 总吨的呢？同一天引航。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-02-14",
+            "fee_type" : "引航费",
+            "tonnage" : "5200"
+          },
+          "actualArgs" : {
+            "fee_type" : "引航费",
+            "tonnage" : "5200",
+            "biz_date" : "2027-02-14"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:21"
+    },
+    {
+      "taskId" : "L4-011",
+      "split" : "dev",
+      "question" : "2027 年上半年一共多少运单？",
+      "rubric" : "第二轮只把 group_by 改为「月份」，其余三项参数不变；改 metric 或丢时间窗即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.group_by（枚举含「月份」）；metric 枚举含「运单数」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2027 年上半年一共多少运单？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "group_by" : "无",
+            "metric" : "运单数"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "metric" : "运单数",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "按月分开看。",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "group_by" : "月份",
+            "metric" : "运单数"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "metric" : "运单数",
+            "group_by" : "月份"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:24"
+    },
+    {
+      "taskId" : "L4-012",
+      "split" : "dev",
+      "question" : "3000 吨钢材的过闸费单价是多少？2027 年 3 月 3 号过闸。",
+      "rubric" : "第一轮货类必须是金属（钢材），第二轮必须改为建材（水泥熟料），其余三项不变；把钢材归入建材或第二轮仍传金属即判错。",
+      "anchor" : "05-计费总则.md 第九条（货类划分，钢材属金属）；25-术语与定义.md 第十九条；07-过闸费费率表（2027版）.md 第六条、第四条",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "3000 吨钢材的过闸费单价是多少？2027 年 3 月 3 号过闸。",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-03-03",
+            "cargo_category" : "金属",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_category" : "金属",
+            "tonnage" : "3000",
+            "biz_date" : "2027-03-03"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那 3000 吨水泥熟料呢，同一天过闸。",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-03-03",
+            "cargo_category" : "建材",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_category" : "建材",
+            "tonnage" : "3000",
+            "biz_date" : "2027-03-03"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:30"
+    },
+    {
+      "taskId" : "L4-013",
+      "split" : "dev",
+      "question" : "上个月有运单被取消吗？",
+      "rubric" : "两轮都必须把相对时间（上个月 / 最近三个月）换算成 YYYY-MM-DD 区间且 status 恒为「已取消」，第二轮只前移起始日；把「上个月」直接当参数传或丢掉状态即判错。",
+      "anchor" : "tool-contracts.json query_waybill.parameters.date_from / date_to（pattern ^\\d{4}-\\d{2}-\\d{2}$）、status 枚举含「已取消」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "上个月有运单被取消吗？",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-08-01",
+            "date_to" : "2027-08-31",
+            "status" : "已取消"
+          },
+          "actualArgs" : {
+            "status" : "已取消",
+            "date_from" : "2027-08-01",
+            "date_to" : "2027-08-31"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "把范围拉到最近三个月再看看。",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2027-06-01",
+            "date_to" : "2027-08-31",
+            "status" : "已取消"
+          },
+          "actualArgs" : {
+            "status" : "已取消",
+            "date_from" : "2027-06-16",
+            "date_to" : "2027-09-15"
+          },
+          "argFails" : [
+            "参数 date_from：期望 2027-06-01，实际 2027-06-16",
+            "参数 date_to：期望 2027-08-31，实际 2027-09-15"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:36"
+    },
+    {
+      "taskId" : "L4-014",
+      "split" : "dev",
+      "question" : "这个月水泥一共运了多少吨？",
+      "rubric" : "第二轮必须换成 query_waybill 并继承时间窗，货种降级为货类「建材」且 limit 不超过 50；凭空造出「未结算」状态值或继续用 query_traffic 即判错。",
+      "anchor" : "tool-contracts.json query_waybill.parameters.cargo_category（货类枚举）、limit（1–50）；query_traffic.parameters.group_by 含「货种」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "这个月水泥一共运了多少吨？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2027-09-01",
+            "date_to" : "2027-09-15",
+            "group_by" : "货种",
+            "metric" : "吨位",
+            "top_n" : "21"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-09-01",
+            "date_to" : "2027-09-15",
+            "metric" : "吨位",
+            "group_by" : "货种",
+            "top_n" : "50"
+          },
+          "argFails" : [
+            "参数 top_n：期望 21，实际 50"
+          ]
+        },
+        {
+          "turn" : 2,
+          "question" : "这些单子列出来给我看看，尤其是还没结算的。",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "cargo_category" : "建材",
+            "date_from" : "2027-09-01",
+            "date_to" : "2027-09-15",
+            "limit" : "50"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-09-01",
+            "date_to" : "2027-09-15",
+            "cargo_category" : "建材"
+          },
+          "argFails" : [
+            "参数 limit：期望 50，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 0,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:44"
+    },
+    {
+      "taskId" : "L4-015",
+      "split" : "dev",
+      "question" : "港杂费 1500 吨的建材收多少？2027 年 4 月 6 号作业完成。",
+      "rubric" : "第二轮只改 tonnage=600 并按 [0,1000) 档取费率；因为单位是元/次就认为「吨位不影响费率」即判错。",
+      "anchor" : "09-港杂费与装卸费费率表.md 第四条（建材 0–1000 档 180 元/次）、第五条 3；tool-contracts.json query_tariff.parameters.tonnage",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "港杂费 1500 吨的建材收多少？2027 年 4 月 6 号作业完成。",
+          "expectTool" : "query_tariff",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "biz_date" : "2027-04-06",
+            "cargo_category" : "建材",
+            "fee_type" : "港杂费",
+            "tonnage" : "1500"
+          },
+          "actualArgs" : {
+            "fee_type" : "港杂费",
+            "cargo_category" : "建材",
+            "tonnage" : "1500",
+            "biz_date" : "2027-04-06"
+          },
+          "argFails" : [
+            "工具错：期望 query_tariff，实际 quote_fee"
+          ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那吨位改成 600 吨呢？",
+          "expectTool" : "query_tariff",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : false,
+          "expectArgs" : {
+            "biz_date" : "2027-04-06",
+            "cargo_category" : "建材",
+            "fee_type" : "港杂费",
+            "tonnage" : "600"
+          },
+          "actualArgs" : {
+            "fee_type" : "港杂费",
+            "cargo_category" : "建材",
+            "tonnage" : "600",
+            "biz_date" : "2027-04-06"
+          },
+          "argFails" : [
+            "工具错：期望 query_tariff，实际 quote_fee"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 0,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:48"
+    },
+    {
+      "taskId" : "L4-016",
+      "split" : "dev",
+      "question" : "1500 吨烧碱过闸，2026 年 11 月 11 号过闸，过闸费多少？",
+      "rubric" : "第二轮只有 cargo_name 由烧碱变硫酸，其余参数逐字不变；改动吨位/日期或漏传货种即判错。",
+      "anchor" : "tool-contracts.json quote_fee.parameters.cargo_name（烧碱、硫酸均在 21 种枚举内）；cargoTaxonomy（两者 is_dangerous=true，category=化工）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "1500 吨烧碱过闸，2026 年 11 月 11 号过闸，过闸费多少？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-11-11",
+            "cargo_name" : "烧碱",
+            "fee_type" : "过闸费",
+            "tonnage" : "1500"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "烧碱",
+            "tonnage" : "1500",
+            "biz_date" : "2026-11-11"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "同样的量换成硫酸呢？还是那一天。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-11-11",
+            "cargo_name" : "硫酸",
+            "fee_type" : "过闸费",
+            "tonnage" : "1500"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "硫酸",
+            "tonnage" : "1500",
+            "biz_date" : "2026-11-11"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:53"
+    },
+    {
+      "taskId" : "L4-017",
+      "split" : "dev",
+      "question" : "2027 年 5 月过闸费收了多少钱？",
+      "rubric" : "第二轮 metric 改吨位且 fee_type 必须去掉；保留 fee_type=过闸费（非法组合）或改动时间窗即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.fee_type（仅当 metric=费用金额 时可用）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2027 年 5 月过闸费收了多少钱？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-05-01",
+            "date_to" : "2027-05-31",
+            "fee_type" : "过闸费",
+            "group_by" : "无",
+            "metric" : "费用金额"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-05-01",
+            "date_to" : "2027-05-31",
+            "metric" : "费用金额",
+            "fee_type" : "过闸费",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那运量呢，多少吨？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-05-01",
+            "date_to" : "2027-05-31",
+            "group_by" : "无",
+            "metric" : "吨位"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-05-01",
+            "date_to" : "2027-05-31",
+            "metric" : "吨位",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:52:57"
+    },
+    {
+      "taskId" : "L4-018",
+      "split" : "holdout",
+      "question" : "有哪些化学品船？",
+      "rubric" : "第二轮必须在保留 vessel_type=化学品船 的基础上加 max_draft_m=4.0；丢掉船型变成无条件查询即判错。",
+      "anchor" : "tool-contracts.json query_vessel.parameters（max_draft_m maximum 20、exclusiveMinimum 0）；vessel 表 draft_m",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "有哪些化学品船？",
+          "expectTool" : "query_vessel",
+          "actualTool" : "query_vessel",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "vessel_type" : "化学品船"
+          },
+          "actualArgs" : {
+            "vessel_type" : "化学品船"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "吃水 4 米以内的呢？",
+          "expectTool" : "query_vessel",
+          "actualTool" : "query_vessel",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "max_draft_m" : "4.0",
+            "vessel_type" : "化学品船"
+          },
+          "actualArgs" : {
+            "vessel_type" : "化学品船",
+            "max_draft_m" : "4"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:01"
+    },
+    {
+      "taskId" : "L4-019",
+      "split" : "dev",
+      "question" : "WB20260000005 这一票多重？",
+      "rubric" : "第二轮必须换成 query_traffic 且用上一轮得到的创建日作为单日窗口（date_from=date_to）；仍传 waybill_no、或用与上一轮无关的日期即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.date_from / date_to（含当日）；query_waybill.parameters.waybill_no",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "WB20260000005 这一票多重？",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "waybill_no" : "WB20260000005"
+          },
+          "actualArgs" : {
+            "waybill_no" : "WB20260000005"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "那它创建那一天，所有运单加起来一共多少吨？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "NEEDS_CLARIFICATION",
+          "degraded" : false,
+          "needsClarification" : true,
+          "toolStatus" : "NEEDS_CLARIFICATION",
+          "turnPass" : false,
+          "expectArgs" : {
+            "date_from" : "2026-11-26",
+            "date_to" : "2026-11-26",
+            "group_by" : "无",
+            "metric" : "吨位"
+          },
+          "actualArgs" : {
+            "metric" : "吨位",
+            "group_by" : "无"
+          },
+          "argFails" : [
+            "参数 date_from：期望 2026-11-26，实际 （缺失）",
+            "参数 date_to：期望 2026-11-26，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:07"
+    },
+    {
+      "taskId" : "L4-020",
+      "split" : "dev",
+      "question" : "4000 总吨的船停一天，停泊费什么标准？2027 年 7 月 7 号靠泊。",
+      "rubric" : "第二轮必须改用 quote_fee 并补 days=4，其余三项继承；漏 days（默认 1 天）或把吨位换成载货吨即判错。",
+      "anchor" : "08-引航费与停泊费费率表.md 第七条（[1000,5000) 0.12 元/吨天）、第八条 3；tool-contracts.json quote_fee.parameters.days",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "4000 总吨的船停一天，停泊费什么标准？2027 年 7 月 7 号靠泊。",
+          "expectTool" : "query_tariff",
+          "actualTool" : "query_tariff",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-07-07",
+            "fee_type" : "停泊费",
+            "tonnage" : "4000"
+          },
+          "actualArgs" : {
+            "fee_type" : "停泊费",
+            "tonnage" : "4000",
+            "biz_date" : "2027-07-07"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "按这个标准，一共停 4 天要交多少钱？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-07-07",
+            "days" : "4",
+            "fee_type" : "停泊费",
+            "tonnage" : "4000"
+          },
+          "actualArgs" : {
+            "fee_type" : "停泊费",
+            "tonnage" : "4000",
+            "biz_date" : "2027-07-07",
+            "days" : "4"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:11"
+    },
+    {
+      "taskId" : "L4-021",
+      "split" : "dev",
+      "question" : "2026 年最后一个季度一共运了多少货？",
+      "rubric" : "第二轮只换时间窗、metric 与 group_by 保持不变；把「一样的口径」理解为改变分组或口径即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.metric（枚举含「吨位」）、group_by（枚举含「无」）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2026 年最后一个季度一共运了多少货？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "group_by" : "无",
+            "metric" : "吨位"
+          },
+          "actualArgs" : {
+            "date_from" : "2026-10-01",
+            "date_to" : "2026-12-31",
+            "metric" : "吨位",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "2027 年开年那一季度呢，一样的口径。",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "group_by" : "无",
+            "metric" : "吨位"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-03-31",
+            "metric" : "吨位",
+            "group_by" : "无"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:15"
+    },
+    {
+      "taskId" : "L4-022",
+      "split" : "holdout",
+      "question" : "WB20260000015 的单证办完没有？",
+      "rubric" : "两轮 expectArgs 必须完全相同（仅 waybill_no），且都能答出该票的货种/重量/运费或单证状态；第二轮擅自加参数或换单号即判错。",
+      "anchor" : "tool-contracts.json query_waybill.parameters.waybill_no（pattern ^WB\\d{4}\\d{7}$）、notes（单证状态来自 documents 表）",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "WB20260000015 的单证办完没有？",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "actualArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "这一票的货是什么、多重、运费多少？",
+          "expectTool" : "query_waybill",
+          "actualTool" : "query_waybill",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "actualArgs" : {
+            "waybill_no" : "WB20260000015"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:18"
+    },
+    {
+      "taskId" : "L4-023",
+      "split" : "dev",
+      "question" : "GX00015 这条船总吨位多少？",
+      "rubric" : "第二轮必须换成 quote_fee，tonnage 取自上一轮的总吨位，且不传任何货种/货类参数；用载重吨顶替总吨位或给引航费附货类即判错。",
+      "anchor" : "tool-contracts.json query_vessel.parameters.vessel_id；quote_fee.parameters（引航费按船舶总吨位、不传货种）；25-术语与定义.md 第十二条",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "GX00015 这条船总吨位多少？",
+          "expectTool" : "query_vessel",
+          "actualTool" : "query_vessel",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "vessel_id" : "GX00015"
+          },
+          "actualArgs" : {
+            "vessel_id" : "GX00015"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "拿它的总吨位算一下 2027 年 6 月 1 号引航一次的费用。",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "NEEDS_CLARIFICATION",
+          "degraded" : false,
+          "needsClarification" : true,
+          "toolStatus" : "NEEDS_CLARIFICATION",
+          "turnPass" : false,
+          "expectArgs" : {
+            "biz_date" : "2027-06-01",
+            "fee_type" : "引航费",
+            "tonnage" : "2774"
+          },
+          "actualArgs" : {
+            "fee_type" : "引航费",
+            "biz_date" : "2027-06-01"
+          },
+          "argFails" : [
+            "参数 tonnage：期望 2774，实际 （缺失）"
+          ]
+        }
+      ],
+      "itemPass" : false,
+      "turnsPassed" : 1,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:23"
+    },
+    {
+      "taskId" : "L4-024",
+      "split" : "dev",
+      "question" : "2027 年 1 月到 6 月哪个客户运量最大？",
+      "rubric" : "第二轮只改 top_n=20、其余参数逐字继承；改动分组维度或试图超上限取数即判错。",
+      "anchor" : "tool-contracts.json query_traffic.parameters.top_n（minimum 1 / maximum 50）、group_by 枚举含「客户」",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "2027 年 1 月到 6 月哪个客户运量最大？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "group_by" : "客户",
+            "metric" : "吨位",
+            "top_n" : "1"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "metric" : "吨位",
+            "group_by" : "客户",
+            "top_n" : "1"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "前二十名呢？",
+          "expectTool" : "query_traffic",
+          "actualTool" : "query_traffic",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "group_by" : "客户",
+            "metric" : "吨位",
+            "top_n" : "20"
+          },
+          "actualArgs" : {
+            "date_from" : "2027-01-01",
+            "date_to" : "2027-06-30",
+            "metric" : "吨位",
+            "group_by" : "客户",
+            "top_n" : "20"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:27"
+    },
+    {
+      "taskId" : "L4-025",
+      "split" : "dev",
+      "question" : "3000 吨化肥的过闸费，2026 年 10 月 8 号过闸，多少？",
+      "rubric" : "第二轮只改 biz_date 为 2027-02-08 并改取 2027 版单价（仍按 70% 计收）；沿用 2026 版单价或漏掉减免系数即判错。",
+      "anchor" : "06-过闸费费率表（2026版）.md 第七条、第十三条；07-过闸费费率表（2027版）.md 第七条、第十一条",
+      "turns" : [
+        {
+          "turn" : 1,
+          "question" : "3000 吨化肥的过闸费，2026 年 10 月 8 号过闸，多少？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2026-10-08",
+            "cargo_name" : "化肥",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "化肥",
+            "tonnage" : "3000",
+            "biz_date" : "2026-10-08"
+          },
+          "argFails" : [ ]
+        },
+        {
+          "turn" : 2,
+          "question" : "同一批货推迟到 2027 年 2 月 8 号才过闸呢？",
+          "expectTool" : "quote_fee",
+          "actualTool" : "quote_fee",
+          "extractionStatus" : "OK",
+          "degraded" : false,
+          "needsClarification" : false,
+          "toolStatus" : "OK",
+          "turnPass" : true,
+          "expectArgs" : {
+            "biz_date" : "2027-02-08",
+            "cargo_name" : "化肥",
+            "fee_type" : "过闸费",
+            "tonnage" : "3000"
+          },
+          "actualArgs" : {
+            "fee_type" : "过闸费",
+            "cargo_name" : "化肥",
+            "tonnage" : "3000",
+            "biz_date" : "2027-02-08"
+          },
+          "argFails" : [ ]
+        }
+      ],
+      "itemPass" : true,
+      "turnsPassed" : 2,
+      "turnsTotal" : 2,
+      "summarizerCalls" : 0,
+      "finishedAt" : "20:53:31"
+    }
+  ],
+  "judgedCount" : 50,
+  "turnPass" : 36,
+  "turnRate" : 0.72,
+  "itemCount" : 25,
+  "itemPass" : 15,
+  "itemRate" : 0.6,
+  "modelCalls" : 53,
+  "compactionTriggered" : 0,
+  "summarizerNeverCalled" : true,
+  "skipped" : 0,
+  "failed" : [
+    "L4-004",
+    "L4-006",
+    "L4-007",
+    "L4-008",
+    "L4-009",
+    "L4-013",
+    "L4-014",
+    "L4-015",
+    "L4-019",
+    "L4-023"
+  ],
+  "bySplit" : {
+    "dev" : 0.5238,
+    "holdout" : 1.0
+  }
+}

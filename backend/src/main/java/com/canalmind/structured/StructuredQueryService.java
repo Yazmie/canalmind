@@ -71,7 +71,33 @@ public final class StructuredQueryService {
 
     /** 端到端：抽取 + 执行。返回的 {@link ToolResult} 已带追踪与确定性事实。 */
     public ToolResult ask(String question) {
+        return askDetailed(question).result();
+    }
+
+    /**
+     * 抽取 + 执行，并把**抽取结果**（工具 + 实参）一并交给调用方。
+     *
+     * <p>⚠️ **为什么需要这个方法**：L4「多轮参数继承」的判据是**工具 + 实参**，
+     * 而实参目前只出现在 {@code traces} 的**人类可读字符串**里（`工具=X，参数={...}`）。
+     * 从那种字符串反解实参，正是「**拿给人看的标签当机器判据**」——
+     * 本项目已因同类错误两次得出**错误的通过结论**（见《评测报告》§6.1 第 3、8 条）。
+     * 故此处**显式开出类型化出口**，⛔ 评测侧不许去解析 traces 文本。
+     *
+     * <p>⛔ 本方法**不改变** {@link #ask(String)} 的任何行为，也**不增加**付费调用次数：
+     * 它只是把原来内部那一次抽取的结果也返回出来（每轮仍是 1 次抽取）。
+     *
+     * @param question 用户本轮问题（多轮场景下由评测侧拼入上文，见 L4 运行器）
+     */
+    public AskOutcome askDetailed(String question) {
         ExtractionOutcome outcome = extractor.extract(question);
+        return new AskOutcome(outcome, run(outcome));
+    }
+
+    /** {@link #askDetailed(String)} 的返回值：抽取（工具 + 实参 + 降级/追问状态）与执行结果。 */
+    public record AskOutcome(ExtractionOutcome extraction, ToolResult result) {}
+
+    /** 抽取之后的一切：校验信息、降级、追问、执行。（由 {@link #askDetailed} 调用） */
+    private ToolResult run(ExtractionOutcome outcome) {
         List<String> traces = new ArrayList<>();
         traces.add("抽取：状态=" + outcome.status() + "，尝试=" + outcome.attempts() + "，耗时=" + outcome.latencyMs() + "ms");
         if (!outcome.errors().isEmpty()) {

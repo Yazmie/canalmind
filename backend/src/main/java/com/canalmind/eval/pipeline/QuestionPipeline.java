@@ -117,6 +117,17 @@ public final class QuestionPipeline {
                 new AnswerComposer(chatModel));
     }
 
+    /**
+     * 结构化通道本体，供 **L4 多轮评测**直接驱动。
+     *
+     * <p>⚠️ L4 故意**不经过意图路由**：L4 的判据是「第二轮有没有把该继承的参数继承下来、
+     * 该改的有没有改」，题面本身就写明是结构化口径（数据集 `expected.channel=structured`），
+     * 再叠一层路由只会把"路由判错"混进"参数继承判错"。
+     */
+    public StructuredQueryService structured() {
+        return structured;
+    }
+
     /** 一次作答的完整现场。 */
     public record Answer(String question, RouteDecision route, String text, ToolResult tool,
                          List<String> contextChunkIds, String contextExcerpt, int modelCalls,
