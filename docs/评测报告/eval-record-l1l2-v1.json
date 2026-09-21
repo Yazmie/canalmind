@@ -1,0 +1,1572 @@
+{
+  "runId" : "w4-2026-09-22-l1l2-artifacts-v1",
+  "count" : 80,
+  "distribution" : {
+    "L1/dev" : 32,
+    "L1/holdout" : 8,
+    "L2/dev" : 32,
+    "L2/holdout" : 8
+  },
+  "records" : [
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-001:1:-",
+      "taskId" : "L1-001",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "ad9fe5b7ae0e4124c8726ebb180673f852c15017f166062650e1bb9ba4cdb64f",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-002:1:-",
+      "taskId" : "L1-002",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "e3a848f22bd680d34bf1843e62f9d5bb0df1b31da6874822b4616ba2c5b63cd7",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-003:1:-",
+      "taskId" : "L1-003",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "a270423f5079757d6035b87c33a9dd3d1d14cfd7e82dee97be83ef8cf241bfe1",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-004:1:-",
+      "taskId" : "L1-004",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "0b6cbd3fb940c9f1fa6b8b73c49997d89d2226f0e7da4acfcc3635849f0c5269",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-005:1:-",
+      "taskId" : "L1-005",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "3673f7d7dce3cbf64cf22889767640e385c510d2fa89e5539f9d994beb1fb83a",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-006:1:-",
+      "taskId" : "L1-006",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "305f5f3f9e30aaaddf64e0cf315324ada4909f5780abb00d68fe8656fc1299fd",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-007:1:-",
+      "taskId" : "L1-007",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "decf34eaf41287656ed6c792aed27879545eef0c45bc217aa25f3eece55fa7e3",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-008:1:-",
+      "taskId" : "L1-008",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "6ddda1b648d1594d0b86c775b0debeed7845f6249a967f1f6dbab51750461b11",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-009:1:-",
+      "taskId" : "L1-009",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "fd026716578d5240c21bf1bd18595637ab4d8bdce1ad8b9775a0ae14c82b3a65",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-010:1:-",
+      "taskId" : "L1-010",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "8dc4a35c3e0604f50f8ceab91b5465f43b1d0160910bf0c8f00f6c6fca244542",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-011:1:-",
+      "taskId" : "L1-011",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "6a14d659205a28539b1d9a38927794a8ed79915cb17f595985f70a28e8f93f46",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-012:1:-",
+      "taskId" : "L1-012",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "dc3a3e6d5b4b141544b1d01797ed6d80687d2e6997d171198fbae5670b93dbbb",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-013:1:-",
+      "taskId" : "L1-013",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "066c26f84d0ab710eb46f0a47839f99e1dc3ec7e551a2ac28b71d33ff306fcef",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-014:1:-",
+      "taskId" : "L1-014",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "39642469d6fcfcabca936997e6d6332f330dc3ea812b4fbb3b9f6a7e46c699af",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-015:1:-",
+      "taskId" : "L1-015",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "00be9fae0b2b8cdb136a2bd03591fc00bfd0b9d2f0eba6a28bc68885b61a1227",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-016:1:-",
+      "taskId" : "L1-016",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "2e742dad6f483e91c1ec1e7ab3dfb4be6711bf027f31830701fe7762a5a12524",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-017:1:-",
+      "taskId" : "L1-017",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "a618b012aa147a207526f904dcd71270931bcd487b370c20a278072071dd4429",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-018:1:-",
+      "taskId" : "L1-018",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "6423cb46bb9002748c54a9c5052e24b53537067c697659ab9f4778c30b2ea341",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-019:1:-",
+      "taskId" : "L1-019",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "0cd99849960b5bdeef59440ce37585a6ff053eadd7a2a3119960be10b1ad7b6a",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-020:1:-",
+      "taskId" : "L1-020",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "2b4126ecbed9509c90f733e3b2e2fffa0da9ec54f2c0a31e67e696d4440e1fae",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-021:1:-",
+      "taskId" : "L1-021",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "0888e9b9ea6c146fe460665e49368fef4dd987d5c0077814968c4d43482b7b8a",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-022:1:-",
+      "taskId" : "L1-022",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "81245fbc22788c8cc2369b1aca90e83f3390ef984f0ab8d0e6dbd7ce7a065ce3",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-023:1:-",
+      "taskId" : "L1-023",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "d28ead601c9370104fa053565f8a4c407ede0274fb2b344fcb9772bd76fe94b8",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-024:1:-",
+      "taskId" : "L1-024",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "3fa84c579b1a0c2591b8af9b41f0697f8b8fdf86fed7b664706e26565c990614",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-025:1:-",
+      "taskId" : "L1-025",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "ff9d36f3477adfbb901d2e6427bcc1ddf5570393cab77fcc52efe6416a76be8e",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-026:1:-",
+      "taskId" : "L1-026",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "befdb2e8dfca945d725bda50dac29946c2e1fb7a0f6c33ed1bec455dbcc2798e",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-027:1:-",
+      "taskId" : "L1-027",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "e8d0ef00368f74fe3b85dbcbd5f98b138de322fea3cc8f89c3da09867e91a08d",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-028:1:-",
+      "taskId" : "L1-028",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "eb7cda80c1e318c0b4e9ec53b8d86c6e0344afb2d52994ab39c020236487b4cd",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-029:1:-",
+      "taskId" : "L1-029",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "59bfabe0e45e9f6691d0f07cb391027ed56fbf923249922354276bbbd552e8df",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-030:1:-",
+      "taskId" : "L1-030",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "8665a7769cacbef4392634ecc2b6650560020d0acd0e6ab4b5669a6c766aced0",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-031:1:-",
+      "taskId" : "L1-031",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "d898a86c0a5b4bc32799f7b19206dffb048921b9dbca26de399ed4da3ed84bad",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-032:1:-",
+      "taskId" : "L1-032",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "6872073ab32dfaf5837b12245a49330f03bbbacd386619e0cb2be11af528c859",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-033:1:-",
+      "taskId" : "L1-033",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "9d545c278a5f1cc00ef2bf657195e945d0b7ea45e91368e2353962d2e05c0510",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-034:1:-",
+      "taskId" : "L1-034",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "57c2700b39882be4fdfb151fb2027f57034aebf59a9afbf199d03a640835b9c7",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-035:1:-",
+      "taskId" : "L1-035",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "c6a91c53ec268fae73b50d9ef2d57b7328d7f3c4719869adce2514b2d145c549",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-036:1:-",
+      "taskId" : "L1-036",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "3040d23db0e7cb333ee2ef87ea140fec3bfc4453926e10dbdcd6a1aa232a59a8",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-037:1:-",
+      "taskId" : "L1-037",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "5122df3a13c20ef31961bd255e8d27cb5afb1d375505d361477ef16d33daecee",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-038:1:-",
+      "taskId" : "L1-038",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "40a05e0fe3813b2ba5eece8921826bf2686ba9413fe9a35b32941fe505c6ac39",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-039:1:-",
+      "taskId" : "L1-039",
+      "layer" : "L1",
+      "split" : "holdout",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "24fd97aa830a941f4c22cc62ad7a7bebf0eb062ea904cfe028dea3bc769b12a3",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L1-040:1:-",
+      "taskId" : "L1-040",
+      "layer" : "L1",
+      "split" : "dev",
+      "judgeKind" : "oracle",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "e69d5c817938cd8a2e2b1c8857d5373be2653a7fed56a0f85b0aa68e33d3373f",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "executionAccuracy" : 1,
+        "status" : "OK"
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-001:1:-",
+      "taskId" : "L2-001",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "6b2d742177ea73be341ddef2b923a9fcc49849102ad680e4eef5bb8eaf944e40",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.333333,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.333333,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.333333,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.333333,
+        "rankOfFirstGold" : 3,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-002:1:-",
+      "taskId" : "L2-002",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "e0489f15cb89a7a40fb1ba137c82e8214326bb2f436f8477e45bd4e06df01699",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.5,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.5,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.5,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.5,
+        "rankOfFirstGold" : 2,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-003:1:-",
+      "taskId" : "L2-003",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "c21428bc5882bb723b1ba1eef0c1c9773116b2ed7375b873267692f87c918726",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-004:1:-",
+      "taskId" : "L2-004",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "a129dcde377aa7da35d2a5b1914ad46766c807355ec053fea0a3cbe43544e987",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-005:1:-",
+      "taskId" : "L2-005",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "49bfab68254612077a6056cd65d233d21d9dc9143125773fa7383588d8d4d43b",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.333333,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.333333,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.333333,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.333333,
+        "rankOfFirstGold" : 3,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-006:1:-",
+      "taskId" : "L2-006",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "0e6c74c689f3852d0886bec7846cb526104f8dca3e83e5722c9677294a2525fe",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-007:1:-",
+      "taskId" : "L2-007",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "760ae7fb3a33b04e4fd80bd7fabe0aaaf8cc58273b72baafd9404c4fb8ec5835",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-008:1:-",
+      "taskId" : "L2-008",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "b8d80746284ace86609b4605c001b616e9bfffd17f63dd36fb42692176487695",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-009:1:-",
+      "taskId" : "L2-009",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "34a98ded59e5c8e8842476f48e3f471cf8ebe7d2bd02e74ce10e9f53d9cd494a",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.5,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.5,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.5,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.5,
+        "rankOfFirstGold" : 2,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-010:1:-",
+      "taskId" : "L2-010",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "FAILED",
+      "inputHash" : "8f0cea1d4c9546f7fbe5150f07734824f0b099b35977c48ecf8670809ad99334",
+      "rootCauseLayer" : "DATA",
+      "errorCategory" : "检索未命中",
+      "scores" : {
+        "HitRate@5" : 0,
+        "MRR@5" : 0.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.142857,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.142857,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.142857,
+        "rankOfFirstGold" : 7,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-011:1:-",
+      "taskId" : "L2-011",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "f0910b3b32b8ca1715d8a8f728deeebeacb78d9e97c5b2b70fd0ed3ce3ee9c63",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-012:1:-",
+      "taskId" : "L2-012",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "cde9889eab6ab3b246f5410bc54f8dd20768d66391c56477930e61d139665dc5",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-013:1:-",
+      "taskId" : "L2-013",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "5988f63d5221ae0cdb1581fed296cd9ea4dbb7cdd5311d2839371d501d3b1d0c",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-014:1:-",
+      "taskId" : "L2-014",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "1ee027180fad14dc151ad60b66e729451124034b84901499bc8d7760ae1785e5",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.25,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.25,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.25,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.25,
+        "rankOfFirstGold" : 4,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-015:1:-",
+      "taskId" : "L2-015",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "8630c7701b51fdeb8ee086fa745389f5804b3dc7cf7d360dc2449737cfed89e9",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-016:1:-",
+      "taskId" : "L2-016",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "35ac468dc28682729a8afa4d22d1ec72ca14583e63947495d8f337daadec686e",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-017:1:-",
+      "taskId" : "L2-017",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "fa4c7223020df8dca4ec5d93589323a50521497b217c6640543442400676b83e",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-018:1:-",
+      "taskId" : "L2-018",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "af6109586216659f3e5f6eb6122f84937925611c61d53af83bdc34b0c1bfe2f9",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-019:1:-",
+      "taskId" : "L2-019",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "0c3fbb7a16b26ba5a207ce120900dbb8720d87333113e2fbf8f214f4a2a7a517",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-020:1:-",
+      "taskId" : "L2-020",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "41deab17e9724f62a68324c3f968631b3a1337fde7af8c07d86203e844b4382b",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-021:1:-",
+      "taskId" : "L2-021",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "e6f48b788e27bc9b982c9218fede3dce6a5ca8d77222f418936bf2dccbe9ca15",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-022:1:-",
+      "taskId" : "L2-022",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "8a838497c7af21b42f9e8807d4d71df2ec60d71353a2bb58f01c90eaa7cd0c4f",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.5,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.5,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.5,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.5,
+        "rankOfFirstGold" : 2,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-023:1:-",
+      "taskId" : "L2-023",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "180791215fd375029ebd358c4b98eef06bb7d6c8bedb8a32194ba0ac0f62511a",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-024:1:-",
+      "taskId" : "L2-024",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "81f5303bd8acc522ec9ce96d13f68900406ec944a74e3d4b7a8333241346010b",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-025:1:-",
+      "taskId" : "L2-025",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "5daab053078350491a2d337e955f6d7a4a564b1550a100154cc3519926bce592",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.333333,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.333333,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.333333,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.333333,
+        "rankOfFirstGold" : 3,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-026:1:-",
+      "taskId" : "L2-026",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "32acde4227349577fc1204a535345e27cdc4fc80a4feaae802eadf83635cee0b",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-027:1:-",
+      "taskId" : "L2-027",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "da7885fcb2eed9d1f30642036e7bbb75ee0d4b75b01af50883b2258b73abd260",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 2,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-028:1:-",
+      "taskId" : "L2-028",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "2d78f5ecb1d196f9dc89f05af5b44deb768308b1513ac0fd61b9ab480df2f70e",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-029:1:-",
+      "taskId" : "L2-029",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "217b5e81e2dc8f890e35a6c38632ff62df6a8ec280988d98e0dfa89129bd0b68",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-030:1:-",
+      "taskId" : "L2-030",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "f56af91e6d6cabd5f6e71b0c7646b2faa8926d90ebdf10cea4ef890eb1e1ea02",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-031:1:-",
+      "taskId" : "L2-031",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "5d485eb232a4e22502553d58c65a6c56859f1e41a0ce4e064fc08d6f91cb64bc",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.25,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.25,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.25,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.25,
+        "rankOfFirstGold" : 4,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-032:1:-",
+      "taskId" : "L2-032",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "edf00156a1670ae64d6e2803107a732bfa6ff74f8b4e4996b6133ca33aa11e78",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-033:1:-",
+      "taskId" : "L2-033",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "93bccf12c7828fc9d7a721eed6f0160005e42944ece19ce8201fda7c07fb7f49",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-034:1:-",
+      "taskId" : "L2-034",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "FAILED",
+      "inputHash" : "7fe785f400b79ac62019fa9bde0bff9147bf356ffc032fad9ba62ff0fce00fd1",
+      "rootCauseLayer" : "DATA",
+      "errorCategory" : "检索未命中",
+      "scores" : {
+        "HitRate@5" : 0,
+        "MRR@5" : 0.0,
+        "HitRate@10" : 0,
+        "MRR@10" : 0.0,
+        "HitRate@20" : 0,
+        "MRR@20" : 0.0,
+        "HitRate@30" : 0,
+        "MRR@30" : 0.0,
+        "rankOfFirstGold" : 0,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-035:1:-",
+      "taskId" : "L2-035",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "d298721d54cfcdf93bc2715038c84d470b47cb0a78c47f2d6076c00f27c16a89",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.5,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.5,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.5,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.5,
+        "rankOfFirstGold" : 2,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-036:1:-",
+      "taskId" : "L2-036",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "1915b2abc3ff064d8cfed05c8f9567194e027f4a5bd0d48c6bc3e4d2c0d6b9b5",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-037:1:-",
+      "taskId" : "L2-037",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "612b7092666946b4c95ab1ee368fc13a26ffe3da7bdd027d10ec1c302cbb38c9",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-038:1:-",
+      "taskId" : "L2-038",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "ed5f181f095ac2a4fde80adc7ba5b96062fa55769cb649ebbd25a0938bb4f824",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 1.0,
+        "HitRate@10" : 1,
+        "MRR@10" : 1.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 1.0,
+        "HitRate@30" : 1,
+        "MRR@30" : 1.0,
+        "rankOfFirstGold" : 1,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-039:1:-",
+      "taskId" : "L2-039",
+      "layer" : "L2",
+      "split" : "holdout",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "FAILED",
+      "inputHash" : "ee9ffc4ec3f5f7bc1d6ef0f59a87f6550a5da395d98d5af958ae074d3107f43c",
+      "rootCauseLayer" : "DATA",
+      "errorCategory" : "检索未命中",
+      "scores" : {
+        "HitRate@5" : 0,
+        "MRR@5" : 0.0,
+        "HitRate@10" : 0,
+        "MRR@10" : 0.0,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.083333,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.083333,
+        "rankOfFirstGold" : 12,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    },
+    {
+      "evalId" : "w4-2026-09-22-l1l2-artifacts-v1:L2-040:1:-",
+      "taskId" : "L2-040",
+      "layer" : "L2",
+      "split" : "dev",
+      "judgeKind" : "rule",
+      "outcomeStatus" : "SUCCESS",
+      "inputHash" : "de8ddbe62da7661c2346d04cef8bfbd0e55eca74fd349688e03377cdddcc5b68",
+      "rootCauseLayer" : null,
+      "errorCategory" : null,
+      "scores" : {
+        "HitRate@5" : 1,
+        "MRR@5" : 0.25,
+        "HitRate@10" : 1,
+        "MRR@10" : 0.25,
+        "HitRate@20" : 1,
+        "MRR@20" : 0.25,
+        "HitRate@30" : 1,
+        "MRR@30" : 0.25,
+        "rankOfFirstGold" : 4,
+        "goldCount" : 1,
+        "topK" : 30
+      }
+    }
+  ]
+}
