@@ -120,6 +120,29 @@
       <artifactId>postgresql</artifactId>
     </dependency>
 
+    <!-- ===== 检索通道：中文分词（第 2 周第 4 项，决策 C-25）===== -->
+    <!--
+      为什么必须用 Java 侧分词（而不是交给 PostgreSQL）：
+      本机 PG18 实测**没有任何中文分词扩展**（`share/extension` 下 65 个 .control 里
+      没有 zhparser / pg_jieba / IK），且上游两个方案都只支持 POSIX 构建
+      （zhparser 要先编译 SCWS；pg_jieba 是 C++/cmake 且只在 CentOS7/PG9.6 与 macOS/PG11 测过），
+      而本机没有 make/gcc/cmake/nmake。详见 V4 迁移文件头与 docs/DECISIONS.md C-25。
+
+      为什么是 jieba-analysis 而不是 HanLP / ansj：
+      ① 它有**自定义词典 API**（本项硬需求：「自定义航运词典」）；
+      ② 纯 Java、**零传递依赖**（实测 pom 无 compile 依赖），不拖入 Netty/模型文件那一类包袱；
+      ③ 算法是结巴分词（业界通行），Apache-2.0。
+      ⚠️ 版本只能写死：它不在 spring-boot-dependencies 的 BOM 里。
+      ⚠️ 实测该库的用户词典**必须恰好两列** `词 词频`，写成三列（标准 jieba 的 tag 格式）
+         会让词频**静默退回默认值 3.0**，词典几乎失效——见 ShippingDictionary 的严格校验
+         与 docs/工程复盘/检索工程/结巴用户词典的列数陷阱.md。
+    -->
+    <dependency>
+      <groupId>com.huaban</groupId>
+      <artifactId>jieba-analysis</artifactId>
+      <version>1.0.2</version>
+    </dependency>
+
     <!-- ===== 测试 ===== -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
