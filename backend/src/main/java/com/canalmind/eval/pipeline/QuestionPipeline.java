@@ -88,6 +88,21 @@ public final class QuestionPipeline {
     public static QuestionPipeline create(JdbcTemplate jdbc, Map<String, String> env,
                                           ChatModel chatModel, String businessToday)
             throws EmbeddingModelGuard.EmbeddingModelMismatchException {
+        return create(jdbc, env, chatModel, businessToday, null);
+    }
+
+    /**
+     * 同上，但**额外带上层名**（C-51）：层名决定作答提示词走 v1 还是 v2。
+     *
+     * <p>⚠️ 为什么层名要从最外层一路传进来：v2 **只对 L5 生效**，而"这一轮跑的是哪一层"
+     * **只有运行器自己知道**。⛔ 不让本类去猜——猜错就又是一次"改了但其实没生效"，
+     * 而那正是本项目刚踩过的坑（见 DECISIONS 的「C-51 v2 目标更正」）。
+     *
+     * @param layer 层名（如 {@code L5}）；{@code null} ⇒ 一律 v1（既有行为零变化）
+     */
+    public static QuestionPipeline create(JdbcTemplate jdbc, Map<String, String> env,
+                                          ChatModel chatModel, String businessToday, String layer)
+            throws EmbeddingModelGuard.EmbeddingModelMismatchException {
         // ── 检索通道：档案名从库里探，探不到就报错（⛔ 不猜、不降级）──
         String vectorProfile = new RagChunkRepository(jdbc).selectProfileName();
         if (vectorProfile == null) {
@@ -114,7 +129,7 @@ public final class QuestionPipeline {
                 new FeeCalculationEngine(), businessToday);
 
         return new QuestionPipeline(jdbc, new IntentRouter(invoker), service, pipeline,
-                new AnswerComposer(chatModel));
+                new AnswerComposer(chatModel, layer, env));
     }
 
     /**
