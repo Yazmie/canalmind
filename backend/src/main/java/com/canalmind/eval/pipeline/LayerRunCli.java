@@ -268,6 +268,11 @@ public final class LayerRunCli {
                     n.put("ruleId", a.route().ruleId());
                     n.put("routeReason", a.route().reason());
                     n.put("answer", a.text());
+                    // ⚠️ `contextExcerpt` **必须落盘**：判分器要靠它核对"作答引用的条款是否真有依据"。
+                    //    实测踩到：这个字段漏写 ⇒ 判分器拿到**空上下文** ⇒ 它把有依据的引用
+                    //    判成"语料中无依据"，faithfulness 系统性偏低，整层通过率被压成假低分。
+                    //    ⛔ 这一条不能靠"反正 id 也在产物里"来省——判分输入是**产物**，不是数据库。
+                    n.put("contextExcerpt", a.contextExcerpt());
                     n.put("toolStatus", a.toolStatus());
                     if (a.tool() != null) {
                         n.put("tool", a.tool().tool());

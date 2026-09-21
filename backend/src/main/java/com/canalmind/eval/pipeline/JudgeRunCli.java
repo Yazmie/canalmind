@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.canalmind.eval.harness.HarnessCli;
 import com.canalmind.eval.judge.JudgeInput;
@@ -137,6 +138,7 @@ public final class JudgeRunCli {
         Map<String, String> env = LlmRerankerFactory.environmentWithDotEnv(
                 List.of(Path.of(".env"), Path.of("../.env")));
         ChatModel chatModel = LlmRerankerFactory.chatModelFromEnvironment(env, JUDGE_MAX_TOKENS);
+        JdbcTemplate jdbc = new JdbcTemplate(HarnessCli.dataSource(env));
         LlmJudge judge = new LlmJudge(new DeepSeekJsonInvoker(chatModel, JUDGE_MAX_TOKENS),
                 "deepseek-v4-flash");
 
@@ -206,7 +208,7 @@ public final class JudgeRunCli {
             }
 
             String answer = r.path("answer").asText();
-            JudgeInput in = buildInput(id, layer, r);
+            JudgeInput in = buildInput(id, layer, r, contextOf(r, jdbc));
             JudgeScores s = judge.judge(in);
 
             ObjectNode n = arr.addObject();
@@ -266,6 +268,12 @@ public final class JudgeRunCli {
                     + s.completeness() + " 均分 " + round4(s.mean())
                     + " 严格" + (s.passStrict(STRICT_MIN_EACH) ? "通过" : "未过")
                     + (ruleVerdict == null ? "" : "，规则判据 " + ruleVerdict));
+            // 边判边写：**与 LayerRunCli 同因**——进程被杀时，已付费拿到的判分必须留在盘上。
+            // 实测踩到：L5 判分跑到一半随会话暂停被杀，而产物只在**最后**写一次 ⇒
+            // 那 20 次判分调用全部白花。⛔ 别把这一行挪到循环外。
+            if (jsonOut != null) {
+                writeJson(Path.of(jsonOut), out);
+            }
         }
 
         out.put("judgedCount", results.size());
@@ -313,7 +321,7 @@ public final class JudgeRunCli {
      * 即"出题时就写死的评分要点"。这样 Judge 是**参照判分**（Reference-guided），
      * 而不是让模型凭印象打分。
      */
-    static JudgeInput buildInput(String id, String layer, JsonNode r) {
+    static JudgeInput buildInput(String id, String layer, JsonNode r, String context) {
         String nl = LF;
         JsonNode exp = r.path("expected");
         List<String> oracle = new ArrayList<>();
@@ -360,8 +368,40 @@ public final class JudgeRunCli {
             default -> ref.append("（本层无参考答案要点）");
         }
 
-        return new JudgeInput(id, layer, r.path("question").asText(), r.path("contextExcerpt").asText(""),
+        return new JudgeInput(id, layer, r.path("question").asText(), context,
                 ref.toString().strip(), r.path("rubric").asText(""), oracle, r.path("answer").asText());
+    }
+
+    /**
+     * 取判分用的上下文。
+     *
+     * <p>⚠️ **这里必须能在 `contextExcerpt` 缺失时回库重建**，理由是**止损**：
+     * 首次判分时作答产物漏写了该字段 ⇒ 判分器拿到**空上下文** ⇒ 它把"有依据的引用"
+     * 判成"语料中无依据"，L3/L5/L6 的 faithfulness 被系统性压低。
+     * 若只能靠"重跑作答"来补，那就要**再付一遍作答的钱**；而 `contextChunkIds` 已在产物里，
+     * **回库取正文是零成本的**，且与作答当时用的是同一段正文（同一 `chunk_id`、同一张表）。
+     * ⛔ 注意：这只是**补上下文**，不改答案本身——所以不会把"作答缺陷"掩盖成"判分缺陷"。
+     */
+    static String contextOf(JsonNode r, JdbcTemplate jdbc) {
+        String stored = r.path("contextExcerpt").asText("");
+        if (!stored.isBlank()) {
+            return stored;
+        }
+        JsonNode ids = r.path("contextChunkIds");
+        if (ids.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        int n = 0;
+        for (JsonNode idNode : ids) {
+            String id = idNode.asText();
+            List<String> got = jdbc.queryForList("SELECT content FROM rag_chunk WHERE chunk_id = ?",
+                    String.class, id);
+            sb.append("[").append(n + 1).append("] ")
+                    .append(got.isEmpty() || got.get(0) == null ? "" : got.get(0)).append(LF);
+            n++;
+        }
+        return sb.toString();
     }
 
     /**
