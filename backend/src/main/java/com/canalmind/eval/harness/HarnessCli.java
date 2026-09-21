@@ -52,6 +52,20 @@ public final class HarnessCli {
     private static final String DEFAULT_L2_HITS = "target/eval/vector-l2-v2-hits.json";
     private static final String DEFAULT_L2_GOLDEN = "docs/评测报告/golden-l2-v2.json";
 
+    /**
+     * C-52：Judge 类三层的 judged 产物默认路径。
+     *
+     * <p>三层**必须一起落库**——只落 L3 会让「分层通过率」在 SQL 侧看起来"有 Judge 层了"，
+     * 而 L5/L6 仍然缺席，这种"部分补齐"比全缺更难发现。
+     */
+    private static final String[] DEFAULT_JUDGED = {
+            "docs/评测报告/layer-L3-judged-v1.json",
+            "docs/评测报告/layer-L5-judged-v1.json",
+            "docs/评测报告/layer-L6-judged-v1.json"};
+
+    /** C-52：三层题号所在的数据集——落库时用它**反证**题号，并作为 `dataset_version`。 */
+    private static final String DEFAULT_JUDGE_GOLDEN = "docs/评测报告/golden-set-v3.json";
+
     private HarnessCli() {
     }
 
@@ -72,6 +86,8 @@ public final class HarnessCli {
         String l1 = null;
         String l2Hits = null;
         String l2Golden = null;
+        java.util.List<String> judgeJudged = new java.util.ArrayList<>();
+        String judgeGoldenPath = null;
         String jsonOut = null;
         String gitCommit = null;
         int primaryK = 5;
@@ -90,6 +106,9 @@ public final class HarnessCli {
                 case "--l1" -> l1 = args[++i];
                 case "--l2-hits" -> l2Hits = args[++i];
                 case "--l2-golden" -> l2Golden = args[++i];
+                // C-52：Judge 类三层（L3/L5/L6）的 judged 产物，可重复给（顺序即入库顺序）
+                case "--l3-judged", "--l5-judged", "--l6-judged" -> judgeJudged.add(args[++i]);
+                case "--judge-golden" -> judgeGoldenPath = args[++i];
                 case "--primary-k" -> primaryK = Integer.parseInt(args[++i]);
                 case "--json" -> jsonOut = Path.of(args[++i]).toString();
                 case "--git-commit" -> gitCommit = args[++i];
@@ -119,11 +138,23 @@ public final class HarnessCli {
             return report(writer, runId, jsonOut);
         }
         if (ingest) {
+            // C-52：未显式给 Judge 产物时，走三层默认路径（缺哪个就显式跳过哪个）
+            java.util.List<String> judgePaths = new java.util.ArrayList<>();
+            if (judgeJudged.isEmpty()) {
+                for (String d : DEFAULT_JUDGED) {
+                    judgePaths.add(resolve(d).toString());
+                }
+            } else {
+                for (String p : judgeJudged) {
+                    judgePaths.add(resolve(p).toString());
+                }
+            }
+            Path judgeGolden = resolve(judgeGoldenPath == null ? DEFAULT_JUDGE_GOLDEN : judgeGoldenPath);
             return ingest(writer, runId, gitCommit, primaryK,
                     resolve(l1 == null ? DEFAULT_L1 : l1),
                     resolve(l2Hits == null ? DEFAULT_L2_HITS : l2Hits),
                     resolve(l2Golden == null ? DEFAULT_L2_GOLDEN : l2Golden),
-                    write, jsonOut);
+                    judgePaths, judgeGolden, write, jsonOut);
         }
         printUsage();
         return 2;
@@ -131,7 +162,8 @@ public final class HarnessCli {
 
     // ------------------------------------------------------------------ ingest
     private static int ingest(EvalRecordWriter writer, String runId, String gitCommit, int primaryK,
-                              Path l1, Path l2Hits, Path l2Golden, boolean write, String jsonOut)
+                              Path l1, Path l2Hits, Path l2Golden, java.util.List<String> judgeJudged,
+                              Path judgeGolden, boolean write, String jsonOut)
             throws IOException {
         List<EvalRecordRow> rows = new ArrayList<>();
         if (Files.exists(l1)) {
@@ -144,6 +176,17 @@ public final class HarnessCli {
         } else {
             System.out.println("⚠️ 跳过 L2：命中文件或数据集不存在（" + l2Hits + " / " + l2Golden + "）");
         }
+        // C-52：Judge 类三层（L3 / L5 / L6）。⛔ 缺失即显式跳过，不静默少算分母。
+        for (String p : judgeJudged) {
+            Path jp = Path.of(p);
+            if (Files.exists(jp)) {
+                List<EvalRecordRow> rs = ArtifactIngest.readJudge(jp, judgeGolden, runId, gitCommit);
+                rows.addAll(rs);
+                System.out.println("  " + jp.getFileName() + " → " + rs.size() + " 条");
+            } else {
+                System.out.println("⚠️ 跳过 Judge 层：产物不存在 " + jp);
+            }
+        }
         if (rows.isEmpty()) {
             System.err.println("[FAIL] 一条记录都没造出来——产物路径不对？⛔ 空产物不得当作成功");
             return 3;
@@ -153,7 +196,8 @@ public final class HarnessCli {
         System.out.println("run_id = " + runId);
         System.out.println("本次将写入 " + rows.size() + " 条记录（layer/split 分布如下）：");
         System.out.println("  " + distribution(rows));
-        System.out.println("判分方式：L1 = oracle（数据库逐格）、L2 = rule（纯规则指标）；两层均 ⛔ 不用 LLM Judge");
+        System.out.println("判分方式：L1 = oracle（数据库逐格）、L2 = rule（纯规则指标）、"
+                + "L3/L5/L6 = reference_guided（LLM Judge，读既有 judged 产物，⛔ 不重新调用付费 API）");
 
         if (!write) {
             System.out.println();
@@ -449,5 +493,6 @@ public final class HarnessCli {
         System.out.println("  --write                    真正写库（⛔ 不加则只空跑）");
         System.out.println("  --report --run-id <id>     读库汇总分层通过率");
         System.out.println("  --l1 / --l2-hits / --l2-golden / --primary-k / --json / --git-commit");
+        System.out.println("  --l3-judged / --l5-judged / --l6-judged   Judge 三层产物（C-52；不给则用默认路径）");
     }
 }

@@ -150,6 +150,133 @@ public final class ArtifactIngest {
     }
 
     /** 首个命中 gold 的名次（1 起）；未命中返回 0。 */
+    /** C-52：Judge 类三层（L3 / L5 / L6）允许的层名，⛔ 不接受别的层。 */
+    private static final java.util.Set<String> JUDGE_LAYERS = java.util.Set.of("L3", "L5", "L6");
+
+    /**
+     * Judge 类三层：读 `layer-L{3,5,6}-judged-v1.json`，每题一条记录（C-52）。
+     *
+     * <p>补做理由：第 4 周任务 4 是「**完整**评测 Harness，`EvalRecord` 表落库」，
+     * 而在此之前 `eval_record` 只有 L1/L2（`readL1`/`readL2` 两条路径），
+     * **Judge 三层根本没有入库通道** ⇒ 「分层通过率」报告在 SQL 侧取不到 L3–L6。
+     * 本方法**只读既有产物**，⛔ 不重新调用任何付费 API。
+     *
+     * <p>⚠️ **三层条目 schema 不完全一致**（实测，且本轮曾把这条记窄过——已更正）：
+     * 规则三键 `ruleExpectedStatus` / `ruleActualStatus` / `rulePass` **并非 L6 独有**——
+     * 落库后按层统计实际是 **L6 15/15 条都有、L5 也有（17/20 条）、L3 一条都没有**。
+     * 故这里**按"条目有没有这个键"逐个取**，⛔ **不按层名分支**：
+     * ①按层分支会漏掉 L5 的 17 条；②照 L3 的键集一刀切会把规则结果**静默丢掉**，
+     * 而丢字段不报错、条数也仍然对——正是"合法但错"。这条口径由
+     * `ArtifactIngestJudgeTest` 与落库后的 `scores->>'rulePass'` 非空计数共同守护。
+     *
+     * <p>⚠️ **刻意留空并在文档里登记的两个字段**：
+     * <ul>
+     *   <li>`promptVersion` = {@code null}：judged 产物里**没有** Prompt 版本字段。
+     *       其 `answersSource`（如 `layer-L3-answers-v1.json`）是**答案产物的版本**，
+     *       ⛔ **不等于 Prompt 版本**——把两者等同就是"合法但错"。
+     *       C-51 要的 v1 锚点必须另找（生成 Prompt 源码的 git 历史），**不得**用文件名硬凑。</li>
+     *   <li>`datasetVersion`：judged 产物**不含**数据集版本，而 DDL 里该列 **NOT NULL**。
+     *       解法是**反证**而不是随便填：逐条要求题号能在 `golden-set-v3.json` 里找到，
+     *       对不上就报错 ⇒ 数据集版本 = 该数据集文件的哈希（与 L2 同一口径）。</li>
+     *   <li>`referenceOutput` / `actualOutput`：judged 产物**不含参考答案与答案正文**
+     *       （答案在同目录的 `layer-L*-answers-v1.json`，本轮⛔ 未接入），故留空并登记。</li>
+     * </ul>
+     *
+     * @param judged 形如 {@code layer-L3-judged-v1.json}
+     */
+    public static List<EvalRecordRow> readJudge(Path judged, Path goldenFile, String runId,
+                                                String gitCommit) throws IOException {
+        JsonNode root = read(judged);
+        String layer = root.path("layer").asText("");
+        if (!JUDGE_LAYERS.contains(layer)) {
+            throw new IllegalArgumentException(
+                    "readJudge 只处理 " + JUDGE_LAYERS + "，实际为「" + layer + "」：" + judged);
+        }
+        JsonNode items = root.path("judged");
+        if (!items.isArray() || items.isEmpty()) {
+            throw new IllegalStateException("judged 数组为空或缺失，拒绝落库（分母为 0 比分子错更难发现）：" + judged);
+        }
+        int declared = root.path("judgedCount").asInt(-1);
+        if (declared >= 0 && declared != items.size()) {
+            // ⛔ 不静默跳过：与 readL2「声明条数 vs 实际条数」同一条纪律
+            throw new IllegalStateException("judgedCount=" + declared + " 与 judged 实际条数="
+                    + items.size() + " 不一致：" + judged);
+        }
+
+        // `dataset_version` 在 DDL 里是 NOT NULL，而 judged 产物**不含**数据集版本。
+        // ⚠️ 解法不是"随便填一个哈希"，而是：数据集文件由 L3/L5/L6 的题号**反证**出来——
+        // 逐条要求 taskId 能在数据集里找到，对不上就报错（数据集拿错了要当场炸，不是静默错配）。
+        JsonNode goldenRoot = read(goldenFile);
+        Map<String, JsonNode> byId = new LinkedHashMap<>();
+        for (JsonNode it : goldenRoot.path("items")) {
+            byId.put(it.path("id").asText(), it);
+        }
+        String datasetVersion = shortVersion(sha256HexFile(goldenFile));
+        String judgeModel = root.path("judgeModel").asText(null);
+        String answersSource = root.path("answersSource").asText("");
+        String evidence = judged.getFileName() + "@" + shortVersion(sha256HexFile(judged))
+                + (answersSource.isEmpty() ? "" : " ← " + answersSource);
+        String graderVersion = "judge-reference-guided@" + root.path("strictMinEach").asInt()
+                + "," + root.path("lenientMinMean").asDouble();
+        String rootCauseOnFail = "MODEL";
+
+        List<EvalRecordRow> rows = new ArrayList<>();
+        for (JsonNode it : items) {
+            String taskId = it.path("taskId").asText();
+            if (taskId.isBlank()) {
+                throw new IllegalStateException("judged 条目缺 taskId：" + judged);
+            }
+            JsonNode goldenItem = byId.get(taskId);
+            if (goldenItem == null) {
+                throw new IllegalStateException("judged 里的题号「" + taskId
+                        + "」在数据集 " + goldenFile.getFileName()
+                        + " 中找不到（数据集不同版？）——⛔ 不静默落库");
+            }
+            String question = goldenItem.path("question").asText(null);
+            boolean passStrict = it.path("passStrict").asBoolean(false);
+            boolean passLenient = it.path("passLenient").asBoolean(false);
+            boolean needsReview = it.path("needsHumanReview").asBoolean(false);
+
+            Map<String, Object> scores = new LinkedHashMap<>();
+            for (String f : new String[] {"faithfulness", "relevance", "completeness"}) {
+                if (it.has(f)) {
+                    scores.put(f, it.path(f).asInt());
+                }
+            }
+            scores.put("mean", it.path("mean").asDouble());
+            scores.put("minScore", it.path("minScore").asInt());
+            scores.put("parseOk", it.path("parseOk").asBoolean(false));
+            scores.put("passStrict", passStrict ? 1 : 0);
+            scores.put("passLenient", passLenient ? 1 : 0);
+            // ⚠️ L6 独有：状态规则校验结果（⛔ 不能因为 L3/L5 没有就跳过）
+            if (it.has("rulePass")) {
+                scores.put("rulePass", it.path("rulePass").asBoolean(false) ? 1 : 0);
+                scores.put("ruleExpectedStatus", it.path("ruleExpectedStatus").asText(""));
+                scores.put("ruleActualStatus", it.path("ruleActualStatus").asText(""));
+            }
+
+            String status = passStrict ? "SUCCESS" : (passLenient ? "PARTIAL" : "FAILED");
+            String errorCategory = switch (status) {
+                case "FAILED" -> "Judge 严格与宽松阈值均未达";
+                case "PARTIAL" -> "Judge 低于严格阈值但达宽松阈值";
+                default -> null;
+            };
+
+            rows.add(new EvalRecordRow(
+                    runId, taskId, 1, null,
+                    layer, it.path("split").asText("dev"), "reference_guided",
+                    null, judgeModel, datasetVersion, null,
+                    null, evidence, sha256Hex(question != null ? question : taskId),
+                    question, null, null,
+                    null, null, null,
+                    status, scores,
+                    judgeModel, graderVersion, it.path("reasoning").asText(null),
+                    errorCategory, "FAILED".equals(status) ? rootCauseOnFail : null,
+                    needsReview ? 0.0 : null, gitCommit));
+        }
+        return rows;
+    }
+
     static int rankOfFirstGold(List<String> ranked, List<String> gold) {
         for (int i = 0; i < ranked.size(); i++) {
             if (gold.contains(ranked.get(i))) {
