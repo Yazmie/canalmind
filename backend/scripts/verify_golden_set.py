@@ -494,6 +494,29 @@ def main() -> int:
         err(f"[FAIL] Golden Set 校验未通过（{len(failures)} 项错误）")
         return 1
     ok("Golden Set L2 结构与分布校验通过")
+
+    # ── L1/L3/L4/L5/L6（v3 文件）：同一入口一并校验 ────────────────────────────
+    # 判据只有一份实现（在 build_golden_set_v3.py 里），这里只做"调用 + 汇总退出码"，
+    # 避免两个脚本各写一套结构校验、日后再漂移。
+    v3_path = Path(__file__).resolve().parent.parent.parent / "docs" / "评测报告" / "golden-set-v3.json"
+    if v3_path.exists() and Path(args.dataset).resolve() == DEFAULT_DATASET.resolve():
+        print("-" * 72)
+        print(f"附带校验：{v3_path.name}（L1/L3/L4/L5/L6）")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from build_golden_set_v3 import check as check_v3      # noqa: E402
+        v3 = json.loads(v3_path.read_text(encoding="utf-8"))
+        v3_errors: list = []
+        v3_warnings: list = []
+        check_v3(v3, v3_errors, v3_warnings)
+        for w in v3_warnings:
+            warn("[v3] " + w)
+        for e in v3_errors:
+            err("[v3] " + e)
+        if v3_errors:
+            err(f"[FAIL] v3 校验未通过（{len(v3_errors)} 项错误）")
+            return 1
+        ok(f"v3 校验通过：{v3['counts']['total']} 条新增（层分布 {v3['counts']['byLayer']}，"
+           f"保留集 {v3['counts']['holdoutTotal']} 条）")
     return 0
 
 

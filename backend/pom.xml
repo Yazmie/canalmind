@@ -143,6 +143,28 @@
       <version>1.0.2</version>
     </dependency>
 
+    <!-- ===== 结构化查询段：JSON Schema 校验（决策 C-32） ===== -->
+    <!--
+      为什么用 networknt/json-schema-validator：
+        C-32 定的是「JSON Mode + **服务端** Schema 校验」——校验必须发生在服务端，
+        因为我们不能要求模型一定合规（DeepSeek 无 strict 模式的 JSON Schema 强制）。
+        知识库《大模型结构化输出》第 161、177–179 行为「反模式」警示：
+        只写提示词说「必须输出 JSON」而不做校验，等于把契约交给模型自觉。
+      ⚠️ 2.0.0 的 API 与 1.x **完全不同**（包结构重构）：
+        1.x 的 JsonSchemaFactory / JsonSchema / SchemaValidatorsConfig / SpecVersion **均已不存在**，
+        现行入口是 SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+        → registry.getSchema(JsonNode) → schema.validate(ExecutionContext, JsonNode)
+        → ctx.getErrors()。用 javap 实测确认，详见 docs/进度看板.md 第 3 周笔记。
+      ⚠️ 传递依赖 com.ethlo.time:itu:1.14.0 是**运行期必需**（RFC3339 format 支持），
+        本机缓存已有；joni / graal-sdk / js 是 optional（只在选用 Joni/GraalJS 正则工厂时需要），
+        本项目用默认的 JDKRegularExpressionFactory，故不需要它们。
+    -->
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>2.0.0</version>
+    </dependency>
+
     <!-- ===== 测试 ===== -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

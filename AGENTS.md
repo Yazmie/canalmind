@@ -409,6 +409,30 @@ spring:
 **⚠️ `.ps1` 必须 BOM + CRLF**（`.gitattributes` 声明 `text eol=crlf`）。入库前可用
 `git add` 的警告自查：出现 `LF will be replaced by CRLF` 即说明工作区与实际约定不一致。
 
+**⚠️ 改语料后必须跑"消费者"的测试，不能只跑语料自己的校验脚本（2026-09-21 带红提交的教训）**
+
+`docs/规则语料/*.md` 同时被三套互不包含的检查消费：
+①`backend/scripts/validate_corpus.py`（Python 侧，11 项文本/结构检查）、
+②`backend/scripts/verify_corpus_db_rates.py`（费率数值 ↔ 库侧逐格）、
+③**Java 侧 `DocumentParser` / `ChunkStructureSplitter`**（元数据格式契约 C-20、结构不变量）。
+
+实测事故：一次把元数据表「生效期」写成 `2026-09-16 至 2027-01-01（终止日不含…）`，
+①②全绿，而③的 `EFFECTIVE` 正则不匹配 ⇒ **20 个测试变红**，且该改动被照常提交。
+⇒ **改语料后的最低验证集 = 三个方向各跑一次**：
+
+```powershell
+python backend\scripts\validate_corpus.py
+python backend\scripts\verify_corpus_db_rates.py --selftest
+# 并且必须跑 Java 全量测试（至少 ChunkStructureSplitterTest）
+```
+
+> 同类教训：**改了 A 的数据，就要跑消费 A 的模块的测试**——输入契约由**消费者**定义。
+
+**⚠️ 手工用 javac+JUnit 跑测试时，必须带 `-parameters`**：Spring MVC 靠参数名注入
+（`@RequestParam`），漏了它会让 `ChatStreamControllerTest` / `DeepSeekRequestShapeTest` 一族
+**全红且报错离题**（`Name for argument of type [String] not specified`）。
+`pom.xml` 第 188 行 `<parameters>true</parameters>` 已声明这一约定——手工链路要手动补上。
+
 ### 7.3 ⚠️ 本机 JDK 环境的两个坑（2026-09-20 实测，务必先读）
 
 **坑 1：`JAVA_HOME` 与 `PATH` 是两件独立的事**

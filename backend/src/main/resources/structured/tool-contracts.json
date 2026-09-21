@@ -1,0 +1,282 @@
+{
+  "contractVersion": "1.0.0",
+  "contentHashSeed": "canalmind-structured-tools",
+  "note": "受控查询工具集的**唯一契约**（决策 C-33：阶段一 = 契约化受控工具集）。本文件同时是①送给模型的工具说明、②服务端 JSON Schema 校验的判据、③评测报告里「工具集有哪些」的出处。⛔ 三处必须同源，故只此一份。",
+  "envelope": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "受控工具调用意图",
+    "type": "object",
+    "required": ["tool", "arguments", "missing", "reason"],
+    "additionalProperties": false,
+    "properties": {
+      "tool": {
+        "type": "string",
+        "description": "要调用的工具名；若用户问题不属于任何工具，填 none"
+      },
+      "arguments": {
+        "type": "object",
+        "description": "工具参数；只填用户**明确说出**的，不要猜测"
+      },
+      "missing": {
+        "type": "array",
+        "description": "必填但用户未提供的参数名（用于向用户追问）；无则空数组",
+        "items": { "type": "string" }
+      },
+      "reason": {
+        "type": "string",
+        "description": "一句话说明为什么选这个工具（≤40 字）"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "query_tariff",
+      "title": "费率查询",
+      "description": "查某费种在指定业务日期的**费率**（单价，如 元/吨、元/次、元/吨天）。用户问“多少费率/单价/标准”而**不需要算出总金额**时用这个。吨位用于决定档位：过闸费/港杂费/装卸费按载货吨位（货重）分档，引航费/停泊费按船舶总吨位分档。",
+      "parameters": {
+        "type": "object",
+        "required": ["fee_type", "tonnage", "biz_date"],
+        "additionalProperties": false,
+        "properties": {
+          "fee_type": {
+            "type": "string",
+            "enum": ["过闸费", "港杂费", "装卸费", "引航费", "停泊费"],
+            "description": "费种（五类，完整枚举）"
+          },
+          "cargo_category": {
+            "type": "string",
+            "enum": ["建材", "能源", "金属", "农资", "化工", "集装箱", "其他"],
+            "description": "货类大类；引航费/停泊费与货类无关，不要传"
+          },
+          "tonnage": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000,
+            "description": "计费吨位：过闸费/港杂费/装卸费填载货吨位（吨）；引航费/停泊费填船舶总吨位"
+          },
+          "biz_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "业务发生日（YYYY-MM-DD）。费率随生效期变化，必须落到具体日期"
+          }
+        }
+      },
+      "notes": "费率有版本（过闸费 2026 版 / 2027 版）。用户说“现在/今年”时必须先确定日期，不得默认。"
+    },
+    {
+      "name": "quote_fee",
+      "title": "费用测算",
+      "description": "测算某笔业务的**费用金额**（元）。用户问“要交多少钱/费用是多少/算一下费用”时用这个。**金额一律由服务端的确定性费用引擎计算**（含危险货物加收 30%、重点保供物资过闸费 70%），模型不参与算术。",
+      "parameters": {
+        "type": "object",
+        "required": ["fee_type", "tonnage", "biz_date"],
+        "additionalProperties": false,
+        "properties": {
+          "fee_type": {
+            "type": "string",
+            "enum": ["过闸费", "港杂费", "装卸费", "引航费", "停泊费"],
+            "description": "费种"
+          },
+          "cargo_name": {
+            "type": "string",
+            "enum": ["机制砂", "碎石", "水泥", "水泥熟料", "混凝土预制件", "动力煤", "焦炭", "成品油", "铁矿石", "铝土矿", "钢材", "锰矿", "化肥", "粮食", "食糖", "烧碱", "硫酸", "液体化工品", "集装箱货物", "机械设备", "日用百货"],
+            "description": "货种（21 种完整枚举）。过闸费/港杂费/装卸费必填此项**或**货类：货类与危险品属性由它推导。⚠️ 用户已说出货种时，填这一项即可，**不要再索要货类**（货种蕴含货类）"
+          },
+          "cargo_category": {
+            "type": "string",
+            "enum": ["建材", "能源", "金属", "农资", "化工", "集装箱", "其他"],
+            "description": "货类（7 类）。用户只说到货类时用它；⚠️ 能源类内部既有危险货物（成品油）也有普通货物（动力煤），此时必须改用 cargo_name"
+          },
+          "tonnage": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000,
+            "description": "计费吨位：过闸费/港杂费/装卸费填货重（吨）；引航费/停泊费填船舶总吨位"
+          },
+          "biz_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "业务发生日（YYYY-MM-DD）"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "计费天数，仅停泊费需要；不传按 1 天"
+          }
+        }
+      },
+      "notes": "危险品/减免由货种或货类推导，不要让模型自行判断危险品。⚠️ 能源类内部危险品属性不一致（成品油危险、动力煤不危险），用户只说“能源”时应追问具体货种；其余六类的危险品属性一致，可直接按货类算。"
+    },
+    {
+      "name": "query_traffic",
+      "title": "运量统计",
+      "description": "按时间窗统计运量、运单数或费用金额，可按货类/货种/港口/客户/月份分组并取前 N。用户问“一共多少吨/哪些货最多/哪个港口吞吐量最大/某月费用总额”时用这个。",
+      "parameters": {
+        "type": "object",
+        "required": ["date_from", "date_to", "metric"],
+        "additionalProperties": false,
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "统计起始日（含）"
+          },
+          "date_to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "统计截止日（含）"
+          },
+          "metric": {
+            "type": "string",
+            "enum": ["吨位", "运单数", "费用金额"],
+            "description": "统计口径"
+          },
+          "group_by": {
+            "type": "string",
+            "enum": ["货类", "货种", "起运港", "目的港", "客户", "月份", "无"],
+            "description": "分组维度；“无”表示只要一个合计值"
+          },
+          "fee_type": {
+            "type": "string",
+            "enum": ["过闸费", "港杂费", "装卸费", "引航费", "停泊费"],
+            "description": "仅当 metric=费用金额 时可用：限定某个费种"
+          },
+          "via_canal_only": {
+            "type": "boolean",
+            "description": "是否只统计经运河的航次（运河专项统计用）"
+          },
+          "top_n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "分组后取前 N 名；不传默认 10"
+          }
+        }
+      },
+      "notes": "日期窗口落在业务窗口 2026-09-16 ~ 2027-09-15 之外时数据为空，应如实说是“数据窗口内无记录”，不得编数。"
+    },
+    {
+      "name": "query_waybill",
+      "title": "运单与单证查询",
+      "description": "查运单明细（货种、货重、运费、状态）及其单证办理情况。用户给出**运单号**，或问“某客户/某港口/某时间段有哪些运单、单证办完没有、有没有滞留”时用这个。",
+      "parameters": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "waybill_no": {
+            "type": "string",
+            "pattern": "^WB\\d{4}\\d{7}$",
+            "description": "运单号，形如 WB20260000001"
+          },
+          "date_from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "运单创建起始日（含）"
+          },
+          "date_to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "运单创建截止日（含）"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["待装船", "在途", "已卸船", "已结算", "已取消"],
+            "description": "运单状态"
+          },
+          "cargo_category": {
+            "type": "string",
+            "enum": ["建材", "能源", "金属", "农资", "化工", "集装箱", "其他"],
+            "description": "货类大类"
+          },
+          "via_canal_only": {
+            "type": "boolean",
+            "description": "是否只看经运河的运单"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "最多返回多少行；不传默认 20"
+          }
+        }
+      },
+      "notes": "无任何过滤条件时不要调用（会返回海量数据）——应向用户追问限定条件。单证状态来自 documents 表（一票多单）。"
+    },
+    {
+      "name": "query_vessel",
+      "title": "船舶查询",
+      "description": "查船舶信息：船名、船型、载重吨、船舶总吨位、吃水、船东、建造年份。用户给出船名/船号，或问“某船东有哪些船、有哪些化学品船”时用这个。",
+      "parameters": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "vessel_id": {
+            "type": "string",
+            "pattern": "^GX\\d{5}$",
+            "description": "船舶编号，形如 GX00001"
+          },
+          "vessel_type": {
+            "type": "string",
+            "enum": ["干散货船", "集装箱船", "多用途船", "化学品船", "驳船"],
+            "description": "船型"
+          },
+          "min_gross_tonnage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "船舶总吨位下限（含）"
+          },
+          "max_draft_m": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 20,
+            "description": "最大吃水（米，含）"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "最多返回多少行；不传默认 20"
+          }
+        }
+      },
+      "notes": "⛔ 本工具不能回答“某船能否过闸”：闸室**水深**不在数据里（语料 03-第六条 明确不规定固定水深），且船舶长宽字段不存在——这类问题属未实现清单，应如实说明缺什么数据。"
+    }
+  ],
+  "businessRules": [
+    "费种只有五类：过闸费、港杂费、装卸费、引航费、停泊费（语料 05-第四条，完整枚举）。",
+    "计费吨位口径：过闸费/港杂费/装卸费按载货吨位；引航费/停泊费按船舶总吨位（语料 25-第十二条）。",
+    "计费单位：过闸费、装卸费为元/吨；引航费、港杂费为元/次；停泊费为元/吨天（语料 25-第二十七条）。",
+    "吨位分档为左闭右开 [下限, 上限)，末档不封顶（语料 25-第二十九条）。",
+    "费率随生效期变化：过闸费有 2026 版（2026-09-16 起）与 2027 版（2027-01-01 起）两版，业务日必须明确。",
+    "危险货物（成品油、烧碱、硫酸、液体化工品）的过闸费与港杂费按对应费率加收 30%（语料 06-第十四条 / 09-第六条）。",
+    "重点保供物资（货类为能源、农资、化工）的过闸费按 70% 计收（语料 06-第十三条）。",
+    "业务数据窗口为 2026-09-16 至 2027-09-15（通航后一年）；此窗口外无数据。"
+  ],
+  "cargoTaxonomy": [
+    { "cargo_name": "机制砂", "category": "建材", "is_dangerous": false },
+    { "cargo_name": "碎石", "category": "建材", "is_dangerous": false },
+    { "cargo_name": "水泥", "category": "建材", "is_dangerous": false },
+    { "cargo_name": "水泥熟料", "category": "建材", "is_dangerous": false },
+    { "cargo_name": "混凝土预制件", "category": "建材", "is_dangerous": false },
+    { "cargo_name": "动力煤", "category": "能源", "is_dangerous": false },
+    { "cargo_name": "焦炭", "category": "能源", "is_dangerous": false },
+    { "cargo_name": "成品油", "category": "能源", "is_dangerous": true },
+    { "cargo_name": "铁矿石", "category": "金属", "is_dangerous": false },
+    { "cargo_name": "铝土矿", "category": "金属", "is_dangerous": false },
+    { "cargo_name": "钢材", "category": "金属", "is_dangerous": false },
+    { "cargo_name": "锰矿", "category": "金属", "is_dangerous": false },
+    { "cargo_name": "化肥", "category": "农资", "is_dangerous": false },
+    { "cargo_name": "粮食", "category": "农资", "is_dangerous": false },
+    { "cargo_name": "食糖", "category": "农资", "is_dangerous": false },
+    { "cargo_name": "烧碱", "category": "化工", "is_dangerous": true },
+    { "cargo_name": "硫酸", "category": "化工", "is_dangerous": true },
+    { "cargo_name": "液体化工品", "category": "化工", "is_dangerous": true },
+    { "cargo_name": "集装箱货物", "category": "集装箱", "is_dangerous": false },
+    { "cargo_name": "机械设备", "category": "其他", "is_dangerous": false },
+    { "cargo_name": "日用百货", "category": "其他", "is_dangerous": false }
+  ]
+}

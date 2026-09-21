@@ -139,6 +139,24 @@ public final class LlmRerankerFactory {
     }
 
     /**
+     * 按环境变量装配 DeepSeek {@code ChatModel}（**构造不发任何网络请求**）。
+     *
+     * <p>抽成 public 是为了让**结构化查询段**（第 3 周）不用把同一段装配逻辑抄第二遍：
+     * 两份装配代码必然分叉，而分叉的表现是"CLI 里是 JSON Mode、链路里不是"这种
+     * **不报错的静默差异**——正是 {@code DeepSeekRequestShapeTest} 守着的那类问题。
+     * 装配出的模型默认带 {@code temperature=0.0} 与 {@code ResponseFormat=json_object}。
+     *
+     * @param env       环境变量（含 {@code DEEPSEEK_API_KEY}；缺 key 由 {@link #requireApiKey} 抛错）
+     * @param maxTokens 输出额度（由调用方按自己的场景给：重排 8192、参数抽取 1024）
+     */
+    public static DeepSeekChatModel chatModelFromEnvironment(Map<String, String> env, int maxTokens) {
+        String apiKey = requireApiKey(env);
+        String baseUrl = value(env, "DEEPSEEK_BASE_URL", DEFAULT_BASE_URL);
+        String model = value(env, "DEEPSEEK_CHAT_MODEL", DEFAULT_MODEL);
+        return deepSeekChatModel(apiKey, baseUrl, model, maxTokens);
+    }
+
+    /**
      * 同上，但把<b>重试次数上限</b>也显式给出（{@code RetrievalQueryCli --rerank-retry}）。
      *
      * <p>重试次数是实验条件之一：它直接决定"降级率"这个观测量，
