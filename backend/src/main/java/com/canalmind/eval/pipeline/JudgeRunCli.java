@@ -57,7 +57,18 @@ public final class JudgeRunCli {
 
     private static final String LF = String.valueOf((char) 10);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final int JUDGE_MAX_TOKENS = 1024;
+    /**
+     * 裁判的 token 预算。
+     *
+     * <p>⚠️ 首次判分用 1024：L3 **17/20**、L6 **7/15**、L5 **19/20** 解析失败，
+     * 且失败项的 `rawResponse` **长度为 0**、原因串是「裁判返回空应答」——
+     * 即**不是 JSON 格式错，而是根本没返回内容**。
+     * 提到 2048 后单题复测**仍然为空**，故继续上调。
+     * 这与作答侧那次空内容（`工程复盘/工程方法/验证工具本身也要被验证/空作答被当成成功作答.md`）
+     * 是**同一个机制**：长输入下预算被推理吃掉、正文没剩额度。
+     * ⛔ 关键区别：**本轮绝不能把这种空应答当成"答错"**，否则三维 0 分会伪装成模型的失败。
+     */
+    private static final int JUDGE_MAX_TOKENS = 4096;
 
     /** 严格口径：三维每维都要 ≥ 该值。 */
     private static final int STRICT_MIN_EACH = 4;
@@ -139,17 +150,61 @@ public final class JudgeRunCli {
         out.put("datasetTotal", datasetTotal);
         ArrayNode arr = out.putArray("judged");
 
+        // ── 断点续跑：已**解析成功**的题不重复判 ──
+        // ⚠️ 判分是**付费**的，而"解析失败"的题必须重判（它的 0 分不是真实分数）。
+        //    只跳过 parseOk=true 的：⛔ 若把解析失败的也跳过，那 17 道 L3 的假 0 分就会被固化。
+        Map<String, JsonNode> prevJudged = new LinkedHashMap<>();
+        if (jsonOut != null && Files.exists(Path.of(jsonOut))) {
+            JsonNode p = MAPPER.readTree(Files.readString(Path.of(jsonOut), StandardCharsets.UTF_8));
+            for (JsonNode j : p.path("judged")) {
+                if (j.path("parseOk").asBoolean(false)) {
+                    prevJudged.put(j.path("taskId").asText(), j);
+                }
+            }
+        }
+
         int strict = 0;
         int lenient = 0;
         int parseFail = 0;
         int humanReview = 0;
         int ruleChecked = 0;
         int rulePassed = 0;
+        int skipped = 0;
         Map<String, int[]> bySplit = new TreeMap<>();
 
         for (JsonNode r : results) {
             String id = r.path("taskId").asText();
             String split = r.path("split").asText("dev");
+
+            if (prevJudged.containsKey(id)) {
+                JsonNode pj = prevJudged.get(id);
+                arr.add(pj);
+                boolean ps = pj.path("passStrict").asBoolean(false);
+                if (ps) {
+                    strict++;
+                }
+                if (pj.path("passLenient").asBoolean(false)) {
+                    lenient++;
+                }
+                if (pj.path("needsHumanReview").asBoolean(false)) {
+                    humanReview++;
+                }
+                if (pj.has("rulePass")) {
+                    ruleChecked++;
+                    if (pj.path("rulePass").asBoolean(false)) {
+                        rulePassed++;
+                    }
+                }
+                bySplit.computeIfAbsent(split, k -> new int[2]);
+                bySplit.get(split)[0]++;
+                if (ps) {
+                    bySplit.get(split)[1]++;
+                }
+                skipped++;
+                System.out.println("  " + id + " → 续跑跳过（已判分且解析成功）");
+                continue;
+            }
+
             String answer = r.path("answer").asText();
             JudgeInput in = buildInput(id, layer, r);
             JudgeScores s = judge.judge(in);
@@ -167,13 +222,25 @@ public final class JudgeRunCli {
             n.put("passStrict", s.passStrict(STRICT_MIN_EACH));
             n.put("passLenient", s.passLenient(LENIENT_MIN_MEAN));
             n.put("reasoning", s.reasoning());
+            // ⚠️ 解析失败时**必须把原始应答留下来**：那是唯一能判断
+            //    "是提示词问题 / 还是被 token 预算截断 / 还是模型没按格式"的证据。
+            //    实测第一次判分 L3 有 17/20 解析失败、L6 有 7/15，当时产物里**没存原文**，
+            //    于是只能靠猜；补上后同类问题下次一眼可判。⛔ 只存失败项，避免产物膨胀。
+            if (!s.parseOk()) {
+                n.put("rawResponse", truncate(s.rawResponse(), 2000));
+            }
 
             // ── 规则判据（零成本、客观）──
+            // ⚠️ 计数**必须读节点里那个布尔值**，⛔ 不许拿标签文本去比。
+            //    实测踩到：原来写 `"PASS".equals(ruleVerdict)`，而 ruleCheck 返回的是
+            //    `"PASS（状态一致）"` 这样的**带说明的标签** ⇒ 恒为 false ⇒
+            //    逐题 `rulePass=True` 却汇总出 `0/15`。
+            //    这与本类早先在 `verify_eval_record.sql` 上犯过的是**同一个错**：
+            //    **拿人看的文字当机器判据**。判据只能是那个布尔值。
             String ruleVerdict = ruleCheck(layer, r, n);
             if (ruleVerdict != null) {
                 ruleChecked++;
-                boolean ok = "PASS".equals(ruleVerdict);
-                if (ok) {
+                if (n.path("rulePass").asBoolean(false)) {
                     rulePassed++;
                 }
             }
@@ -207,6 +274,7 @@ public final class JudgeRunCli {
         out.put("strictRate", round4(results.isEmpty() ? 0 : (double) strict / results.size()));
         out.put("lenientRate", round4(results.isEmpty() ? 0 : (double) lenient / results.size()));
         out.put("parseFail", parseFail);
+        out.put("skipped", skipped);
         out.put("needsHumanReview", humanReview);
         out.put("ruleChecked", ruleChecked);
         out.put("rulePassed", rulePassed);
@@ -361,6 +429,14 @@ public final class JudgeRunCli {
 
     static double round4(double v) {
         return Math.round(v * 10000.0) / 10000.0;
+    }
+
+    /** 截断用于落盘的原始应答；⛔ 只截长度，不改内容（改内容就不是证据了）。 */
+    static String truncate(String s, int max) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() <= max ? s : s.substring(0, max) + "…[已截断，" + s.length() + " 字符]";
     }
 
     private static void writeJson(Path out, JsonNode node) throws IOException {
