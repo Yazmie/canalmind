@@ -1,0 +1,924 @@
+{
+  "channel": "vector",
+  "dataset": "golden-l2-v1.json",
+  "datasetSha256": "4f32a3f0865cd19859a7a20fe078e55fb570aaa8ded8041b9c8f409f877365c7",
+  "datasetVersion": "v1",
+  "goldChunkTypeCounts": {
+    "BODY": 26,
+    "TABLE": 14
+  },
+  "goldSizeValues": [
+    1
+  ],
+  "hitsFile": "vector-l2-hits.json",
+  "hitsFileSha256": "d305ab7363fbda311906b755dfb6892a488a4d95251377e8f512b7fbcc956553",
+  "kValues": [
+    5,
+    10,
+    20,
+    30
+  ],
+  "label": "vector-baseline-topk30",
+  "metricDefinitions": {
+    "HitRate@k": "至少命中一个 gold chunk 的题占比",
+    "MRR@k": "首个 gold 命中排名倒数的均值（无命中记 0）",
+    "Precision@k": "|R_k ∩ G| / k 的均值（m=1 时上界仅 1/k，信息量低，仅为口径完整而列）",
+    "Precision@m": "|R_m ∩ G| / |G| 的均值（R-Precision；本数据集 m=1 即 Top-1 准确率）",
+    "Recall@k": "|R_k ∩ G| / |G| 的均值",
+    "wording": "传统 IR 纯规则口径，只用 chunk_id 命中判定，不含任何 LLM 打分；与 RAGAS 的 Context Recall 属不同口径，不可互相替代（知识库《AI 应用评测体系》第 246、248 行）"
+  },
+  "misses": [
+    {
+      "goldChunkIds": [
+        "039a5c3a38396f46"
+      ],
+      "id": "L2-034",
+      "question": "文号 PLYH-GZ-2026-001 对应哪一份文件？它主要规定了什么？",
+      "questionType": "T5-出处与文号",
+      "split": "dev",
+      "top3": [
+        {
+          "chunkId": "227bfe6bfecfe815",
+          "rank": 1,
+          "score": 0.6737448171530253
+        },
+        {
+          "chunkId": "3ac5f8d90325bc96",
+          "rank": 2,
+          "score": 0.5468471804716888
+        },
+        {
+          "chunkId": "47e68f09b312a686",
+          "rank": 3,
+          "score": 0.5259745279687205
+        }
+      ],
+      "topicClass": "A"
+    }
+  ],
+  "placeholderSiblingAnalysis": {
+    "detail": [
+      {
+        "goldTableChunkId": "174355c01152002a",
+        "goldTableRank": 3,
+        "itemId": "L2-001",
+        "placeholderChunkId": "d314f2f51d0b2a02",
+        "placeholderRank": 2,
+        "placeholderRankedHigher": true
+      },
+      {
+        "goldTableChunkId": "57845177c9078fea",
+        "goldTableRank": 2,
+        "itemId": "L2-002",
+        "placeholderChunkId": "f853634a7852b7cf",
+        "placeholderRank": 1,
+        "placeholderRankedHigher": true
+      },
+      {
+        "goldTableChunkId": "c5badd5949feccdb",
+        "goldTableRank": 3,
+        "itemId": "L2-005",
+        "placeholderChunkId": "c2a88e46842ac997",
+        "placeholderRank": 6,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "ee85fc8e4f9f8e25",
+        "goldTableRank": 1,
+        "itemId": "L2-007",
+        "placeholderChunkId": "ea252159540072b2",
+        "placeholderRank": 2,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "e68438ba2724ceda",
+        "goldTableRank": 1,
+        "itemId": "L2-008",
+        "placeholderChunkId": "0310a23e3cc9710d",
+        "placeholderRank": 3,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "0bedf0ae2a95b64d",
+        "goldTableRank": 2,
+        "itemId": "L2-009",
+        "placeholderChunkId": "41a70955847c5345",
+        "placeholderRank": 1,
+        "placeholderRankedHigher": true
+      },
+      {
+        "goldTableChunkId": "04883383f967ffa2",
+        "goldTableRank": 3,
+        "itemId": "L2-014",
+        "placeholderChunkId": "8d6f77cf1c2fb13f",
+        "placeholderRank": 2,
+        "placeholderRankedHigher": true
+      },
+      {
+        "goldTableChunkId": "7f83bb32ecaf43ac",
+        "goldTableRank": 1,
+        "itemId": "L2-019",
+        "placeholderChunkId": "6cb25be7ee18ee7d",
+        "placeholderRank": 23,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "96605245bd8808ee",
+        "goldTableRank": 2,
+        "itemId": "L2-022",
+        "placeholderChunkId": "0a62fb2b3e0c0572",
+        "placeholderRank": 1,
+        "placeholderRankedHigher": true
+      },
+      {
+        "goldTableChunkId": "caea297390e5ebf9",
+        "goldTableRank": 1,
+        "itemId": "L2-028",
+        "placeholderChunkId": "15de697b93b8e7f4",
+        "placeholderRank": 2,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "128dd3633f199688",
+        "goldTableRank": 1,
+        "itemId": "L2-030",
+        "placeholderChunkId": "ce383225f3c9bb13",
+        "placeholderRank": null,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "054aa6350ae39ea0",
+        "goldTableRank": 3,
+        "itemId": "L2-031",
+        "placeholderChunkId": "5e50898288330b6a",
+        "placeholderRank": 7,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "39f4d3c6300934b8",
+        "goldTableRank": 1,
+        "itemId": "L2-033",
+        "placeholderChunkId": "b205a0ea152c713c",
+        "placeholderRank": 2,
+        "placeholderRankedHigher": false
+      },
+      {
+        "goldTableChunkId": "1287a36aaae7400e",
+        "goldTableRank": 4,
+        "itemId": "L2-040",
+        "placeholderChunkId": "cfd473f5975476a4",
+        "placeholderRank": 7,
+        "placeholderRankedHigher": false
+      }
+    ],
+    "itemsInvolved": 14,
+    "placeholderRankedHigherCount": 5
+  },
+  "rankOfFirstGoldHistogram": {
+    "1": 27,
+    "12": 1,
+    "2": 4,
+    "3": 5,
+    "4": 1,
+    "7": 1,
+    "未命中": 1
+  },
+  "recallEqualsHitRate": true,
+  "results": {
+    "all": {
+      "HitRate@10": 0.95,
+      "HitRate@20": 0.975,
+      "HitRate@30": 0.975,
+      "HitRate@5": 0.925,
+      "MRR@10": 0.776488,
+      "MRR@20": 0.778571,
+      "MRR@30": 0.778571,
+      "MRR@5": 0.772917,
+      "Precision@10": 0.095,
+      "Precision@20": 0.04875,
+      "Precision@30": 0.0325,
+      "Precision@5": 0.185,
+      "Precision@m": 0.675,
+      "Recall@10": 0.95,
+      "Recall@20": 0.975,
+      "Recall@30": 0.975,
+      "Recall@5": 0.925,
+      "allGoldRecalledAtTopK": 0.975,
+      "queryCount": 40
+    },
+    "byQuestionType": {
+      "T1-精确数值": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 0.738095,
+        "MRR@20": 0.738095,
+        "MRR@30": 0.738095,
+        "MRR@5": 0.738095,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 0.571429,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      },
+      "T2-时效": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 0.857143,
+        "MRR@10": 0.710884,
+        "MRR@20": 0.710884,
+        "MRR@30": 0.710884,
+        "MRR@5": 0.690476,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.171429,
+        "Precision@m": 0.571429,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 0.857143,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      },
+      "T3-条件组合": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 1.0,
+        "MRR@20": 1.0,
+        "MRR@30": 1.0,
+        "MRR@5": 1.0,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 1.0,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      },
+      "T4-术语定义": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 0.833333,
+        "MRR@20": 0.833333,
+        "MRR@30": 0.833333,
+        "MRR@5": 0.833333,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 0.714286,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      },
+      "T5-出处与文号": {
+        "HitRate@10": 0.833333,
+        "HitRate@20": 0.833333,
+        "HitRate@30": 0.833333,
+        "HitRate@5": 0.833333,
+        "MRR@10": 0.722222,
+        "MRR@20": 0.722222,
+        "MRR@30": 0.722222,
+        "MRR@5": 0.722222,
+        "Precision@10": 0.083333,
+        "Precision@20": 0.041667,
+        "Precision@30": 0.027778,
+        "Precision@5": 0.166667,
+        "Precision@m": 0.666667,
+        "Recall@10": 0.833333,
+        "Recall@20": 0.833333,
+        "Recall@30": 0.833333,
+        "Recall@5": 0.833333,
+        "allGoldRecalledAtTopK": 0.833333,
+        "queryCount": 6
+      },
+      "T6-版本冲突": {
+        "HitRate@10": 0.833333,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 0.833333,
+        "MRR@10": 0.625,
+        "MRR@20": 0.638889,
+        "MRR@30": 0.638889,
+        "MRR@5": 0.625,
+        "Precision@10": 0.083333,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.166667,
+        "Precision@m": 0.5,
+        "Recall@10": 0.833333,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 0.833333,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 6
+      }
+    },
+    "bySplit": {
+      "dev": {
+        "HitRate@10": 0.96875,
+        "HitRate@20": 0.96875,
+        "HitRate@30": 0.96875,
+        "HitRate@5": 0.9375,
+        "MRR@10": 0.767485,
+        "MRR@20": 0.767485,
+        "MRR@30": 0.767485,
+        "MRR@5": 0.763021,
+        "Precision@10": 0.096875,
+        "Precision@20": 0.048438,
+        "Precision@30": 0.032292,
+        "Precision@5": 0.1875,
+        "Precision@m": 0.65625,
+        "Recall@10": 0.96875,
+        "Recall@20": 0.96875,
+        "Recall@30": 0.96875,
+        "Recall@5": 0.9375,
+        "allGoldRecalledAtTopK": 0.96875,
+        "queryCount": 32
+      },
+      "holdout": {
+        "HitRate@10": 0.875,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 0.875,
+        "MRR@10": 0.8125,
+        "MRR@20": 0.822917,
+        "MRR@30": 0.822917,
+        "MRR@5": 0.8125,
+        "Precision@10": 0.0875,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.175,
+        "Precision@m": 0.75,
+        "Recall@10": 0.875,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 0.875,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 8
+      }
+    },
+    "byTopicClass": {
+      "A": {
+        "HitRate@10": 0.833333,
+        "HitRate@20": 0.833333,
+        "HitRate@30": 0.833333,
+        "HitRate@5": 0.833333,
+        "MRR@10": 0.722222,
+        "MRR@20": 0.722222,
+        "MRR@30": 0.722222,
+        "MRR@5": 0.722222,
+        "Precision@10": 0.083333,
+        "Precision@20": 0.041667,
+        "Precision@30": 0.027778,
+        "Precision@5": 0.166667,
+        "Precision@m": 0.666667,
+        "Recall@10": 0.833333,
+        "Recall@20": 0.833333,
+        "Recall@30": 0.833333,
+        "Recall@5": 0.833333,
+        "allGoldRecalledAtTopK": 0.833333,
+        "queryCount": 6
+      },
+      "B": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 0.630952,
+        "MRR@20": 0.630952,
+        "MRR@30": 0.630952,
+        "MRR@5": 0.630952,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 0.428571,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      },
+      "C": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 0.833333,
+        "MRR@10": 0.857143,
+        "MRR@20": 0.857143,
+        "MRR@30": 0.857143,
+        "MRR@5": 0.833333,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.166667,
+        "Precision@m": 0.833333,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 0.833333,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 6
+      },
+      "D": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 1.0,
+        "MRR@20": 1.0,
+        "MRR@30": 1.0,
+        "MRR@5": 1.0,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 1.0,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 4
+      },
+      "E": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 0.722222,
+        "MRR@20": 0.722222,
+        "MRR@30": 0.722222,
+        "MRR@5": 0.722222,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 0.5,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 6
+      },
+      "F": {
+        "HitRate@10": 0.75,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 0.75,
+        "MRR@10": 0.583333,
+        "MRR@20": 0.604167,
+        "MRR@30": 0.604167,
+        "MRR@5": 0.583333,
+        "Precision@10": 0.075,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.15,
+        "Precision@m": 0.5,
+        "Recall@10": 0.75,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 0.75,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 4
+      },
+      "G": {
+        "HitRate@10": 1.0,
+        "HitRate@20": 1.0,
+        "HitRate@30": 1.0,
+        "HitRate@5": 1.0,
+        "MRR@10": 0.928571,
+        "MRR@20": 0.928571,
+        "MRR@30": 0.928571,
+        "MRR@5": 0.928571,
+        "Precision@10": 0.1,
+        "Precision@20": 0.05,
+        "Precision@30": 0.033333,
+        "Precision@5": 0.2,
+        "Precision@m": 0.857143,
+        "Recall@10": 1.0,
+        "Recall@20": 1.0,
+        "Recall@30": 1.0,
+        "Recall@5": 1.0,
+        "allGoldRecalledAtTopK": 1.0,
+        "queryCount": 7
+      }
+    },
+    "exclFlaggedNote": "剔除的是数据集里带 knownLimitation 字段的题；该字段只说明'本题有已知问题'，不区分是标注缺陷还是实现限制",
+    "exclKnownLimitation": {
+      "HitRate@10": 0.974359,
+      "HitRate@20": 1.0,
+      "HitRate@30": 1.0,
+      "HitRate@5": 0.948718,
+      "MRR@10": 0.796398,
+      "MRR@20": 0.798535,
+      "MRR@30": 0.798535,
+      "MRR@5": 0.792735,
+      "Precision@10": 0.097436,
+      "Precision@20": 0.05,
+      "Precision@30": 0.033333,
+      "Precision@5": 0.189744,
+      "Precision@m": 0.692308,
+      "Recall@10": 0.974359,
+      "Recall@20": 1.0,
+      "Recall@30": 1.0,
+      "Recall@5": 0.948718,
+      "allGoldRecalledAtTopK": 1.0,
+      "queryCount": 39
+    }
+  },
+  "scoreMarginAnalysis": {
+    "detail": [
+      {
+        "bestNonGoldScore": 0.6691455038948928,
+        "goldRank": 3,
+        "goldScore": 0.6506909907690157,
+        "id": "L2-001",
+        "margin": -0.018454513125877092,
+        "nearTie": false,
+        "top1Margin": 0.00897063350809113
+      },
+      {
+        "bestNonGoldScore": 0.6965432475378384,
+        "goldRank": 2,
+        "goldScore": 0.6753482369493458,
+        "id": "L2-002",
+        "margin": -0.021195010588492602,
+        "nearTie": false,
+        "top1Margin": 0.021195010588492602
+      },
+      {
+        "bestNonGoldScore": 0.6336172122904307,
+        "goldRank": 1,
+        "goldScore": 0.6942584696855072,
+        "id": "L2-003",
+        "margin": 0.06064125739507653,
+        "nearTie": false,
+        "top1Margin": 0.06064125739507653
+      },
+      {
+        "bestNonGoldScore": 0.6511155006610339,
+        "goldRank": 1,
+        "goldScore": 0.7009791793190078,
+        "id": "L2-004",
+        "margin": 0.04986367865797392,
+        "nearTie": false,
+        "top1Margin": 0.04986367865797392
+      },
+      {
+        "bestNonGoldScore": 0.68200160694084,
+        "goldRank": 3,
+        "goldScore": 0.6263803315674676,
+        "id": "L2-005",
+        "margin": -0.05562127537337236,
+        "nearTie": false,
+        "top1Margin": 0.05237381401686336
+      },
+      {
+        "bestNonGoldScore": 0.7667643526898777,
+        "goldRank": 1,
+        "goldScore": 0.7804329715352787,
+        "id": "L2-006",
+        "margin": 0.013668618845400937,
+        "nearTie": false,
+        "top1Margin": 0.013668618845400937
+      },
+      {
+        "bestNonGoldScore": 0.592881430044109,
+        "goldRank": 1,
+        "goldScore": 0.6485622879415429,
+        "id": "L2-007",
+        "margin": 0.05568085789743393,
+        "nearTie": false,
+        "top1Margin": 0.05568085789743393
+      },
+      {
+        "bestNonGoldScore": 0.7677465906068243,
+        "goldRank": 1,
+        "goldScore": 0.7797944605963063,
+        "id": "L2-008",
+        "margin": 0.01204786998948204,
+        "nearTie": false,
+        "top1Margin": 0.01204786998948204
+      },
+      {
+        "bestNonGoldScore": 0.7429719584055258,
+        "goldRank": 2,
+        "goldScore": 0.686899297154206,
+        "id": "L2-009",
+        "margin": -0.05607266125131982,
+        "nearTie": false,
+        "top1Margin": 0.05607266125131982
+      },
+      {
+        "bestNonGoldScore": 0.7530086272084094,
+        "goldRank": 7,
+        "goldScore": 0.6797789288358523,
+        "id": "L2-010",
+        "margin": -0.0732296983725571,
+        "nearTie": false,
+        "top1Margin": 0.024529794458157284
+      },
+      {
+        "bestNonGoldScore": 0.768159971723589,
+        "goldRank": 1,
+        "goldScore": 0.7832506795231801,
+        "id": "L2-011",
+        "margin": 0.015090707799591097,
+        "nearTie": false,
+        "top1Margin": 0.015090707799591097
+      },
+      {
+        "bestNonGoldScore": 0.710652836081894,
+        "goldRank": 1,
+        "goldScore": 0.7509515433936511,
+        "id": "L2-012",
+        "margin": 0.04029870731175711,
+        "nearTie": false,
+        "top1Margin": 0.04029870731175711
+      },
+      {
+        "bestNonGoldScore": 0.748203955537207,
+        "goldRank": 1,
+        "goldScore": 0.8074983084210395,
+        "id": "L2-013",
+        "margin": 0.05929435288383256,
+        "nearTie": false,
+        "top1Margin": 0.05929435288383256
+      },
+      {
+        "bestNonGoldScore": 0.7627060468933327,
+        "goldRank": 3,
+        "goldScore": 0.7154254142908811,
+        "id": "L2-014",
+        "margin": -0.04728063260245152,
+        "nearTie": false,
+        "top1Margin": 0.03151805469700664
+      },
+      {
+        "bestNonGoldScore": 0.7482434511185171,
+        "goldRank": 1,
+        "goldScore": 0.8055126435175938,
+        "id": "L2-015",
+        "margin": 0.057269192399076685,
+        "nearTie": false,
+        "top1Margin": 0.057269192399076685
+      },
+      {
+        "bestNonGoldScore": 0.6572403958342627,
+        "goldRank": 1,
+        "goldScore": 0.6718369312676357,
+        "id": "L2-016",
+        "margin": 0.014596535433372915,
+        "nearTie": false,
+        "top1Margin": 0.014596535433372915
+      },
+      {
+        "bestNonGoldScore": 0.7618079468827145,
+        "goldRank": 1,
+        "goldScore": 0.8087530745198034,
+        "id": "L2-017",
+        "margin": 0.04694512763708891,
+        "nearTie": false,
+        "top1Margin": 0.04694512763708891
+      },
+      {
+        "bestNonGoldScore": 0.7487167349235996,
+        "goldRank": 1,
+        "goldScore": 0.7578598304935746,
+        "id": "L2-018",
+        "margin": 0.009143095569975057,
+        "nearTie": true,
+        "top1Margin": 0.009143095569975057
+      },
+      {
+        "bestNonGoldScore": 0.7468980558162929,
+        "goldRank": 1,
+        "goldScore": 0.7560982515167853,
+        "id": "L2-019",
+        "margin": 0.009200195700492464,
+        "nearTie": true,
+        "top1Margin": 0.009200195700492464
+      },
+      {
+        "bestNonGoldScore": 0.7017457453836361,
+        "goldRank": 1,
+        "goldScore": 0.7599472820523236,
+        "id": "L2-020",
+        "margin": 0.05820153666868755,
+        "nearTie": false,
+        "top1Margin": 0.05820153666868755
+      },
+      {
+        "bestNonGoldScore": 0.7705208795952286,
+        "goldRank": 1,
+        "goldScore": 0.8302088582266738,
+        "id": "L2-021",
+        "margin": 0.05968797863144515,
+        "nearTie": false,
+        "top1Margin": 0.05968797863144515
+      },
+      {
+        "bestNonGoldScore": 0.7167876790039348,
+        "goldRank": 2,
+        "goldScore": 0.6699821162181285,
+        "id": "L2-022",
+        "margin": -0.046805562785806276,
+        "nearTie": false,
+        "top1Margin": 0.046805562785806276
+      },
+      {
+        "bestNonGoldScore": 0.7459216491603522,
+        "goldRank": 1,
+        "goldScore": 0.7698327854026538,
+        "id": "L2-023",
+        "margin": 0.023911136242301567,
+        "nearTie": false,
+        "top1Margin": 0.023911136242301567
+      },
+      {
+        "bestNonGoldScore": 0.773418434435663,
+        "goldRank": 1,
+        "goldScore": 0.7747423858372281,
+        "id": "L2-024",
+        "margin": 0.0013239514015650489,
+        "nearTie": true,
+        "top1Margin": 0.0013239514015650489
+      },
+      {
+        "bestNonGoldScore": 0.7263694782167679,
+        "goldRank": 3,
+        "goldScore": 0.7018975480627779,
+        "id": "L2-025",
+        "margin": -0.024471930153989963,
+        "nearTie": false,
+        "top1Margin": 0.002576785629492817
+      },
+      {
+        "bestNonGoldScore": 0.7027486917080105,
+        "goldRank": 1,
+        "goldScore": 0.749424524553863,
+        "id": "L2-026",
+        "margin": 0.04667583284585253,
+        "nearTie": false,
+        "top1Margin": 0.04667583284585253
+      },
+      {
+        "bestNonGoldScore": 0.6959475874900818,
+        "goldRank": 1,
+        "goldScore": 0.7213627911020161,
+        "id": "L2-027",
+        "margin": 0.02541520361193428,
+        "nearTie": false,
+        "top1Margin": 0.02541520361193428
+      },
+      {
+        "bestNonGoldScore": 0.7017627839477345,
+        "goldRank": 1,
+        "goldScore": 0.7469378185515047,
+        "id": "L2-028",
+        "margin": 0.04517503460377015,
+        "nearTie": false,
+        "top1Margin": 0.04517503460377015
+      },
+      {
+        "bestNonGoldScore": 0.5797426320351023,
+        "goldRank": 1,
+        "goldScore": 0.6429688632024048,
+        "id": "L2-029",
+        "margin": 0.06322623116730242,
+        "nearTie": false,
+        "top1Margin": 0.06322623116730242
+      },
+      {
+        "bestNonGoldScore": 0.48809701417152396,
+        "goldRank": 1,
+        "goldScore": 0.6845082388794695,
+        "id": "L2-030",
+        "margin": 0.1964112247079456,
+        "nearTie": false,
+        "top1Margin": 0.1964112247079456
+      },
+      {
+        "bestNonGoldScore": 0.7780920067861413,
+        "goldRank": 3,
+        "goldScore": 0.7551582710614809,
+        "id": "L2-031",
+        "margin": -0.022933735724660398,
+        "nearTie": false,
+        "top1Margin": 0.015150538147292947
+      },
+      {
+        "bestNonGoldScore": 0.6737892822152816,
+        "goldRank": 1,
+        "goldScore": 0.7368224796403666,
+        "id": "L2-032",
+        "margin": 0.06303319742508506,
+        "nearTie": false,
+        "top1Margin": 0.06303319742508506
+      },
+      {
+        "bestNonGoldScore": 0.7388524853499238,
+        "goldRank": 1,
+        "goldScore": 0.7569365501403809,
+        "id": "L2-033",
+        "margin": 0.0180840647904571,
+        "nearTie": false,
+        "top1Margin": 0.0180840647904571
+      },
+      {
+        "bestNonGoldScore": 0.6737448171530253,
+        "goldRank": null,
+        "goldScore": null,
+        "id": "L2-034",
+        "margin": null,
+        "nearTie": false,
+        "top1Margin": 0.12689763668133647
+      },
+      {
+        "bestNonGoldScore": 0.7342960955434029,
+        "goldRank": 2,
+        "goldScore": 0.7211664279003,
+        "id": "L2-035",
+        "margin": -0.01312966764310286,
+        "nearTie": false,
+        "top1Margin": 0.01312966764310286
+      },
+      {
+        "bestNonGoldScore": 0.6506145747349352,
+        "goldRank": 1,
+        "goldScore": 0.665103733819085,
+        "id": "L2-036",
+        "margin": 0.014489159084149827,
+        "nearTie": false,
+        "top1Margin": 0.014489159084149827
+      },
+      {
+        "bestNonGoldScore": 0.7262318996631912,
+        "goldRank": 1,
+        "goldScore": 0.7348022826445544,
+        "id": "L2-037",
+        "margin": 0.008570382981363145,
+        "nearTie": true,
+        "top1Margin": 0.008570382981363145
+      },
+      {
+        "bestNonGoldScore": 0.7699432826448341,
+        "goldRank": 1,
+        "goldScore": 0.8115392336471294,
+        "id": "L2-038",
+        "margin": 0.041595951002295295,
+        "nearTie": false,
+        "top1Margin": 0.041595951002295295
+      },
+      {
+        "bestNonGoldScore": 0.6660188632106093,
+        "goldRank": 12,
+        "goldScore": 0.6067795030142548,
+        "id": "L2-039",
+        "margin": -0.05923936019635456,
+        "nearTie": false,
+        "top1Margin": 0.00351389069485486
+      },
+      {
+        "bestNonGoldScore": 0.6803166055301947,
+        "goldRank": 4,
+        "goldScore": 0.6237608790397644,
+        "id": "L2-040",
+        "margin": -0.05655572649043028,
+        "nearTie": false,
+        "top1Margin": 0.04851686376132247
+      }
+    ],
+    "maxMargin": 0.1964112247079456,
+    "medianMargin": 0.014596535433372915,
+    "minMargin": -0.0732296983725571,
+    "nearTieCount": 4,
+    "nearTieThreshold": 0.01,
+    "nearTieThresholdNote": "启发式阈值，只为把值得人工复核的脆弱命中捞出来，不具备统计含义"
+  },
+  "topK": 30
+}
