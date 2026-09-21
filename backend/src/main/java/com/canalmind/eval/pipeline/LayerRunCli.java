@@ -212,8 +212,31 @@ public final class LayerRunCli {
         ArrayNode arr = root.putArray("results");
         Map<String, Integer> byChannel = new TreeMap<>();
         int failed = 0;
+        int skipped = 0;
+
+        // ── 断点续跑：把上一次已写出的作答读回来，跳过已完成的题 ──
+        // ⚠️ 这条不是"优化"，是**止损**：作答是**付费**产物，而进程可能被超时杀掉。
+        //    实测踩过——20 题跑到第 15 题被杀，因为产物只在**最后**写一次，
+        //    于是那 15 题约 30 次调用**白花了**。所以：边跑边写 + 重跑能续。
+        Map<String, JsonNode> previous = new LinkedHashMap<>();
+        if (jsonOut != null && Files.exists(Path.of(jsonOut))) {
+            JsonNode prev = MAPPER.readTree(Files.readString(Path.of(jsonOut), StandardCharsets.UTF_8));
+            for (JsonNode r : prev.path("results")) {
+                if (r.hasNonNull("answer") && !r.path("answer").asText("").isBlank()) {
+                    previous.put(r.path("taskId").asText(), r);
+                }
+            }
+        }
 
         for (Item it : items) {
+            if (previous.containsKey(it.id())) {
+                arr.add(previous.get(it.id()));
+                byChannel.merge(previous.get(it.id()).path("effectiveChannel")
+                        .asText(previous.get(it.id()).path("channel").asText("?")), 1, Integer::sum);
+                skipped++;
+                System.out.println("  " + it.id() + " → 续跑跳过（已有作答）");
+                continue;
+            }
             ObjectNode n = arr.addObject();
             n.put("taskId", it.id());
             n.put("split", it.split());
@@ -260,18 +283,27 @@ public final class LayerRunCli {
                     System.out.println("  " + it.id() + " → ❌ " + n.get("error").asText());
                 }
             }
+            // 边跑边写：进程被超时杀掉时，已付费拿到的作答必须留在盘上（见上面的止损说明）。
+            // ⛔ 不要挪到循环外"只写一次"——那正是上一次白花 30 次调用的原因。
+            if (jsonOut != null && !routeOnly) {
+                writeJson(Path.of(jsonOut), root);
+            }
         }
 
         ObjectNode dist = root.putObject("channelDistribution");
         byChannel.forEach(dist::put);
         root.put("failed", failed);
+        root.put("skipped", skipped);
         if (jsonOut != null) {
             writeJson(Path.of(jsonOut), root);
             System.out.println();
             System.out.println("机读产物：" + jsonOut);
         }
         System.out.println();
-        System.out.println("通道分布：" + byChannel);
+        System.out.println("通道分布（按实际依据通道）：" + byChannel);
+        if (skipped > 0) {
+            System.out.println("续跑跳过 " + skipped + " 题（本次未重复付费）");
+        }
         if (failed > 0) {
             System.out.println("[FAIL] " + failed + " 题抛异常——先查原因，⛔ 别把异常记成答错");
             return 3;
