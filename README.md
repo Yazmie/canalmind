@@ -260,7 +260,7 @@ canalmind/
 | 5 | **Judge 与被测系统同模型** ⇒ 自增强偏差**未排除**（本机端点无法换裁判模型） | 报告 §5.1 |
 | 6 | **判分端仍有空应答**（L3 1/20、L6 1/15、L5 2/20）⇒ 相关通过率**只能当"下界"** | 报告 §5.4.1 |
 | 7 | **保留集纪律有一处已披露的偏差**：L5 的 v2 提示词是在**看到含 holdout 的 v1 总分之后**设计的 ⇒ **L5 的 holdout 对该组对照不再纯净** | ⛔ 不得表述为"保留集全程未参与任何调整" |
-| 8 | **`reference_output` / `actual_output` 对 L3/L5/L6 仍为 null**（作答在 `layer-L*-answers-*.json`，未接入落库） | 报告 §2 |
+| 8 | **`reference_output` / `actual_output` 对 L3/L5/L6 仍为 null**（作答在 `layer-L*-answers-*.json`，未接入落库）；⚠️ **L4 的 `prompt_version` / `model_id` / 会话 id 也均为 null**（L4 产物**不记录**这些字段，⛔ 不编造） | 报告 §2；缺口登记在 `ArtifactIngest.readL4` 注释里 |
 | 9 | **SSE 流式下 HTTP Span 挂不到模型 Span 下**（Spring AI 官方记录的当前限制） | 属框架限制，**记录而非当 bug 修**；留痕 `DECISIONS.md` |
 | 10 | **仿真数据有 18 / 71 个费率档位无数据触发**（船队吨位不足以触及最高两档），**6 项条款不可实现**（逐条登记原因） | `verify_corpus_db_rates.py` 的 `UNIMPLEMENTED` |
 
