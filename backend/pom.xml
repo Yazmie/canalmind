@@ -40,6 +40,12 @@
     <spring-boot.version>3.5.9</spring-boot.version>
     <spring-ai.version>1.1.2</spring-ai.version>
 
+    <!-- Redis（C-55）：显式钉版本，且必须是本机离线仓库里**确实有 jar** 的版本。
+         ⚠️ 为什么不用 spring-boot-starter-data-redis：它经 BOM 要 lettuce-core 6.6.0.RELEASE，
+         而离线仓库只有 6.1.10/6.3.2/6.5.5 ⇒ `-o` 构建失败（实测）。 -->
+    <jedis.version>6.0.0</jedis.version>
+    <commons-pool2.version>2.12.1</commons-pool2.version>
+
     <!-- 插件版本：因未用 parent，必须显式声明，且须是本机缓存中已有的版本 -->
     <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
@@ -56,10 +62,44 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- Redis / Spring Cache 已移到真正的 <dependencies> 块（见下方注释，C-55） -->
+
+      <!-- Spring Cache 抽象同样已下移（当前未被 C-55 使用） -->
+
     </dependencies>
   </dependencyManagement>
 
   <dependencies>
+    <!-- ===== Redis（C-55 作答缓存的前提）===== -->
+    <!--
+      ⚠️ **必须放在本 `<dependencies>` 块里**。实测踩到（2026-09-22）：这两条依赖最初被写在
+      上面的 `<dependencyManagement>` 里——那里**只声明版本、不引入依赖**，于是
+      `mvn test` **照样全绿**，而 `target/cp.txt` 里**根本没有 lettuce**，
+      表现是"依赖加了、代码却 import 不到"，⛔ 典型的「改了但其实没生效」。
+
+      ⚠️ **为什么不是 `spring-boot-starter-data-redis`**（实测，非偏好）：
+      它经 BOM 传递要求 `io.lettuce:lettuce-core:6.6.0.RELEASE`，而本机离线仓库只有
+      6.1.10 / 6.3.2 / 6.5.5 ⇒ `-o` 离线构建**直接失败**
+      （`Cannot access huaweicloud … in offline mode`），而本项目**必须能离线构建**。
+      ⇒ 改用**纯客户端 Jedis**（不经 Spring 容器、版本显式钉住、离线仓库里 jar 齐备），
+      经 `com.canalmind.cache.RedisAnswerCache` 使用；版本按本仓库既有约定**显式写死**
+      （本项目无 spring-boot-starter-parent，见 AGENTS §7.2）。
+      ⚠️ `spring-boot-starter-cache`（注解式 `@Cacheable`）**本项目当前未使用**，
+      故**不加**：C-55 走的是显式 `AnswerCache` 接口，理由是评测/CLI 路径没有 Spring 容器，
+      注解式缓存拿不到、也没法断言（见 `AnswerCache` 的 javadoc）。
+    -->
+    <dependency>
+      <groupId>redis.clients</groupId>
+      <artifactId>jedis</artifactId>
+      <version>${jedis.version}</version>
+    </dependency>
+    <!-- Jedis 的连接池依赖，显式钉住以确保离线可解析（仓库内有 2.11.1 / 2.12.1） -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-pool2</artifactId>
+      <version>${commons-pool2.version}</version>
+    </dependency>
+
     <!-- ===== Web / SSE ===== -->
     <!--
       SSE 不需要 spring-boot-starter-webflux：

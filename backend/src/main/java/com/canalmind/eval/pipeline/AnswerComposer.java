@@ -1,9 +1,11 @@
 package com.canalmind.eval.pipeline;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -14,6 +16,9 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import com.canalmind.cache.AnswerCache;
+import com.canalmind.cache.AnswerCacheFactory;
+import com.canalmind.cache.CacheKey;
 import com.canalmind.chat.LlmCallGuard;
 import com.canalmind.config.PromptVersions;
 import com.canalmind.intent.RouteDecision;
@@ -80,6 +85,35 @@ public final class AnswerComposer {
      * 三个测试类）**一行都不用改**，避免"加一层守卫"演变成改十处装配。
      */
     private final LlmCallGuard guard;
+
+    /**
+     * 作答缓存（**C-55** / D16）：**默认 {@link AnswerCache#noop()}，也就是关闭**。
+     * 只有显式 {@link #attachAnswerCache} 才会打开；评测路径不调用它 ⇒ **评测强制关**。
+     */
+    private AnswerCache cache = AnswerCache.noop();
+    /** 缓存键里的数据版本；{@link AnswerCacheFactory.DataVersion#UNAVAILABLE} ⇒ 不许缓存。 */
+    private String cacheDataVersion = AnswerCacheFactory.DataVersion.UNAVAILABLE;
+    private Duration cacheTtl = Duration.ofSeconds(AnswerCacheFactory.DEFAULT_TTL_SECONDS);
+
+    /**
+     * 装作答缓存（**C-55**）。只有"确定性规则/费率类"的作答会被缓存，判据见 {@link #cacheKeyFor}。
+     *
+     * <p>⚠️ 传 {@link AnswerCache#noop()} 或数据版本 `unavailable` 时**等于不缓存**——
+     * 装配层取不到数据库版本时应当这样传（安全方向：**没有版本就不缓存**），
+     * ⛔ 不要退回"无版本键"，那正是知识库第 310 行禁止的。
+     */
+    public AnswerComposer attachAnswerCache(AnswerCache answerCache, String dataVersion, Duration ttl) {
+        this.cache = answerCache == null ? AnswerCache.noop() : answerCache;
+        this.cacheDataVersion = dataVersion == null
+                ? AnswerCacheFactory.DataVersion.UNAVAILABLE : dataVersion;
+        this.cacheTtl = ttl == null ? Duration.ofSeconds(AnswerCacheFactory.DEFAULT_TTL_SECONDS) : ttl;
+        return this;
+    }
+
+    /** 当前缓存后端（核对用）。 */
+    public String cacheBackend() {
+        return cache.backend();
+    }
 
     /** 既有构造器：**不启用 v2**（保持既有行为零变化）。 */
     public AnswerComposer(ChatModel chatModel) {
@@ -233,6 +267,17 @@ public final class AnswerComposer {
      * 而那一个 {@code attempt} 就够了。⚠️ 如实记这笔差异，而不是假装两处口径一致。
      */
     public String compose(String question, RouteDecision route, ToolResult tool, String context) {
+        // ── C-55：缓存查询放在**起 Span 之前** ──
+        // ⚠️ 命中时**连 ai.llm.generate 都不起**：那一刻确实没有模型调用，
+        //    起一个空 Span 就是把"没发生的事"画进 Trace（本项目已记录过同族教训）。
+        //    好处还有一个：**"没有这个 Span"本身可断言**，不必给 §7.3 的白名单加新键。
+        CacheKey cacheKey = cacheKeyFor(question, route, tool);
+        if (cacheKey != null) {
+            Optional<String> cached = cache.lookup(cacheKey);
+            if (cached.isPresent()) {
+                return cached.get();
+            }
+        }
         Observation observation = AiObservation.start(AiSpans.LLM_GENERATE, observationRegistry);
         return observation.observe(() -> {
             AiObservation.highCardinality(observation, AiSpans.KEY_CONFIG_VERSION, promptVersion());
@@ -258,7 +303,11 @@ public final class AnswerComposer {
                         });
                 if (text != null && !text.isBlank()) {
                     AiObservation.attempt(observation, attempt);
-                    return text.strip();
+                    String answer = text.strip();
+                    if (cacheKey != null) {
+                        cache.store(cacheKey, answer, cacheTtl);   // 只存"真的答出来了"的那一次
+                    }
+                    return answer;
                 }
                 System.err.println("  [WARN] 作答第 " + attempt + " 次返回空内容，"
                         + (attempt == 1 ? "重试一次" : "放弃并抛错") + "（prompt 长度 "
@@ -269,6 +318,37 @@ public final class AnswerComposer {
                             + "⛔ 这**不是**答错，是链路未能产出作答：请先查 token 预算与提示词长度，"
                             + "别把空答案当成「模型答错」记进评测。");
         });
+    }
+
+    /**
+     * **能不能缓存**（**C-55**）：只有"确定性规则/费率类"才行，返回 {@code null} 表示不缓存。
+     *
+     * <p>四道闸门，缺一不可：
+     * <ol>
+     *   <li>缓存**真的开着**（{@link AnswerCache#enabled()}，默认关）；</li>
+     *   <li>**数据版本可用**（取不到库版本 ⇒ 不缓存，⛔ 不允许"无版本键"）；</li>
+     *   <li>走的是**结构化通道**（{@link RouteDecision#CHANNEL_STRUCTURED}）——即答案由规则表算出来，
+     *       而不是模型从检索片段里合成（后者属知识库第 308 行点名的"需要专业判断"那一类，**必须绕过缓存**）；</li>
+     *   <li>工具状态是 **OK**（{@link ToolResult#ok()}）。⚠️ 刻意**排除 DEGRADED**：
+     *       降级意味着参数没抽全、答案是模型**猜**的，把它缓存下来等于把一次偶发错误固化。</li>
+     * </ol>
+     */
+    private CacheKey cacheKeyFor(String question, RouteDecision route, ToolResult tool) {
+        if (!cache.enabled() || !AnswerCacheFactory.DataVersion.usable(cacheDataVersion)) {
+            return null;
+        }
+        if (route == null || !RouteDecision.CHANNEL_STRUCTURED.equals(route.channel())) {
+            return null;
+        }
+        if (tool == null || !tool.ok()) {
+            return null;
+        }
+        return CacheKey.of(cacheDataVersion, scene(), promptVersion(), question);
+    }
+
+    /** 缓存键里的**场景**：与提示词 v1/v2 的层语义一致（缺层名时用 {@code default}）。 */
+    private String scene() {
+        return citationV2 ? "L5-v2" : "default";
     }
 
     private String callOnce(String question, RouteDecision route, ToolResult tool, String context) {
