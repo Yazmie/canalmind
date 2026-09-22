@@ -116,7 +116,7 @@ flowchart TB
 | 嵌入 | **Ollama + `bge-m3`**（本地，1024 维） | 决策 **C-22**。⚠️ **索引与查询必须同一模型**，混用会"测试正常、上线召回率腰斩" |
 | 数据库 | PostgreSQL **18.4** + pgvector **0.8.0** + btree_gist | 决策 **C-15**（PG18 不兼容 pgvector 0.7 及以下） |
 | 分词 | jieba-analysis 1.0.2 + **自建航运词典**（164 词） | 决策 **C-25**。⚠️ 本机 PG18 扩展目录里**没有任何中文分词器** |
-| 观测 | Micrometer Observation / OpenTelemetry (OTLP) | 🚧 业务 Span 用 **Micrometer Observation API**（实测类路径已有 `micrometer-observation` 1.15.7）；⛔ **OTLP 导出与 tracing bridge 未接入**（D15 待决） |
+| 观测 | Micrometer Observation / OpenTelemetry (OTLP) | 🚧 业务 Span 用 **Micrometer Observation API**（实测类路径已有 `micrometer-observation` 1.15.7）；⛔ **OTLP 导出与 tracing bridge 均未接入**（**D15 已确认 → C-54**：**选自写导出器**，⛔ **不是 OTLP**；且类路径无 tracing 桥 ⇒ 本项目**没有 `traceId`**，见第 19 条） |
 | 部署 | 本机 PostgreSQL + Redis（**不使用 Docker**，决策 **C-12**） | 仓库内 `docker-compose.yml` 保留给他人 clone 后试用，**不是本项目主路径** |
 
 ## 快速开始
@@ -261,7 +261,7 @@ canalmind/
 | # | 限制 | 锚点 / 量化 |
 |---|---|---|
 | 1 | **前端未实现**：`frontend/` 只有 `.gitkeep`。规格书明写"复杂前端不做，单页聊天足够，甚至只做 Swagger" | 后端接口与演示脚本已可用 |
-| 2 | **Trace 导出未接入（OTLP / 任何后端都没有）**：规格书第 661 行属第 5 周任务，观测平台选型是 **D15 待决**。 ⚠️ **实测类路径**（2026-09-22）：**有** `spring-boot-starter-actuator 3.5.9`、`micrometer-observation 1.15.7`、`context-propagation 1.1.3`；**没有** `micrometer-tracing`、`micrometer-tracing-bridge-otel`、`opentelemetry-instrumentation-annotations`（⇒ **`@WithSpan` 用不了**）；`spring-boot-starter-opentelemetry` 在**本机两个 Maven 仓库里都不存在**（知识库第 424 行称其为 Spring Boot 4 的用法，本项目 3.5.9）。⚠️ 易看走眼处：`micrometer-tracing-bom` 目录**在**（15 个版本），但**实测含 `0` 个 JAR**——**那只是版本清单**，⛔ 别把"BOM 在"当成"实现可用" | ⇒ 业务 Span **只能用 Micrometer Observation API**；且**目前只能在测试内用 `ObservationHandler` 断言，没有任何 Trace 后端可看** | `pom.xml` + `AiObservabilityTest` |
+| 2 | **Trace 导出未接入（OTLP / 任何后端都没有）**：规格书第 661 行属第 5 周任务，观测平台选型 **D15 已确认 → C-54**（**选自写导出器**，⛔ **不是 OTLP**）。 ⚠️ **实测类路径**（2026-09-22）：**有** `spring-boot-starter-actuator 3.5.9`、`micrometer-observation 1.15.7`、`context-propagation 1.1.3`；**没有** `micrometer-tracing`、`micrometer-tracing-bridge-otel`、`opentelemetry-instrumentation-annotations`（⇒ **`@WithSpan` 用不了**）；`spring-boot-starter-opentelemetry` 在**本机两个 Maven 仓库里都不存在**（知识库第 424 行称其为 Spring Boot 4 的用法，本项目 3.5.9）。⚠️ 易看走眼处：`micrometer-tracing-bom` 目录**在**（15 个版本），但**实测含 `0` 个 JAR**——**那只是版本清单**，⛔ 别把"BOM 在"当成"实现可用" | ⇒ 业务 Span **只能用 Micrometer Observation API**；**现在可用 C-54 的自写导出器把 Span 树导成 JSON**（只接在 `QuestionPipeline.create` 与 `LlmRerankerFactory` 两处，见第 14 条），测试内亦可用 `ObservationHandler` 断言；但**仍没有任何 Trace 后端 / UI 可看**（⛔ 别把「能导出 JSON」说成「接了观测平台」） | `pom.xml` + `AiObservabilityTest` |
 | 3 | **HNSW 索引"可用且结果正确"，但当前规模下规划器不选它**（实测 **≥1000 行才自发选**）| ⛔ 不得对外说"线上在用 HNSW" |
 | 4 | **`L6` 有 5 类实现缺口 + 1 类未登记缺口**：其中 `group_by` **注入实测未被拦住**（返回 `OK`），**属安全相关** | 报告 §5.5 + `badcase记录.md` |
 | 5 | **Judge 与被测系统同模型** ⇒ 自增强偏差**未排除**（本机端点无法换裁判模型） | 报告 §5.1 |
@@ -276,11 +276,18 @@ canalmind/
 
 | 14 | **自写导出器（C-54）不是 OTLP 导出器**——规格书第 661 行要的是 **OTLP + 8 个集成测试场景**，那一项**未完成**，⛔ 不得勾选。而且它连父子靠「**父名 + 时间包含 + 取最内层**」，**不是对象身份**：实测（`javap`）`Observation.Context.getParentObservation()` 返回的只是 `ObservationView`（**拿不到父的 `Context`**）⇒ 同名且**时间上重叠**的并行兄弟会连错（本项目编排串行，实测导出树与 §7.2 一致）；连不上的 Span **不猜**，如实写 `parentMissing` 并计数。时长用 `nanoTime`（毫秒分辨率下嵌套 Span 常落在同一毫秒，会连错父）；只 start 没 stop 的 Span 导成 `durationMillis: null`（⛔ 不写 0） | `SpanTreeExporter` 的 javadoc；`SpanTreeExporterTest`（9 例）；`docs/进度看板.md` §0.4.5 |
 
-| 15 | **限流/退避/降级（C-58）只包住"最终作答"这一次调用**：重排与结构化抽取路径**未接**守卫。⚠️ **知识库第 55 行要求的"每次重试新建 Span"未做**——重试次数只在退避告警行与降级 Span 上可见，**没有逐次重试的子 Span**。⚠️ **TPM / Token 预算 / 熔断未做**（知识库第 442、459 行要求"不能只按 QPS 看"，本轮只落了 **RPM + 并发**两维）。⚠️ 作答/评测路径**刻意"不降级成话术、直接抛错"**（只把原因写进 Span），因为把"系统繁忙"当答案写进评测会被判分器记成"模型答错"、归因全错——降级成提示语那条路留给将来的在线服务路径 | `LlmCallGuard` 的 javadoc；`LlmCallGuardTest`（17 例）；`AnswerComposerGuardWiringTest`（3 例）；`docs/进度看板.md` §0.4.6 |
+| 15 | **限流/退避/降级（C-58）只包住"最终作答"这一次调用**：重排与结构化抽取路径**未接**守卫。⚠️ **知识库第 55 行要求的"每次重试新建 Span"未做**——重试次数只在退避告警行与降级 Span 上可见，**没有逐次重试的子 Span**。⚠️ **2026-09-22 实测补充**：**只有抽取层**会给每次尝试建独立 Span（`ai.tool.param.extract` × 2、`attempt=1/2`、互为兄弟），**`LlmCallGuard` 的退避重试不建独立 Attempt**（见看板 §0.4.9）。⚠️ **TPM / Token 预算 / 熔断未做**（知识库第 442、459 行要求"不能只按 QPS 看"，本轮只落了 **RPM + 并发**两维）。⚠️ 作答/评测路径**刻意"不降级成话术、直接抛错"**（只把原因写进 Span），因为把"系统繁忙"当答案写进评测会被判分器记成"模型答错"、归因全错——降级成提示语那条路留给将来的在线服务路径 | `LlmCallGuard` 的 javadoc；`LlmCallGuardTest`（17 例）；`AnswerComposerGuardWiringTest`（3 例）；`docs/进度看板.md` §0.4.6 |
 
 | 16 | **两档模型（C-56）只接了评测 / CLI 那条路**：强档 `deepseek-v4-pro` 只用于**最终生成**（`QuestionPipeline` 的两档装配重载）；**Web 流式聊天那条路未接**（它不走 `QuestionPipeline`，仍是小档）。⚠️ 接线本身已有**零付费端到端证据**（本地回显桩 `backend/scripts/stub_deepseek.py` + `LayerRunCli --smoke`：抽取 3 次走 `deepseek-v4-flash`、最终生成 1 次走 `deepseek-v4-pro`），但 `AnswerModelTierTest` 仍只覆盖配置解析与一键回退。⚠️ 另：本项目**小档实为 `deepseek-v4-flash`**（`.env` 的 `DEEPSEEK_CHAT_MODEL`），`application.yml` 里的 `deepseek-chat` 只是官方直连端点的兜底默认值——实测本项目中继**不提供** `deepseek-chat`（3/3 HTTP 503） | `LlmRerankerFactory` 的 `DEFAULT_ANSWER_MODEL` javadoc；`AnswerModelTierTest`（5 例）；`docs/进度看板.md` §0.4.7 |
-| 17 | **作答缓存（C-55）机制齐备但尚无调用方开启**：AnswerCache 接口 + Redis/内存两种实现 + 开关 + 14 例测试都在，**默认关**，且**评测/CLI 路径不调用 ttachAnswerCache**（⇒ 现有分层数字零影响，也⇒**没有任何生产路径在用**）；Web 流式聊天路径**未接**。⚠️ **不用向量相似度**（确定性规则/费率类必须精确命中，比知识库允许的更保守）；⚠️ 
-ag_chunk 只进**行数**不进内容哈希 ⇒ **若把缓存扩到检索类问句，必须先换掉数据版本取法**；⚠️ spring-boot-starter-cache（注解式）**未使用**——评测/CLI 路径没有 Spring 容器，注解式缓存拿不到也没法断言 | AnswerCache/CacheKey/AnswerCacheFactory 的 javadoc；AnswerCacheTest（10 例，含真跑本机 Redis）；AnswerComposerCacheTest（6 例）；docs/进度看板.md §0.4.8 |
+| 17 | **作答缓存（C-55）机制齐备但尚无调用方开启**：AnswerCache 接口 + Redis/内存两种实现 + 开关 + 14 例测试都在，**默认关**，且**评测/CLI 路径不调用 `attachAnswerCache`**（⇒ 现有分层数字零影响，也⇒**没有任何生产路径在用**）；Web 流式聊天路径**未接**。⚠️ **不用向量相似度**（确定性规则/费率类必须精确命中，比知识库允许的更保守）；⚠️ **`rag_chunk`** 只进**行数**不进内容哈希 ⇒ **若把缓存扩到检索类问句，必须先换掉数据版本取法**；⚠️ spring-boot-starter-cache（注解式）**未使用**——评测/CLI 路径没有 Spring 容器，注解式缓存拿不到也没法断言 | AnswerCache/CacheKey/AnswerCacheFactory 的 javadoc；AnswerCacheTest（10 例，含真跑本机 Redis）；AnswerComposerCacheTest（6 例）；docs/进度看板.md §0.4.8 |
+
+| 18 | **SSE 流式聊天链路里，§7.2 的业务 Span 是 0 条**（2026-09-22 实测，8 场景之⑤）：该链路注册表里只有 **5 条框架 Span**（`http.server.requests` / `http.client.requests` / `gen_ai.client.operation` / `spring.ai.chat.client` / `spring.ai.advisor`），**没有任何 `ai.rag.*` / `ai.intent.*` / `ai.llm.generate`**——因为 `ChatStreamController` **直连 `ChatClient.stream()`、不过 `QuestionPipeline`**。⇒ **C-55（语义缓存）与 C-56（两档模型）在 Web 流式路径上都没接**；这**不是**「埋点没生效」，而是**该路径本来就没走那条编排**（同类见第 12 条） | `ObservabilityStreamingAndDownstreamTest`；实测产物 `backend/target/eval/observability-8-scenarios/sse-observed-spans.txt`；看板 §0.4.9 |
+
+| 19 | **本项目没有 `traceId`**（2026-09-22 实测）：运行时类路径**没有**任何 tracing 桥（无 `micrometer-tracing` / `opentelemetry`，见第 2 条），故知识库《AI 可观测性与 Trace》**第 480 行**要求的「**跨线程 / 跨服务 `traceId` 一致**」**无法断言**——本项目能断言的是**自写导出器导出的 Span 树**；同源两条：**第 482 行的采样 = N/A**（无采样器）、场景⑥的「**或消息队列**」那半**未覆盖**（本项目无 MQ；实测请求头 `traceparent` 为空） | `ObservabilityStreamingAndDownstreamTest`；看板 §0.4.9 |
+
+| 20 | **Trace 看不出「这次生成用了哪次检索」**（2026-09-22 实测，8 场景之①）：Span 树里**生成段与检索段是兄弟**（都挂在根下），**不是父子**——只凭 Trace 无法把一次生成与它实际用的那次检索对应起来（本项目编排串行，暂未造成误判）。⚠️ 改成父子属**改 §7.2 对外契约**；用户 2026-09-22 裁定：**先登记为已知限定、不动契约** | `ObservabilityEightScenariosTest`；看板 §0.4.9 |
+
+| 21 | **非 `TOOL_NONE` 的业务失败：不回退检索，且 Span 上零个键**（2026-09-22 实测，8 场景之③）：✅ 业务失败**没有被记成技术错误**（这点是对的）；⚠️ 但知识库**第 478 行**「错误状态、业务结果和取消状态是否准确」**只达成一半**——只有 `TOOL_NONE` 那条路会写 `ai.rag.fallback=true`（有对照用例证明），**其它业务失败在 Trace 上不留任何键**。⚠️ 同一裁定：**先登记为已知限定、不动契约**（补键 / 补回退都属改 §7.3 语义） | `ObservabilityEightScenariosTest`；看板 §0.4.9 |
 
 ### 已知建模缺口（记录而非隐藏）
 
