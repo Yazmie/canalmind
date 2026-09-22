@@ -278,7 +278,7 @@ canalmind/
 
 | 15 | **限流/退避/降级（C-58）只包住"最终作答"这一次调用**：重排与结构化抽取路径**未接**守卫。⚠️ **知识库第 55 行要求的"每次重试新建 Span"未做**——重试次数只在退避告警行与降级 Span 上可见，**没有逐次重试的子 Span**。⚠️ **TPM / Token 预算 / 熔断未做**（知识库第 442、459 行要求"不能只按 QPS 看"，本轮只落了 **RPM + 并发**两维）。⚠️ 作答/评测路径**刻意"不降级成话术、直接抛错"**（只把原因写进 Span），因为把"系统繁忙"当答案写进评测会被判分器记成"模型答错"、归因全错——降级成提示语那条路留给将来的在线服务路径 | `LlmCallGuard` 的 javadoc；`LlmCallGuardTest`（17 例）；`AnswerComposerGuardWiringTest`（3 例）；`docs/进度看板.md` §0.4.6 |
 
-| 16 | **两档模型（C-56）只接了评测 / CLI 那条路**：强档 `deepseek-v4-pro` 只用于**最终生成**（`QuestionPipeline` 的两档装配重载）；**Web 流式聊天那条路未接**（它不走 `QuestionPipeline`，仍是小档）。⚠️ **"CLI 真的把强档传给了作答器"这一环尚无端到端证据**——`AnswerModelTierTest` 只证明配置解析与一键回退。⚠️ 另：本项目**小档实为 `deepseek-v4-flash`**（`.env` 的 `DEEPSEEK_CHAT_MODEL`），`application.yml` 里的 `deepseek-chat` 只是官方直连端点的兜底默认值——实测本项目中继**不提供** `deepseek-chat`（3/3 HTTP 503） | `LlmRerankerFactory` 的 `DEFAULT_ANSWER_MODEL` javadoc；`AnswerModelTierTest`（5 例）；`docs/进度看板.md` §0.4.7 |
+| 16 | **两档模型（C-56）只接了评测 / CLI 那条路**：强档 `deepseek-v4-pro` 只用于**最终生成**（`QuestionPipeline` 的两档装配重载）；**Web 流式聊天那条路未接**（它不走 `QuestionPipeline`，仍是小档）。⚠️ 接线本身已有**零付费端到端证据**（本地回显桩 `backend/scripts/stub_deepseek.py` + `LayerRunCli --smoke`：抽取 3 次走 `deepseek-v4-flash`、最终生成 1 次走 `deepseek-v4-pro`），但 `AnswerModelTierTest` 仍只覆盖配置解析与一键回退。⚠️ 另：本项目**小档实为 `deepseek-v4-flash`**（`.env` 的 `DEEPSEEK_CHAT_MODEL`），`application.yml` 里的 `deepseek-chat` 只是官方直连端点的兜底默认值——实测本项目中继**不提供** `deepseek-chat`（3/3 HTTP 503） | `LlmRerankerFactory` 的 `DEFAULT_ANSWER_MODEL` javadoc；`AnswerModelTierTest`（5 例）；`docs/进度看板.md` §0.4.7 |
 
 ### 已知建模缺口（记录而非隐藏）
 
