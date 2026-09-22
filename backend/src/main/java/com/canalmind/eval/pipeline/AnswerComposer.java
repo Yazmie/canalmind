@@ -14,6 +14,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import com.canalmind.chat.LlmCallGuard;
 import com.canalmind.config.PromptVersions;
 import com.canalmind.intent.RouteDecision;
 import com.canalmind.observability.AiObservation;
@@ -71,6 +72,15 @@ public final class AnswerComposer {
     /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.llm.generate}）；无观测需求时为 NOOP。 */
     private final ObservationRegistry observationRegistry;
 
+    /**
+     * 模型调用的限流 / 退避重试 / 降级守卫（**C-58**）。
+     *
+     * <p>⚠️ 由本类的构造器**自建**（{@link LlmCallGuard#fromEnvironment}，参数走环境变量），
+     * 而不是再加一个构造参数——这样既有的 1/3/4 参构造点（{@code QuestionPipeline.create} 与
+     * 三个测试类）**一行都不用改**，避免"加一层守卫"演变成改十处装配。
+     */
+    private final LlmCallGuard guard;
+
     /** 既有构造器：**不启用 v2**（保持既有行为零变化）。 */
     public AnswerComposer(ChatModel chatModel) {
         this(chatModel, null, Map.of(), ObservationRegistry.NOOP);
@@ -104,6 +114,7 @@ public final class AnswerComposer {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
         this.citationV2 = PromptVersions.appliesToLayer(layer, env);
         this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
+        this.guard = LlmCallGuard.fromEnvironment(env);
     }
 
     /**
@@ -233,7 +244,18 @@ public final class AnswerComposer {
             //    最可能的原因：长提示词（数据表 + 5 条片段）把 token 预算吃在推理上，
             //    正文没剩额度 ⇒ 接口返回了**内容为空但并非错误**的响应。
             for (int attempt = 1; attempt <= 2; attempt++) {
-                String text = callOnce(question, route, tool, context);
+                String text = guard.call("answer",
+                        () -> callOnce(question, route, tool, context),
+                        degraded -> {
+                            // C-58：429/5xx 退避重试用尽、超截止、并发满或被中断 ⇒ 走到这里。
+                            // ⚠️ 作答（评测）路径刻意**不降级成一条话术**：把"系统繁忙"当答案写进评测，
+                            //    会被判分器记成"答错"，而真实归因是链路被限流——与本方法第 228-234 行
+                            //    那条"空作答被当成成功作答"的教训同类。⇒ 只把原因留在 Span 上，再如实抛错。
+                            //    （面向在线服务的路径应当反过来：返回降级提示语，见知识库《大模型网关详解…》第 228 行。）
+                            AiObservation.degrade(observation, degraded.reason());
+                            AiObservation.attempt(observation, Math.max(1, degraded.attempts()));
+                            throw degraded;
+                        });
                 if (text != null && !text.isBlank()) {
                     AiObservation.attempt(observation, attempt);
                     return text.strip();

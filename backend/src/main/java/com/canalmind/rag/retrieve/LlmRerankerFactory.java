@@ -1,5 +1,6 @@
 package com.canalmind.rag.retrieve;
 
+import com.canalmind.chat.DeepSeekHttpErrorHandler;
 import com.canalmind.observability.SpanTreeExporter;
 import com.canalmind.rag.retrieve.LlmReranker.ChunkSnippetProvider;
 import com.canalmind.rag.retrieve.LlmReranker.PromptCompleter;
@@ -471,6 +472,10 @@ public final class LlmRerankerFactory {
         DeepSeekApi api = DeepSeekApi.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
+                // C-58：装自己的错误处理器，把 HTTP 失败**如实**翻译成带状态码与 Retry-After 的
+                // LlmHttpFailure。⛔ 不装的话，Spring AI 会抛 NonTransientAiException 并把状态码
+                // 只留在消息文本里（实测），下游就只能靠解析散文来判"是不是 429"了。
+                .responseErrorHandler(new DeepSeekHttpErrorHandler())
                 .build();
         DeepSeekChatOptions options = DeepSeekChatOptions.builder()
                 .model(model)

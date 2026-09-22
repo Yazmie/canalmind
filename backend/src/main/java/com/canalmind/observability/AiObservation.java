@@ -174,6 +174,23 @@ public final class AiObservation {
                 empty ? AiSpans.VALUE_RESULT_EMPTY : AiSpans.VALUE_RESULT_HIT);
     }
 
+    /**
+     * 记录"这一环降级了，原因是 X"（{@code ai.degrade.reason}，规格书 §7.3 的低基数键）。
+     *
+     * <p><b>取值只允许传封闭枚举</b>（⛔ 不许传自由文本、更不许传异常消息或用户问句）——
+     * 这个键之所以能在低基数白名单里，唯一理由就是"取值集合是有限且封闭的"；
+     * 传字符串进来它就会变成一个基数和问题原文一样高的键，而**指标侧不会报错，只会悄悄爆掉**。
+     *
+     * <p>目前有两个来源，各自封闭：
+     * ①重排降级：{@code RerankOutcome.FailureKind}（超时、无法解析、调用失败…）；
+     * ②模型调用降级：{@link com.canalmind.chat.LlmCallGuard.DegradeReason}
+     * （限流、重试用尽、超截止、并发满、被中断，见 C-58）。
+     * 两个枚举的**并集**仍然是封闭集合，故该键的性质不变。
+     */
+    public static Observation degrade(Observation observation, Enum<?> reason) {
+        return lowCardinality(observation, AiSpans.KEY_DEGRADE_REASON, reason.name());
+    }
+
     /** 异常消息里截断长取值，避免把正文原样回显到日志（否则"挡在属性外、漏进了日志"）。 */
     private static String abbreviate(String value) {
         return value.length() <= 24 ? value : value.substring(0, 24) + "…（共 " + value.length() + " 字符）";
