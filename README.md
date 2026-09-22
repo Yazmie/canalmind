@@ -6,7 +6,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-green)]()
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4%20%2B%20pgvector%200.8.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-573%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-583%20passing-brightgreen)]()
 
 ---
 
@@ -201,9 +201,14 @@ mvn -o -s ..\.proto\settings.xml -gs ..\.proto\settings.xml `
   "-DargLine=-javaagent:.m2repo\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar" test
 ```
 
-**实测 `Tests run: 573, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
+**实测 `Tests run: 583, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
 ⚠️ 这个数字**跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
 本项目实测撞到过"源码编译不过而构建仍绿"，见 `docs/工程复盘/工程方法/编译错误被静默放过/README.md`）。
+
+**看见 Trace（可选，默认关）**：跑任何走 `QuestionPipeline.create` / `LlmRerankerFactory` 的命令时加
+`-Dcanalmind.observability.export=<文件路径>`，JVM 退出那一刻会把 §7.2 的 Span 树导成 JSON
+（零新依赖；LF 换行、UTF-8 无 BOM）。⛔ 不设该属性时**连 handler 都不注册**，默认行为零变化。
+⚠️ **本项目没有接真 OTLP 导出器**——规格书第 661 行那一项**未完成**，见「已知限制」第 14 条。
 
 测试分三层，**刻意分开**，以便失败时能判断是接线错、协议错还是网络错：
 
@@ -266,8 +271,10 @@ canalmind/
 | 9 | **SSE 流式下 HTTP Span 挂不到模型 Span 下**（Spring AI 官方记录的当前限制） | 属框架限制，**记录而非当 bug 修**；留痕 `DECISIONS.md` |
 | 10 | **仿真数据有 18 / 71 个费率档位无数据触发**（船队吨位不足以触及最高两档），**6 项条款不可实现**（逐条登记原因） | `verify_corpus_db_rates.py` 的 `UNIMPLEMENTED` |
 | 11 | **`ai.output.validate` 这个 Span 没有埋点**——规格书 §7.2 的树里列了它，但本项目运行时**没有"最终输出校验"这个环节**：`SchemaGate` 校验的是**工具参数**（对应 `ai.tool.param.validate`），把它再报一次就是知识库第 459 行明令禁止的"**名称不同、内容相同的两层节点**"。⇒ **如实记为未埋，⛔ 不造一个空壳 Span 充数**（是否新增该环节属待决 **D23**） | `AiSpans.OUTPUT_VALIDATE` 的 javadoc；`DECISIONS.md` D23 |
-| 12 | **三个"单步探针"CLI 仍不埋点**（实测 `IntentRouterCli` / `StructuredQueryCli` / `JudgeRunCli` 只传 2 参构造器 ⇒ 落到 `ObservationRegistry.NOOP`）；但**六层评测主路径有 Span**——`LayerRunCli` 与 `L4RunCli` 都经 `QuestionPipeline.create` 那条"缺省给**真**注册表"的重载。⇒ 从这三个 CLI 跑出来的 Trace **本来就是空的**，这是**如实记录、不是故障**；且当前未接任何导出器（属 **D15** 待决、⛔ 未接 OTLP），Span 只在挂了 `ObservationHandler` 的测试里可见 ⇒ ⛔ **别据此说"埋点没生效"** | 锚点：三个 CLI 里 `new DeepSeekJsonInvoker(...)` 的实参个数；`QuestionPipeline.create` 的重载链 |
+| 12 | **三个"单步探针"CLI 仍不埋点**（实测 `IntentRouterCli` / `StructuredQueryCli` / `JudgeRunCli` 只传 2 参构造器 ⇒ 落到 `ObservationRegistry.NOOP`）；但**六层评测主路径有 Span**——`LayerRunCli` 与 `L4RunCli` 都经 `QuestionPipeline.create` 那条"缺省给**真**注册表"的重载。⇒ 从这三个 CLI 跑出来的 Trace **本来就是空的**，这是**如实记录、不是故障**。⚠️ 另：**C-54 的导出器只接在** `QuestionPipeline.create`（六层评测主路径）与 `LlmRerankerFactory`（检索 CLI 路径）两处 ⇒ 这三个 CLI 既没有 Span、也导不出文件；主路径则有 Span 且可导出（见第 14 条）⇒ ⛔ **别据此说"埋点没生效"** | 锚点：三个 CLI 里 `new DeepSeekJsonInvoker(...)` 的实参个数；`QuestionPipeline.create` 的重载链 |
 | 13 | **规格书 §7.2 的 Span 树，比"默认运行实际会产生什么"大**：默认装配里是 `RetrievalConfig.defaults().withoutRerank()` + **只挂向量通道**（混合检索按 **C-30** 未启用）+ `new NoopReranker()`，且**没有 Query Rewrite 环节**（改写只存在于**离线消融实验** `QueryRewriteCli`）⇒ **默认运行的 Trace 里不会出现 `db.bm25.search` / `ai.rag.rerank` / `ai.rag.rewrite`**。⛔ **别把"Trace 里没有这个节点"当成埋点没生效**——那三个节点有宿主、只是默认路径不走它们；`ai.output.validate` 则是真的没埋（见第 11 条） | 锚点：`QuestionPipeline.create` 的装配代码（⛔ 不引行号：该文件在改）；`AiSpans` 各类 javadoc |
+
+| 14 | **自写导出器（C-54）不是 OTLP 导出器**——规格书第 661 行要的是 **OTLP + 8 个集成测试场景**，那一项**未完成**，⛔ 不得勾选。而且它连父子靠「**父名 + 时间包含 + 取最内层**」，**不是对象身份**：实测（`javap`）`Observation.Context.getParentObservation()` 返回的只是 `ObservationView`（**拿不到父的 `Context`**）⇒ 同名且**时间上重叠**的并行兄弟会连错（本项目编排串行，实测导出树与 §7.2 一致）；连不上的 Span **不猜**，如实写 `parentMissing` 并计数。时长用 `nanoTime`（毫秒分辨率下嵌套 Span 常落在同一毫秒，会连错父）；只 start 没 stop 的 Span 导成 `durationMillis: null`（⛔ 不写 0） | `SpanTreeExporter` 的 javadoc；`SpanTreeExporterTest`（9 例）；`docs/进度看板.md` §0.4.5 |
 
 ### 已知建模缺口（记录而非隐藏）
 

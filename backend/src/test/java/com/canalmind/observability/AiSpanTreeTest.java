@@ -22,6 +22,8 @@ import com.canalmind.structured.TariffRuleLookup;
 import com.canalmind.structured.TariffRuleRow;
 import com.canalmind.structured.ToolArgumentExtractor;
 import com.canalmind.structured.ToolCatalog;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
@@ -398,6 +400,42 @@ class AiSpanTreeTest {
      *
      * <p>⚠️ 这里必须用真实注册表注入每一层，否则本类测的就成了"桩自己"。
      */
+    @Test
+    @DisplayName("★ C-54 端到端：真跑一次编排，导出的 JSON 就是 §7.2 那棵树（而不是一张平表）")
+    void exportedJsonIsTheSpecTree() throws Exception {
+        ObservationRegistry registry = ObservationRegistry.create();
+        SpanTreeExporter exporter = SpanTreeExporter.attach(registry);
+
+        pipeline(registry, stubInvoker(QUOTE_FEE_JSON)).run(COMPOSITE_Q);
+
+        JsonNode json = new ObjectMapper().readTree(exporter.toJson());
+        JsonNode root = json.get("roots").get(0);
+        assertThat(root.get("name").asText()).isEqualTo(AiSpans.AGENT_RUN);
+        assertThat(json.get("roots").size()).as("根只该有一个（ai.agent.run）").isEqualTo(1);
+        assertThat(json.get("unresolvedParentCount").asInt())
+                .as("真实编排里不许出现连不上父的 Span——出现即说明父指针在某一层丢了")
+                .isZero();
+
+        JsonNode retrieve = childNamed(root, AiSpans.RAG_RETRIEVE);
+        assertThat(retrieve).as("ai.rag.retrieve 必须挂在根之下").isNotNull();
+        assertThat(childNamed(retrieve, AiSpans.RAG_CONTEXT_BUILD))
+                .as("ai.rag.context.build 必须**嵌在** ai.rag.retrieve 里面（§7.2 的链）")
+                .isNotNull();
+        assertThat(retrieve.get("highCardinality").get(AiSpans.KEY_KNOWLEDGE_BASE_ID).asText())
+                .as("C-59 补写的 knowledge_base_id 要能在导出物里读到")
+                .isEqualTo(RetrievalPipeline.KNOWLEDGE_BASE_ID);
+    }
+
+    /** 在 children 里按名字找**直接**子节点；找不到返回 null，交给断言报错（⛔ 不抛异常）。 */
+    private static JsonNode childNamed(JsonNode parent, String name) {
+        for (JsonNode child : parent.get("children")) {
+            if (child.get("name").asText().equals(name)) {
+                return child;
+            }
+        }
+        return null;
+    }
+
     private static QuestionPipeline pipeline(ObservationRegistry registry, JsonChatInvoker invoker)
             throws Exception {
         VectorSearcher searcher = Mockito.mock(VectorSearcher.class);

@@ -14,6 +14,7 @@ import com.canalmind.intent.IntentRouter;
 import com.canalmind.intent.RouteDecision;
 import com.canalmind.observability.AiObservation;
 import com.canalmind.observability.AiSpans;
+import com.canalmind.observability.SpanTreeExporter;
 import com.canalmind.rag.embed.EmbeddingClientFactory;
 import com.canalmind.rag.embed.EmbeddingModelGuard;
 import com.canalmind.rag.ingest.RagChunkRepository;
@@ -133,7 +134,12 @@ public final class QuestionPipeline {
         // ⚠️ 缺省给一个**真的**注册表（不是 NOOP）：CLI / 评测路径没有 Spring 容器，
         //    本方法就是那条路径的依赖注入根。若这里给 NOOP，
         //    那么"真实运行时到底有没有 Span"就永远无法回答（这正是本次要修的问题）。
-        return create(jdbc, env, chatModel, businessToday, layer, ObservationRegistry.create());
+        // ⚠️ 外面再套一层 `SpanTreeExporter.attachIfEnabled`（**C-54**）：**默认关**，
+        //    只有显式设了 `-Dcanalmind.observability.export=<文件>` 才会多挂一个
+        //    "把 §7.2 的树导成 JSON"的 handler；不设时它**原样返回**这个注册表，
+        //    行为与本行改动前完全一致（进程内零新依赖、离线构建不受影响）。
+        return create(jdbc, env, chatModel, businessToday, layer,
+                SpanTreeExporter.attachIfEnabled(ObservationRegistry.create()));
     }
 
     /**

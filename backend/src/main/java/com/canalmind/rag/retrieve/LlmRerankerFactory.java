@@ -1,5 +1,6 @@
 package com.canalmind.rag.retrieve;
 
+import com.canalmind.observability.SpanTreeExporter;
 import com.canalmind.rag.retrieve.LlmReranker.ChunkSnippetProvider;
 import com.canalmind.rag.retrieve.LlmReranker.PromptCompleter;
 import io.micrometer.observation.ObservationRegistry;
@@ -189,8 +190,10 @@ public final class LlmRerankerFactory {
         //    `LlmRerankerFactory` 就是那条路径的依赖注入根——若这里给 NOOP，
         //    那么"真实运行时到底有没有 ai.rag.rerank 这个节点"就永远无法回答
         //    （与 QuestionPipeline.create 的既有重载同一理由）。
+        // ⚠️ 外面再套一层 `SpanTreeExporter.attachIfEnabled`（**C-54**，默认关）：
+        //    设了 `-Dcanalmind.observability.export=<文件>` 才会把检索这棵树导成 JSON。
         return fromEnvironment(env, snippets, maxRetries, completerWrapper,
-                ObservationRegistry.create());
+                SpanTreeExporter.attachIfEnabled(ObservationRegistry.create()));
     }
 
     /**
