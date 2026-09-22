@@ -83,6 +83,21 @@ public final class RetrievalPipeline {
     /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.rag.retrieve} / {@code ai.rag.context.build}）。 */
     private final ObservationRegistry observationRegistry;
 
+    /**
+     * 知识库标识（规格书 §7.3 点名的 {@code knowledge_base_id}，C-59，2026-09-22 补写）。
+     *
+     * <p><b>⚠️ 如实记一笔：它今天是常量。</b>本项目只有<b>一个</b>知识库
+     * （{@code docs/规则语料/} 的 28 篇 → 库内 541 个 chunk，同属索引档案
+     * {@code ollama:bge-m3:1024}），所以这个键当下<b>基数并不高</b>。
+     * 仍按规格书 §7.3 归入高基数一侧（只进 Trace），理由是它<b>随知识库数量增长</b>，
+     * 而本项目的对外形态是<b>多知识库</b>。
+     *
+     * <p>为什么写成常量而不是构造器参数：本项目唯一的知识库是既成事实，
+     * 加一个参数会让 14 处既有装配点各多传一个恒同的值，收益为零。
+     * ⇒ <b>等真有第二个知识库时再改成注入</b>（那时这个常量正好是需要被替换的那一行）。
+     */
+    public static final String KNOWLEDGE_BASE_ID = "canalmind-rules";
+
     public RetrievalPipeline(List<RetrievalChannel> channels, FusionStrategy fusion,
                              Reranker reranker, RetrievalConfig config) {
         this(channels, fusion, reranker, config, ObservationRegistry.NOOP);
@@ -172,6 +187,8 @@ public final class RetrievalPipeline {
             AiObservation.ragResult(observation, result.context().isEmpty());
             AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
                     Integer.toString(result.context().size()));
+            AiObservation.highCardinality(observation, AiSpans.KEY_KNOWLEDGE_BASE_ID,
+                    KNOWLEDGE_BASE_ID);
             return result;
         });
     }

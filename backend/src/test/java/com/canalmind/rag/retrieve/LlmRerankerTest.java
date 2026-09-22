@@ -1,14 +1,20 @@
 package com.canalmind.rag.retrieve;
 
+import com.canalmind.observability.AiSpans;
 import com.canalmind.rag.retrieve.LlmReranker.ChunkSnippetProvider;
 import com.canalmind.rag.retrieve.LlmReranker.PromptCompleter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.common.KeyValue;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -809,6 +815,86 @@ class LlmRerankerTest {
         assertThat(out.degraded()).isTrue();
         assertThat(out.failureKind()).isEqualTo(RerankOutcome.FailureKind.INTERRUPTED);
         assertThat(out.attempts()).as("中断不重试：调用方要求停").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("★ 降级时把机器可读的 FailureKind 写进 ai.degrade.reason（否则「降级」与「重排没效果」长得一样）")
+    void degradeReasonIsRecordedOnTheSpan() {
+        Capturing capturing = new Capturing();
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig().observationHandler(capturing);
+
+        RerankOutcome degraded = tracingReranker(ok(TRUNCATED_JSON), registry)
+                .rerank(PROBE, candidates("a", "b"), 10);
+
+        assertThat(degraded.degraded()).as("前提：这次调用真的降级了").isTrue();
+        assertThat(degraded.failureKind()).isEqualTo(RerankOutcome.FailureKind.UNPARSABLE);
+        assertThat(capturing.attrsOf(AiSpans.RAG_RERANK))
+                .as("降级原因必须写进 Span，且取 FailureKind 的**枚举名**——"
+                        + "RerankOutcome 自己写着「⛔ 不许让读者去猜 degradeReason 的措辞、"
+                        + "更不许用字符串匹配来判断」，所以这里断言的是枚举名本身，不是中文措辞")
+                .containsEntry(AiSpans.KEY_DEGRADE_REASON, "UNPARSABLE");
+    }
+
+    @Test
+    @DisplayName("成功路径上**不写** ai.degrade.reason（若成功也写 NONE，键恒存在就没法用「键在不在」判断降级）")
+    void successPathDoesNotRecordDegradeReason() {
+        Capturing capturing = new Capturing();
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig().observationHandler(capturing);
+
+        RerankOutcome succeeded = tracingReranker(
+                ok("{\"ranking\":[{\"chunk_id\":\"a\",\"score\":0.9}]}"), registry)
+                .rerank(PROBE, candidates("a", "b"), 10);
+
+        assertThat(succeeded.degraded()).as("前提：这次调用没有降级").isFalse();
+        assertThat(capturing.attrsOf(AiSpans.RAG_RERANK))
+                .as("成功路径不写降级原因（C-59 口径：只在真的降级时写；"
+                        + "同 KEY_RAG_FALLBACK 的做法）")
+                .doesNotContainKey(AiSpans.KEY_DEGRADE_REASON);
+    }
+
+    /** 带观测注册表的重排器（7 参构造器；超时/候选上限/片段长度给够，不干扰本次要测的降级分类）。 */
+    private static LlmReranker tracingReranker(PromptCompleter completer,
+                                                ObservationRegistry registry) {
+        return new LlmReranker(completer, snippets("正文"), "stub-model",
+                Duration.ofSeconds(30), 50, 2000, registry);
+    }
+
+    /** 只收属性、不做判断的 {@link ObservationHandler}。 */
+    private static final class Capturing implements ObservationHandler<Observation.Context> {
+
+        private final Map<String, Map<String, String>> byName = new LinkedHashMap<>();
+
+        @Override
+        public boolean supportsContext(Observation.Context context) {
+            return true;
+        }
+
+        /**
+         * ⚠️ 属性只能在 {@code onStop} 收：{@code observe(...)} 体内的属性是**启动之后**
+         * 才写的，在 {@code onStart} 快照只会得到一份空属性表（那样断言会静默失效）。
+         */
+        @Override
+        public void onStop(Observation.Context context) {
+            Map<String, String> attrs = new LinkedHashMap<>();
+            for (KeyValue kv : context.getLowCardinalityKeyValues()) {
+                attrs.put(kv.getKey(), kv.getValue());
+            }
+            for (KeyValue kv : context.getHighCardinalityKeyValues()) {
+                attrs.put(kv.getKey(), kv.getValue());
+            }
+            byName.put(context.getName(), attrs);
+        }
+
+        Map<String, String> attrsOf(String spanName) {
+            Map<String, String> got = byName.get(spanName);
+            assertThat(got)
+                    .as("Span「" + spanName + "」应当出现过："
+                            + "没出现说明埋点没生效或被短路，后面的属性断言会因此失去意义")
+                    .isNotNull();
+            return got;
+        }
     }
 
     // ── 夹具 ──────────────────────────────────────────────────────────────

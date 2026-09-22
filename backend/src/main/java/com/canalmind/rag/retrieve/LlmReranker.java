@@ -634,6 +634,16 @@ public final class LlmReranker implements Reranker {
                     orderChanged(in, outcome.candidates()) ? "true" : "false");
             AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
                     Integer.toString(outcome.candidates().size()));
+            // ⚠️ 只在**真的降级**时写这个键（C-59，2026-09-22）：本链路会静默降级成
+            //    "融合原序"，而降级后的产物与「重排本来就没效果」在数据上**完全一样**
+            //    ——本项目已实测过 max_tokens 量程不足导致 3/3 必然降级，却只能被读成
+            //    "重排无增益"（见 docs/工程复盘/工程检索类/量程不足会把配置掐死记成能力不足/）。
+            //    取值用 FailureKind 的**枚举名**：RerankOutcome 已声明"⛔ 不许让读者去猜
+            //    degradeReason 的措辞、更不许用字符串匹配来判断"，故这里不自造措辞。
+            if (outcome.degraded()) {
+                AiObservation.lowCardinality(observation, AiSpans.KEY_DEGRADE_REASON,
+                        outcome.failureKind().name());
+            }
             return outcome;
         });
     }

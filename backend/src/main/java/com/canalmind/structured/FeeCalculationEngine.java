@@ -147,11 +147,11 @@ public final class FeeCalculationEngine {
         Observation observation = AiObservation.start(AiSpans.FEE_CALCULATE, observationRegistry);
         return observation.observe(() -> {
             Quote quote = computeQuote(rule, tonnage, days, dangerous, bizDate);
-            // ⚠️ 如实记一笔：本引擎失败时**抛异常**而不是返回 null，所以 quote == null
-            //    这一支当前不可能发生 ⇒ 该键实际恒为 hit。失败本身由 observe(...) 自动
-            //    记成这个 Span 的 **error 状态**（并带上原始异常），⛔ 不额外造一个"失败"
-            //    枚举值去挤低基数位（那会让它的取值集合不再是封闭的两值）。
-            AiObservation.ragResult(observation, quote == null);
+            // ⛔ 这里**刻意不写** ai.rag.result（C-59，2026-09-22 裁示删除）：
+            //    本引擎失败时**抛异常**而不是返回 null，所以那个键的取值**恒为 hit**。
+            //    一个只能取一个值的键不是信息、是噪声——它既不可聚合，又会让读者以为
+            //    "这里也有空召回的可能"。失败本身已由 observe(...) 记成这个 Span 的
+            //    **error 状态**（并带上原始异常），⛔ 不需要再造一个假的两值枚举。
             return quote;
         });
     }

@@ -34,7 +34,9 @@ package com.canalmind.observability;
  *       <td>{@code ai.rag.strategy}、{@code ai.rag.result}</td>
  *       <td>Metrics + Trace</td></tr>
  *   <tr><td>{@code ai.intent.type}</td><td>Metrics + Trace</td></tr>
- *   <tr><td>{@code ai.rag.rerank.changed}、{@code ai.rag.fallback}（布尔式封闭枚举）</td>
+ *   <tr><td>{@code ai.rag.rerank.changed}、{@code ai.rag.fallback}（布尔式封闭枚举）、
+ *       {@code ai.tool.param.validate.stage}（{@code envelope}/{@code arguments}）、
+ *       {@code ai.degrade.reason}（{@code RerankOutcome.FailureKind} 的枚举名）</td>
  *       <td>Metrics + Trace</td></tr>
  *   <tr><td colspan="2">取值必须是<b>封闭枚举</b>（如 {@code hit}/{@code empty}）</td></tr>
  *   <tr><td rowspan="4">高基数（{@link #HIGH_CARDINALITY_KEYS}）</td>
@@ -195,10 +197,28 @@ public final class AiSpans {
     /** {@link #KEY_RAG_RESULT} 的取值：空召回。 */
     public static final String VALUE_RESULT_EMPTY = "empty";
 
+    /**
+     * 降级 / 回退原因（C-59，2026-09-22）。
+     *
+     * <p>取值是 {@code RerankOutcome.FailureKind} 的**枚举名**（{@code TIMEOUT}、
+     * {@code UNPARSABLE}、{@code BLANK_COMPLETION}…）——⛔ 不得塞自由文本或中文措辞。
+     *
+     * <p><b>为什么它属于低基数一侧</b>（本条是 C-59 的处置）：§7.3 划界的判据是
+     * "取值是不是封闭枚举"，而非"键名听起来像不像标签"。{@code FailureKind} 的取值集合
+     * 由代码固定（不足 12 个），与 {@code hit}/{@code empty} 同类 ⇒ 归低基数，
+     * 于是"**降级率按原因聚合**"这件事才进得了 Metrics。
+     *
+     * <p>⚠️ <b>只在真的降级时才写</b>：成功路径上不写这个键。若成功也写一个
+     * {@code NONE}，那"有没有降级"就要靠读取值来判断，而键恒存在 ⇒ 无法用
+     * "键在不在"做廉价筛选（同 {@code AiSpans.KEY_RAG_FALLBACK} 的口径）。
+     */
+    public static final String KEY_DEGRADE_REASON = "ai.degrade.reason";
+
     /** 低基数键全集——供测试断言"没有高基数的东西混进来"。 */
     public static final java.util.Set<String> LOW_CARDINALITY_KEYS =
             java.util.Set.of(KEY_RAG_STRATEGY, KEY_RAG_RESULT, KEY_INTENT_TYPE,
-                    KEY_RAG_RERANK_CHANGED, KEY_RAG_FALLBACK, KEY_TOOL_VALIDATE_STAGE);
+                    KEY_RAG_RERANK_CHANGED, KEY_RAG_FALLBACK, KEY_TOOL_VALIDATE_STAGE,
+                    KEY_DEGRADE_REASON);
 
     // ==================== 高基数属性键（只进 Trace） ====================
 
@@ -212,8 +232,6 @@ public final class AiSpans {
     public static final String KEY_ATTEMPT = "attempt";
     /** 受影响行数（只进 Trace，规格书第 553 行要求记"行数"）。 */
     public static final String KEY_DB_ROWS = "db.rows";
-    /** 通道降级/回退原因（受控枚举由调用方给，⛔ 不得塞自由文本）。 */
-    public static final String KEY_DEGRADE_REASON = "ai.degrade.reason";
 
     /**
      * 配置 / 提示词 / 模型的**版本标识**（只进 Trace）。
@@ -235,7 +253,7 @@ public final class AiSpans {
     /** 高基数键全集。 */
     public static final java.util.Set<String> HIGH_CARDINALITY_KEYS =
             java.util.Set.of(KEY_RAG_RESULT_COUNT, KEY_KNOWLEDGE_BASE_ID, KEY_DOCUMENT_IDS,
-                    KEY_ATTEMPT, KEY_DB_ROWS, KEY_DEGRADE_REASON, KEY_CONFIG_VERSION);
+                    KEY_ATTEMPT, KEY_DB_ROWS, KEY_CONFIG_VERSION);
 
     /**
      * 规格书 §7.2 要求的 Span 名单（顺序照抄规格书第 548–563 行）。

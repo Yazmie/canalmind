@@ -6,7 +6,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-green)]()
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4%20%2B%20pgvector%200.8.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-530%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-573%20passing-brightgreen)]()
 
 ---
 
@@ -201,7 +201,9 @@ mvn -o -s ..\.proto\settings.xml -gs ..\.proto\settings.xml `
   "-DargLine=-javaagent:.m2repo\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar" test
 ```
 
-**实测 `Tests run: 530, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
+**实测 `Tests run: 573, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
+⚠️ 这个数字**跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
+本项目实测撞到过"源码编译不过而构建仍绿"，见 `docs/工程复盘/工程方法/编译错误被静默放过/README.md`）。
 
 测试分三层，**刻意分开**，以便失败时能判断是接线错、协议错还是网络错：
 

@@ -216,6 +216,10 @@ class AiSpanTreeTest {
                 .isEqualTo(VectorRetrievalChannel.NAME);
         assertThat(retrieve.attr(AiSpans.KEY_RAG_RESULT)).isEqualTo(AiSpans.VALUE_RESULT_HIT);
         assertThat(retrieve.attr(AiSpans.KEY_RAG_RESULT_COUNT)).isEqualTo("2");
+        assertThat(retrieve.attr(AiSpans.KEY_KNOWLEDGE_BASE_ID))
+                .as("规格书 §7.3 点名的 knowledge_base_id（高基数、只进 Trace）。"
+                        + "取到 null 就说明这个键挂在白名单里却没人写——那正是 C-59 要修的死键")
+                .isEqualTo(RetrievalPipeline.KNOWLEDGE_BASE_ID);
 
         Recorder.Span contextBuild = rec.only(AiSpans.RAG_CONTEXT_BUILD);
         assertThat(contextBuild.attr(AiSpans.KEY_RAG_RESULT_COUNT)).isEqualTo("2");
@@ -226,8 +230,13 @@ class AiSpanTreeTest {
         assertThat(extract.attr(AiSpans.KEY_ATTEMPT))
                 .as("抽取 Span 必须带 attempt（重试时它才是分辨第几次的那把钥匙）")
                 .isEqualTo("1");
-        assertThat(rec.only(AiSpans.FEE_CALCULATE).attr(AiSpans.KEY_RAG_RESULT))
-                .isEqualTo(AiSpans.VALUE_RESULT_HIT);
+        Recorder.Span fee = rec.only(AiSpans.FEE_CALCULATE);
+        assertThat(fee.attrs)
+                .as("费用 Span **刻意不挂** ai.rag.result（C-59，2026-09-22 裁示删除）："
+                        + "引擎失败是抛异常、不是返回 null ⇒ 该键恒为 hit，是噪声。"
+                        + "⚠️ 断言「不含某键」之前必须先用 only(...) 证明这个 Span 真的跑到了，"
+                        + "否则「键不存在」可能只是环节没执行，那样这条断言是假通过")
+                .doesNotContainKey(AiSpans.KEY_RAG_RESULT);
 
         Recorder.Span generate = rec.only(AiSpans.LLM_GENERATE);
         assertThat(generate.attr(AiSpans.KEY_CONFIG_VERSION))
