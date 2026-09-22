@@ -252,8 +252,8 @@ L3 **1/20**、L6 **1/15**、L5 **2/20**。证据：失败项 `rawResponse` 长�
 #   item5/corpus0921-*.json             ← 四路消融的原始命中
 # 入库的评测资产在 docs/评测报告/*.json（可对外引用，可 diff）
 
-# 一键复现（零付费）
-pwsh -File backend\scripts\demo.ps1
+# 一键复现（零付费；⚠️ 用 powershell，本机没有 pwsh）
+powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1
 ```
 
 > ⚠️ **产物落库边界**：`docs/评测报告/**` 入库（可对外引用）｜`backend/target/eval/**` **不入库**

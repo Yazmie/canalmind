@@ -136,11 +136,19 @@ flowchart TB
 
 ```powershell
 # 默认零付费：环境 → 资产自检 → 路由 → 检索 → 分层通过率（全部本地计算）
-pwsh -File backend\scripts\demo.ps1
+powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1
 
 # 追加一次真实端到端问答（⚠️ 会调用付费模型）
-pwsh -File backend\scripts\demo.ps1 -IncludePaid
+powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1 -IncludePaid
+
+# 追加全量测试（离线，约 40 秒）
+powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1 -WithTests
 ```
+
+> ⚠️ **用 `powershell`（Windows PowerShell 5.1+），不要写 `pwsh`**：本机**没有安装 PowerShell 7**
+> （实测 `Get-Command pwsh` 为空），`pwsh -File …` 会直接报"不是内部或外部命令"。
+> 脚本本身在 **5.1 上实测跑通**（退出码 0）。
+> 这也是本仓库既有脚本的统一写法（如 `backend/scripts/verify_env.ps1`）。
 
 演示脚本**默认不产生任何付费调用**，逐段打印"这一步花了什么、结论是什么"。
 ⚠️ 长跑务必放后台任务，⛔ 别用会超时的前台调用（本项目多次因此丢过产物）。

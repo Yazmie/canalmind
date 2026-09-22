@@ -21,10 +21,10 @@
   跳过文档自检（链接/结构/编码）。
 
 .EXAMPLE
-  pwsh -File backend\scripts\demo.ps1
+  powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1
 
 .EXAMPLE
-  pwsh -File backend\scripts\demo.ps1 -IncludePaid
+  powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1 -IncludePaid
 #>
 [CmdletBinding()]
 param(
@@ -363,7 +363,7 @@ if ($IncludePaid) {
 } else {
     Write-Head -Title '真实端到端问答（已跳过）' -Cost '零付费'
     Write-Note '默认不调用付费模型。如需演示真实问答，请加 -IncludePaid：'
-    Write-Note '  pwsh -File backend\scripts\demo.ps1 -IncludePaid'
+    Write-Note '  powershell -ExecutionPolicy Bypass -File backend\scripts\demo.ps1 -IncludePaid'
 }
 
 # ---------------------------------------------------------------------------
