@@ -1,5 +1,6 @@
 package com.canalmind.observability;
 
+import com.canalmind.structured.StructuredQueryRepository;
 import io.micrometer.common.KeyValue;
 import io.micrometer.common.KeyValues;
 import io.micrometer.observation.Observation;
@@ -7,6 +8,7 @@ import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -236,6 +238,39 @@ class AiObservabilityTest {
         o.stop();
 
         assertNotNull(handler.errorOf(AiSpans.LLM_GENERATE), "错误必须挂在该 Span 上");
+    }
+
+    @Test
+    @DisplayName("★ 宿主层的真实异常原样上抛、且记在它自己的 Span 上（⛔ 埋点不得吞异常、不得改写异常）")
+    void hostLevelErrorPropagatesAndLandsOnItsOwnSpan() {
+        ObservationRegistry registry = ObservationRegistry.create();
+        Capturing handler = new Capturing();
+        registry.observationConfig().observationHandler(handler);
+
+        // ⚠️ 这里**故意用真实抛错的 JDBC**，而不是手工调 o.error(...) 造一个错误态：
+        //    上面 errorIsRecorded 验的是"闸门会把 error 记下来"，这一条验的是**宿主那一层**
+        //    ——异常能否穿过 observe(...) 传到调用者手里、同时被记在正确的 Span 上。
+        //    ⛔ 宿主若在 lambda **内部** try/catch 把异常吃掉，业务行为就从"抛"变成"返回值或
+        //    默认值"，而上层（与既有测试）会静默看到另一个结果。
+        JdbcTemplate failing = new JdbcTemplate() {
+            @Override
+            public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
+                throw new IllegalStateException("模拟数据库连接中断");
+            }
+        };
+        StructuredQueryRepository repository = new StructuredQueryRepository(failing, registry);
+
+        IllegalStateException thrown =
+                assertThrows(IllegalStateException.class, repository::waybillCountInWindow);
+
+        // ⚠️ 先断言"这个 Span 真的起过"：否则下面那条 errorOf 断言若因别的原因为空，
+        //    测试会以"没有 Span"的姿态通过，看起来却像验过了错误态。
+        assertTrue(handler.startedNames.contains(AiSpans.DB_SQL_EXECUTE),
+                "db.sql.execute 必须真的启动过，否则本测试什么都没验到");
+        assertEquals("模拟数据库连接中断", thrown.getMessage(),
+                "⛔ 埋点不得吞掉或改写业务异常——否则埋点前后的对外行为不一致");
+        assertNotNull(handler.errorOf(AiSpans.DB_SQL_EXECUTE),
+                "宿主层的异常必须记在 db.sql.execute 上，否则「这一步失败了」在 Trace 上查不到");
     }
 
     // ==================== 四、NOOP 安全：没有观测环境时埋点不能改变行为 ====================
