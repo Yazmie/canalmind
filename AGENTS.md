@@ -200,14 +200,14 @@ canalmind/                          ← git 仓库根（main 分支）
 | D4 | **Rerank 方案** | 专用 Reranker / LLM Rerank | `RAG 优化` 第 184 行 | ✅ 已确认 → **C-27**（LLM Rerank + 可插拔 `Reranker` 接口） |
 | D5 | **向量索引算法** | HNSW / IVFFLAT | `RAG 向量索引算法和向量数据库` 第 111、171 行 | ✅ 已确认 → **C-23**（HNSW；须 `EXPLAIN ANALYZE` 验证命中） |
 | D6 | **向量库选型** | PgVector / Milvus / Qdrant / Weaviate / Elasticsearch | 同上 第 244–247 行 | 待决 |
-| D7 | **路由策略演进** | 固定规则 / 级联路由 / 语义-分类路由 / 学习型 / 个性化 / Agentic | `大模型网关详解` 第 334 行 | 待决 |
+| D7 | **路由策略演进** | 固定规则 / 级联路由 / 语义-分类路由 / 学习型 / 个性化 / Agentic | `大模型网关详解` 第 334 行 | ✅ 已确认 → **C-37**（2026-09-22：级联路由 + 分类器兜底 + 复合意图拆步；学习型 / 个性化 / Agentic **登记为不做**，前置条件不具备） |
 | D8 | **检索类查询改写策略** | 多种 Query Rewrite 策略 | `RAG 优化` 第 137 行 | 待决 |
 | D9 | **是否上 GraphRAG** | 向量 RAG(+混合检索+rerank) vs 图结构 | `GraphRAG` 第 89、230–232 行 | 待决 |
 | D10 | **上下文超限处理** | 滑动窗口 / Compaction 摘要压缩 / 结构化笔记 | `上下文工程` 第 172 行 | 待决 |
 | D11 | **Schema 约束强度** | JSON Mode / JSON Schema / Structured Outputs | `大模型结构化输出` 第 105 行 | ✅ 已确认 → **C-32**（JSON Mode + 服务端 JSON Schema 校验 + 错误反馈重试 ≤2 + 降级；⛔ DeepSeek 无严格模式，**不得声称"已用 Structured Outputs"**） |
 | D12 | **结构化查询形态** | 契约化受控工具集 / 模型自生成 SQL | 规格书 §0.3（两阶段设计） | ✅ 已确认 → **C-33**（阶段一：受控工具集 3–5 个 + JSON Schema，**金额由纯代码算**；阶段二本轮不做） |
 | D13 | **评测样本规模与分层** | 知识库明示"没有固定答案"，需按风险与方差反推 | `AI 应用评测体系` 第 92–100 行 | ✅ 已确认 → **C-28**（L2 层：chunk 级人工标注 + 纯规则指标 `Recall@k`/`HitRate@k`/`MRR`/`Precision@k`；双维度分层；**保留集 8 条**；模板骨架 + LLM 改写 + 人工审核） |
-| D14 | **Judge 用法** | 规则评测 / LLM-as-Judge / Reference-guided Judge | 同上 第 120、196–198 行 | 待决 |
+| D14 | **Judge 用法** | 规则评测 / LLM-as-Judge / Reference-guided Judge | 同上 第 120、196–198 行 | ✅ 已确认 → **C-39**（2026-09-22：**按层分配判分器，⛔ 不搞"全覆盖"**；L1 = DB 执行结果 oracle、L2 = 纯规则检索指标、L4 = 规则判据；**仅 L3/L5/L6 用 Reference-guided**） |
 | D15 | **观测平台选型** | 通用 APM / LLM Trace 平台 / 自建 OTLP 后端 | `AI 可观测性与 Trace` 第 488–497 行 | 待决 |
 | D16 | **缓存策略** | 普通缓存 / 语义缓存（键隔离要求） | `大模型网关详解` 第 300–312 行 | 待决 |
 
