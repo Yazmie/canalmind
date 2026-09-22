@@ -6,7 +6,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-green)]()
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4%20%2B%20pgvector%200.8.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-583%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-603%20passing-brightgreen)]()
 
 ---
 
@@ -201,7 +201,7 @@ mvn -o -s ..\.proto\settings.xml -gs ..\.proto\settings.xml `
   "-DargLine=-javaagent:.m2repo\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar" test
 ```
 
-**实测 `Tests run: 583, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
+**实测 `Tests run: 603, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
 ⚠️ 这个数字**跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
 本项目实测撞到过"源码编译不过而构建仍绿"，见 `docs/工程复盘/工程方法/编译错误被静默放过/README.md`）。
 
@@ -275,6 +275,8 @@ canalmind/
 | 13 | **规格书 §7.2 的 Span 树，比"默认运行实际会产生什么"大**：默认装配里是 `RetrievalConfig.defaults().withoutRerank()` + **只挂向量通道**（混合检索按 **C-30** 未启用）+ `new NoopReranker()`，且**没有 Query Rewrite 环节**（改写只存在于**离线消融实验** `QueryRewriteCli`）⇒ **默认运行的 Trace 里不会出现 `db.bm25.search` / `ai.rag.rerank` / `ai.rag.rewrite`**。⛔ **别把"Trace 里没有这个节点"当成埋点没生效**——那三个节点有宿主、只是默认路径不走它们；`ai.output.validate` 则是真的没埋（见第 11 条） | 锚点：`QuestionPipeline.create` 的装配代码（⛔ 不引行号：该文件在改）；`AiSpans` 各类 javadoc |
 
 | 14 | **自写导出器（C-54）不是 OTLP 导出器**——规格书第 661 行要的是 **OTLP + 8 个集成测试场景**，那一项**未完成**，⛔ 不得勾选。而且它连父子靠「**父名 + 时间包含 + 取最内层**」，**不是对象身份**：实测（`javap`）`Observation.Context.getParentObservation()` 返回的只是 `ObservationView`（**拿不到父的 `Context`**）⇒ 同名且**时间上重叠**的并行兄弟会连错（本项目编排串行，实测导出树与 §7.2 一致）；连不上的 Span **不猜**，如实写 `parentMissing` 并计数。时长用 `nanoTime`（毫秒分辨率下嵌套 Span 常落在同一毫秒，会连错父）；只 start 没 stop 的 Span 导成 `durationMillis: null`（⛔ 不写 0） | `SpanTreeExporter` 的 javadoc；`SpanTreeExporterTest`（9 例）；`docs/进度看板.md` §0.4.5 |
+
+| 15 | **限流/退避/降级（C-58）只包住"最终作答"这一次调用**：重排与结构化抽取路径**未接**守卫。⚠️ **知识库第 55 行要求的"每次重试新建 Span"未做**——重试次数只在退避告警行与降级 Span 上可见，**没有逐次重试的子 Span**。⚠️ **TPM / Token 预算 / 熔断未做**（知识库第 442、459 行要求"不能只按 QPS 看"，本轮只落了 **RPM + 并发**两维）。⚠️ 作答/评测路径**刻意"不降级成话术、直接抛错"**（只把原因写进 Span），因为把"系统繁忙"当答案写进评测会被判分器记成"模型答错"、归因全错——降级成提示语那条路留给将来的在线服务路径 | `LlmCallGuard` 的 javadoc；`LlmCallGuardTest`（17 例）；`AnswerComposerGuardWiringTest`（3 例）；`docs/进度看板.md` §0.4.6 |
 
 ### 已知建模缺口（记录而非隐藏）
 
