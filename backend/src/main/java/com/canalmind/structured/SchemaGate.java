@@ -87,6 +87,8 @@ public final class SchemaGate {
     public List<String> validateEnvelope(JsonNode node) {
         Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_VALIDATE, observationRegistry);
         return observation.observe(() -> {
+            AiObservation.lowCardinality(observation, AiSpans.KEY_TOOL_VALIDATE_STAGE,
+                    AiSpans.VALUE_VALIDATE_STAGE_ENVELOPE);
             List<String> errors = validate(envelopeSchema, node);
             AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
                     Integer.toString(errors.size()));
@@ -102,10 +104,14 @@ public final class SchemaGate {
      * envelope 校的是"模型输出的整体形状"，arguments 校的是"所选工具的每个参数"。
      * 合并成一个 Span 会让"错在信封还是错在参数"在 Trace 上分不出来，
      * 而这两者的处置不同（前者多半要改提示词，后者多半是模型没看懂某个参数的契约）。
+     * ⇒ 两次校验各自上报 <b>{@link AiSpans#KEY_TOOL_VALIDATE_STAGE}</b> 加以区分——
+     * 既保留规格书的节点名，又不让两个同名节点变成无法区分的一份数据。
      */
     public List<String> validateArguments(String tool, JsonNode arguments) {
         Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_VALIDATE, observationRegistry);
         return observation.observe(() -> {
+            AiObservation.lowCardinality(observation, AiSpans.KEY_TOOL_VALIDATE_STAGE,
+                    AiSpans.VALUE_VALIDATE_STAGE_ARGUMENTS);
             Schema s = toolSchemas.get(tool);
             List<String> errors = s == null ? List.of("未知工具：" + tool) : validate(s, arguments);
             AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,

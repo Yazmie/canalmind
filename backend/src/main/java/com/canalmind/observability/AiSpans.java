@@ -168,6 +168,28 @@ public final class AiSpans {
      */
     public static final String KEY_RAG_FALLBACK = "ai.rag.fallback";
 
+    /**
+     * {@code ai.tool.param.validate} 这**一次**校的是哪一步（封闭枚举：{@code envelope} / {@code arguments}）。
+     *
+     * <p><b>为什么需要它</b>：该 Span 在**一次抽取尝试里会出现两次**——先校模型回包的
+     * <b>JSON 外壳</b>（是不是合法 JSON、字段齐不齐），再校<b>所选工具的实参</b>
+     * （必填项、类型、取值域）。两处都按规格书 §7.2 的**同一个名字**上报，
+     * 于是在 Trace 上就是**两个同名兄弟节点**：Span 一条不少、名字也全对，
+     * 但读者分不清哪一条对应哪一种失败。
+     *
+     * <p>而这两种失败的<b>补救方式不同</b>：外壳不合法要多半改提示词（模型没按格式答），
+     * 实参不合法要带着错误信息重试抽取（模型看错了某个参数的契约）。
+     * ⇒ 本键只做一件事：**在不偏离规格书节点名的前提下，让两个节点可区分**。
+     *
+     * <p>⚠️ 取值只有两个字面量（见 {@code SchemaGate} 的两处调用），⛔ 不写工具名等开放取值。
+     */
+    public static final String KEY_TOOL_VALIDATE_STAGE = "ai.tool.param.validate.stage";
+
+    /** {@link #KEY_TOOL_VALIDATE_STAGE} 的取值：校验模型回包的 JSON 外壳。 */
+    public static final String VALUE_VALIDATE_STAGE_ENVELOPE = "envelope";
+    /** {@link #KEY_TOOL_VALIDATE_STAGE} 的取值：校验所选工具的实参。 */
+    public static final String VALUE_VALIDATE_STAGE_ARGUMENTS = "arguments";
+
     /** {@link #KEY_RAG_RESULT} 的取值：命中。 */
     public static final String VALUE_RESULT_HIT = "hit";
     /** {@link #KEY_RAG_RESULT} 的取值：空召回。 */
@@ -176,7 +198,7 @@ public final class AiSpans {
     /** 低基数键全集——供测试断言"没有高基数的东西混进来"。 */
     public static final java.util.Set<String> LOW_CARDINALITY_KEYS =
             java.util.Set.of(KEY_RAG_STRATEGY, KEY_RAG_RESULT, KEY_INTENT_TYPE,
-                    KEY_RAG_RERANK_CHANGED, KEY_RAG_FALLBACK);
+                    KEY_RAG_RERANK_CHANGED, KEY_RAG_FALLBACK, KEY_TOOL_VALIDATE_STAGE);
 
     // ==================== 高基数属性键（只进 Trace） ====================
 

@@ -168,6 +168,14 @@ class AiSpanTreeTest {
                     .as("校验 Span 要记错误条数（0 = 这次抽出来的参数合规）")
                     .isEqualTo("0");
         }
+        // ⚠️ 两个 Span **同名**，所以光数"有 2 个"并不能说明它们是两件不同的事：
+        //    必须再断言它们的 stage 不同，否则读者看到的是"两个无法区分的同名节点"。
+        assertThat(rec.all(AiSpans.TOOL_PARAM_VALIDATE))
+                .extracting((Recorder.Span v) -> v.attr(AiSpans.KEY_TOOL_VALIDATE_STAGE))
+                .as("envelope 与 arguments 两次校验必须**各自上报自己的 stage**——"
+                        + "否则两个同名兄弟节点在 Trace 上分不出哪一条对应哪种补救")
+                .containsExactlyInAnyOrder(AiSpans.VALUE_VALIDATE_STAGE_ENVELOPE,
+                        AiSpans.VALUE_VALIDATE_STAGE_ARGUMENTS);
 
         // ── ④'' 检索内部三个兄弟节点：通道召回 / 融合 / 裁剪都挂在同一层 ──
         for (String child : List.of(AiSpans.DB_VECTOR_SEARCH, AiSpans.RAG_HYBRID,
