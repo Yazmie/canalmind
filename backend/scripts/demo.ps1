@@ -332,9 +332,11 @@ try {
 Write-Head -Title '分层通过率（数据取自库内 eval_record，不是内存变量）' -Cost '零付费'
 Push-Location $BackendDir
 try {
-    $RunId = if ($env:CANALMIND_DEMO_RUN_ID) { $env:CANALMIND_DEMO_RUN_ID } else { 'w4-2026-09-22-all6-artifacts-v2' }
+    $RunId = if ($env:CANALMIND_DEMO_RUN_ID) { $env:CANALMIND_DEMO_RUN_ID } else { 'w4-2026-09-22-all6-artifacts-v3' }
     Write-Note "run_id = $RunId"
-    Write-Note '⚠️ 该 run 覆盖 L1/L2/L3/L5/L6 五层（L4 由规则判分，不在这个 run 的落库范围内）。'
+    Write-Note '该 run 覆盖六层（含 L4：由规则判分、逐题落库）。'
+    Write-Note '另有旧 run w4-2026-09-22-all6-artifacts-v2 = 135 条 / 五层（名字里的 all6 名不副实：无 L4）；'
+    Write-Note '要对比它，用环境变量 CANALMIND_DEMO_RUN_ID 覆盖即可。'
     Invoke-Java -Display "HarnessCli --report --run-id $RunId" `
         -MainClass 'com.canalmind.eval.harness.HarnessCli' `
         -MainArgs @('--report', '--run-id', $RunId) | Out-Null
