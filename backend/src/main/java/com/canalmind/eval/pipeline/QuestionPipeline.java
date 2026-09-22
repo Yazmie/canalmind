@@ -165,7 +165,40 @@ public final class QuestionPipeline {
                                           ChatModel chatModel, String businessToday, String layer,
                                           ObservationRegistry observationRegistry)
             throws EmbeddingModelGuard.EmbeddingModelMismatchException {
+        // ⚠️ 单档装配（**C-56 之前的既有行为，一字不改**）：路由/抽取与最终生成共用同一个模型。
+        //    两档装配走下面那个带 answerChatModel 的重载。
+        return create(jdbc, env, chatModel, chatModel, businessToday, layer, observationRegistry);
+    }
+
+    /**
+     * **两档装配**（**C-56**）：路由/抽取用小档、最终生成用强档，注册表按 C-54 的开关自动决定。
+     */
+    public static QuestionPipeline create(JdbcTemplate jdbc, Map<String, String> env,
+                                          ChatModel routeChatModel, ChatModel answerChatModel,
+                                          String businessToday, String layer)
+            throws EmbeddingModelGuard.EmbeddingModelMismatchException {
+        return create(jdbc, env, routeChatModel, answerChatModel, businessToday, layer,
+                SpanTreeExporter.attachIfEnabled(ObservationRegistry.create()));
+    }
+
+    /**
+     * **两档装配** + 显式注册表（**C-56**，规格书第 662 行：小模型做路由/改写、大模型做生成）。
+     *
+     * <p>⚠️ 只把**最终生成**换成强档，路由 / 参数抽取 / 查询改写**刻意不动**：
+     * 那些环节是"检索与判据口径"的一部分，换了会让本轮的分层数字与既有基线不可比
+     * （本项目纪律：每轮只改少量变量）。实测两档模型分别为 {@code deepseek-v4-flash}（小档）
+     * 与 {@code deepseek-v4-pro}（强档）。
+     *
+     * @param routeChatModel  路由 + 参数抽取用的模型（小档）
+     * @param answerChatModel 最终生成用的模型（强档）
+     */
+    public static QuestionPipeline create(JdbcTemplate jdbc, Map<String, String> env,
+                                          ChatModel routeChatModel, ChatModel answerChatModel,
+                                          String businessToday, String layer,
+                                          ObservationRegistry observationRegistry)
+            throws EmbeddingModelGuard.EmbeddingModelMismatchException {
         Objects.requireNonNull(observationRegistry, "observationRegistry");
+        Objects.requireNonNull(answerChatModel, "answerChatModel");
         // ── 检索通道：档案名从库里探，探不到就报错（⛔ 不猜、不降级）──
         String vectorProfile = new RagChunkRepository(jdbc).selectProfileName();
         if (vectorProfile == null) {
@@ -185,7 +218,7 @@ public final class QuestionPipeline {
         // 抽取器与路由分类器**共用一个 invoker**：它们调的是同一个模型，
         // 各自再造一个只会让用法与重试预算分叉。
         ToolCatalog catalog = ToolCatalog.loadDefault();
-        DeepSeekJsonInvoker invoker = new DeepSeekJsonInvoker(chatModel, 2048, observationRegistry);
+        DeepSeekJsonInvoker invoker = new DeepSeekJsonInvoker(routeChatModel, 2048, observationRegistry);
         ToolArgumentExtractor extractor = new ToolArgumentExtractor(catalog,
                 SchemaGate.of(catalog, observationRegistry), invoker,
                 ToolArgumentExtractor.DEFAULT_MAX_RETRIES, businessToday, observationRegistry);
@@ -195,7 +228,7 @@ public final class QuestionPipeline {
                 new FeeCalculationEngine(observationRegistry), businessToday, observationRegistry);
 
         return new QuestionPipeline(jdbc, new IntentRouter(invoker, observationRegistry), service,
-                pipeline, new AnswerComposer(chatModel, layer, env, observationRegistry),
+                pipeline, new AnswerComposer(answerChatModel, layer, env, observationRegistry),
                 observationRegistry);
     }
 

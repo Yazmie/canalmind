@@ -82,6 +82,22 @@ public final class LlmRerankerFactory {
     public static final String DEFAULT_MODEL = "deepseek-chat";
 
     /**
+     * **强档**模型名（**C-56**）：最终生成用它，路由/改写/参数抽取仍用小档。
+     * 规格书第 662 行的分工就是"小模型做路由改写、大模型做生成"。
+     *
+     * <p>⚠️ **实测值**（2026-09-22，本项目中继 {@code DEEPSEEK_BASE_URL=https://fastmodel.top/v1}，
+     * 6 次极短调用）：{@code deepseek-v4-pro} **3/3 成功**、响应**回显** {@code deepseek-v4-pro}
+     * （未被中继静默回落成别的模型）、2.8–3.9 s、约 200 token；
+     * 而字面量 {@code deepseek-chat} **3/3 返回 HTTP 503**（该中继不提供它）。
+     * 本机 {@code .env} 的小档是 {@code deepseek-v4-flash} ⇒ 两档同族。
+     * 原始记录：{@code backend/target/probe/strong-model.txt}（构建产物目录，不入 git）。
+     */
+    public static final String DEFAULT_ANSWER_MODEL = "deepseek-v4-pro";
+
+    /** 强档模型名的环境变量键；**置空 ⇒ 一键回退到小档**（⛔ 不需要改代码）。 */
+    public static final String ANSWER_MODEL_ENV = "DEEPSEEK_ANSWER_MODEL";
+
+    /**
      * 覆盖<b>重排侧</b>输出额度的环境变量（⛔ 只影响重排，不动主对话那条链路）。
      *
      * <p>刻意做成环境变量而不是命令行参数：{@code maxTokens} 是<b>实验条件</b>，
@@ -156,6 +172,37 @@ public final class LlmRerankerFactory {
         String baseUrl = value(env, "DEEPSEEK_BASE_URL", DEFAULT_BASE_URL);
         String model = value(env, "DEEPSEEK_CHAT_MODEL", DEFAULT_MODEL);
         return deepSeekChatModel(apiKey, baseUrl, model, maxTokens);
+    }
+
+    /**
+     * 强档模型名（**C-56**，见 {@link #DEFAULT_ANSWER_MODEL} 的实测记录）。
+     *
+     * <p>⚠️ **留空即回退**：{@code DEEPSEEK_ANSWER_MODEL=}（空串）或显式写成空白 ⇒
+     * 返回 {@code DEEPSEEK_CHAT_MODEL}（小档）⇒ 一键退回"两档合一"的既有行为。
+     * 这样"换个模型"这件事不需要改代码、也不需要重新构建。
+     */
+    public static String answerModel(Map<String, String> env) {
+        // ⚠️ 必须**先看原始值**再走 value(...)：value() 会把"空串/空白"折叠成 fallback，
+        //    于是"键存在但显式置空 ⇒ 回退小档"这条语义会被它吃掉（本实现第一版就是这么错的，
+        //    被 AnswerModelTierTest 当场抓到）。两种"没给强档"要分开：
+        //    ①键**不存在** ⇒ 用默认强档（配置漏了就按裁示用强档）；
+        //    ②键存在但**空白** ⇒ 回退小档（运维的一键回退开关）。
+        String raw = env == null ? null : env.get(ANSWER_MODEL_ENV);
+        if (raw != null && raw.isBlank()) {
+            return value(env, "DEEPSEEK_CHAT_MODEL", DEFAULT_MODEL);
+        }
+        return value(env, ANSWER_MODEL_ENV, DEFAULT_ANSWER_MODEL);
+    }
+
+    /**
+     * 最终生成用的**强档** {@code ChatModel}（**C-56**）。
+     * ⚠️ 只给最终生成用；路由 / 查询改写 / 参数抽取一律继续用
+     * {@link #chatModelFromEnvironment}（小档），这才是规格书第 662 行的分工。
+     */
+    public static DeepSeekChatModel answerModelFromEnvironment(Map<String, String> env, int maxTokens) {
+        String apiKey = requireApiKey(env);
+        String baseUrl = value(env, "DEEPSEEK_BASE_URL", DEFAULT_BASE_URL);
+        return deepSeekChatModel(apiKey, baseUrl, answerModel(env), maxTokens);
     }
 
     /**

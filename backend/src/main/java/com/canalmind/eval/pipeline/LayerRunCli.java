@@ -167,8 +167,13 @@ public final class LayerRunCli {
         System.out.println("问句：" + item.question());
 
         ChatModel chatModel = LlmRerankerFactory.chatModelFromEnvironment(env, ANSWER_MAX_TOKENS);
-        QuestionPipeline pipeline = QuestionPipeline.create(jdbc, env, chatModel, BUSINESS_TODAY,
-                item.layer());
+        // C-56：最终生成换强档（路由/抽取仍是上面那个小档）
+        ChatModel answerModel = LlmRerankerFactory.answerModelFromEnvironment(env, ANSWER_MAX_TOKENS);
+        System.out.println("模型        ：强档=" + LlmRerankerFactory.answerModel(env)
+                + "（键 " + LlmRerankerFactory.ANSWER_MODEL_ENV + "，置空即回落小档）"
+                + "｜小档见 DEEPSEEK_CHAT_MODEL");
+        QuestionPipeline pipeline = QuestionPipeline.create(jdbc, env, chatModel, answerModel,
+                BUSINESS_TODAY, item.layer());
 
         long t0 = System.currentTimeMillis();
         QuestionPipeline.Answer a = pipeline.run(item.question());
@@ -208,8 +213,11 @@ public final class LayerRunCli {
 
         ChatModel chatModel = routeOnly ? null
                 : LlmRerankerFactory.chatModelFromEnvironment(env, ANSWER_MAX_TOKENS);
+        // C-56：最终生成用强档；route-only 模式下两者都为 null（零付费）
+        ChatModel answerModel = routeOnly ? null
+                : LlmRerankerFactory.answerModelFromEnvironment(env, ANSWER_MAX_TOKENS);
         QuestionPipeline pipeline = routeOnly ? null
-                : QuestionPipeline.create(jdbc, env, chatModel, BUSINESS_TODAY, layer);
+                : QuestionPipeline.create(jdbc, env, chatModel, answerModel, BUSINESS_TODAY, layer);
         // route-only 也要真路由，故单独装一个路由器（零付费：rulesOnly）
         var router = com.canalmind.intent.IntentRouter.rulesOnly();
 

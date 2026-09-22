@@ -111,7 +111,10 @@ public final class L4RunCli {
                     List.of(Path.of(".env"), Path.of("../.env")));
             JdbcTemplate jdbc = new JdbcTemplate(HarnessCli.dataSource(env));
             ChatModel chatModel = LlmRerankerFactory.chatModelFromEnvironment(env, 2048);
-            QuestionPipeline pipeline = QuestionPipeline.create(jdbc, env, chatModel, BUSINESS_TODAY);
+            // C-56：最终生成换强档（L4 的路由/参数抽取仍用小档）
+            ChatModel answerModel = LlmRerankerFactory.answerModelFromEnvironment(env, 2048);
+            QuestionPipeline pipeline = QuestionPipeline.create(jdbc, env, chatModel, answerModel,
+                    BUSINESS_TODAY, (String) null);   // L4 不用 v2 提示词 ⇒ 层名照旧传 null
             StructuredQueryService service = pipeline.structured();
 
             Path dataset = HarnessCli.resolve("docs/评测报告/" + DATASET);
