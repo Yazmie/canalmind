@@ -26,10 +26,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * 评测 Harness 命令行（第 4 周第 4 项）。
  *
  * <pre>
- *   --ingest --run-id &lt;id&gt;     把 L1 / L2 已有产物读成 eval_record 行
+ *   --ingest --run-id &lt;id&gt;     把**六层**已有产物读成 eval_record 行（C-52 补 L3/L5/L6，C-53b 补 L4）
  *       [--l1 &lt;path&gt;]           默认 docs/评测报告/execution-accuracy-l1.json
  *       [--l2-hits &lt;path&gt;]      默认 backend/target/eval/vector-l2-v2-hits.json
  *       [--l2-golden &lt;path&gt;]    默认 docs/评测报告/golden-l2-v2.json
+ *       [--l4 &lt;path&gt;]           L4 多轮参数继承产物（默认 docs/评测报告/layer-L4-inheritance-v1.json）
+ *       [--l3-judged …]          Judge 三层产物（默认 docs/评测报告/layer-L{3,5,6}-judged-v1.json）
+ *       [--judge-golden &lt;path&gt;] Judge 三层与 L4 共用的数据集（用于**反证**题号）
  *       [--primary-k 5]         L2 主判据的 k（其余 k 全部落进 scores，换 k 不必重跑）
  *       [--write]               ⛔ 不加则只空跑，不写库
  *       [--json &lt;path&gt;]        机读产物（LF、键排序、无时间戳）
@@ -66,6 +69,16 @@ public final class HarnessCli {
     /** C-52：三层题号所在的数据集——落库时用它**反证**题号，并作为 `dataset_version`。 */
     private static final String DEFAULT_JUDGE_GOLDEN = "docs/评测报告/golden-set-v3.json";
 
+    /**
+     * C-53b：L4（多轮参数继承）产物默认路径。
+     *
+     * <p>⚠️ 补它的原因值得写在代码里：在此之前的落库只有 L1/L2/L3/L5/L6 五层，
+     * 而文档多处写着「**六层全部在库**」——**这句话当时是假的**。
+     * L4 的分数只存在于 docs 侧产物，`eval_record` 里一条都没有。
+     * 补上之后，"六层全部在库"才是可被 SQL 验证的事实，而不是一句汇总。
+     */
+    private static final String DEFAULT_L4 = "docs/评测报告/layer-L4-inheritance-v1.json";
+
     private HarnessCli() {
     }
 
@@ -88,6 +101,7 @@ public final class HarnessCli {
         String l2Golden = null;
         java.util.List<String> judgeJudged = new java.util.ArrayList<>();
         String judgeGoldenPath = null;
+        String l4Path = null;
         String jsonOut = null;
         String gitCommit = null;
         int primaryK = 5;
@@ -109,6 +123,8 @@ public final class HarnessCli {
                 // C-52：Judge 类三层（L3/L5/L6）的 judged 产物，可重复给（顺序即入库顺序）
                 case "--l3-judged", "--l5-judged", "--l6-judged" -> judgeJudged.add(args[++i]);
                 case "--judge-golden" -> judgeGoldenPath = args[++i];
+                // C-53b：L4（多轮参数继承）产物——规则判分，⛔ 不调用任何付费 API
+                case "--l4" -> l4Path = args[++i];
                 case "--primary-k" -> primaryK = Integer.parseInt(args[++i]);
                 case "--json" -> jsonOut = Path.of(args[++i]).toString();
                 case "--git-commit" -> gitCommit = args[++i];
@@ -154,6 +170,7 @@ public final class HarnessCli {
                     resolve(l1 == null ? DEFAULT_L1 : l1),
                     resolve(l2Hits == null ? DEFAULT_L2_HITS : l2Hits),
                     resolve(l2Golden == null ? DEFAULT_L2_GOLDEN : l2Golden),
+                    resolve(l4Path == null ? DEFAULT_L4 : l4Path),
                     judgePaths, judgeGolden, write, jsonOut);
         }
         printUsage();
@@ -162,7 +179,8 @@ public final class HarnessCli {
 
     // ------------------------------------------------------------------ ingest
     private static int ingest(EvalRecordWriter writer, String runId, String gitCommit, int primaryK,
-                              Path l1, Path l2Hits, Path l2Golden, java.util.List<String> judgeJudged,
+                              Path l1, Path l2Hits, Path l2Golden, Path l4,
+                              java.util.List<String> judgeJudged,
                               Path judgeGolden, boolean write, String jsonOut)
             throws IOException {
         List<EvalRecordRow> rows = new ArrayList<>();
@@ -175,6 +193,15 @@ public final class HarnessCli {
             rows.addAll(ArtifactIngest.readL2(l2Hits, l2Golden, runId, gitCommit, primaryK));
         } else {
             System.out.println("⚠️ 跳过 L2：命中文件或数据集不存在（" + l2Hits + " / " + l2Golden + "）");
+        }
+        // C-53b：L4（规则判分）。⚠️ 它用**自己声明的**数据集反证题号，
+        // 而 L4 数据集与 Judge 三层同为一个文件（golden-set-v3.json）——故共用 judgeGolden。
+        if (Files.exists(l4)) {
+            List<EvalRecordRow> rs = ArtifactIngest.readL4(l4, judgeGolden, runId, gitCommit);
+            rows.addAll(rs);
+            System.out.println("  " + l4.getFileName() + " → " + rs.size() + " 条（L4，judge_kind=rule）");
+        } else {
+            System.out.println("⚠️ 跳过 L4：产物不存在 " + l4);
         }
         // C-52：Judge 类三层（L3 / L5 / L6）。⛔ 缺失即显式跳过，不静默少算分母。
         for (String p : judgeJudged) {
@@ -197,6 +224,7 @@ public final class HarnessCli {
         System.out.println("本次将写入 " + rows.size() + " 条记录（layer/split 分布如下）：");
         System.out.println("  " + distribution(rows));
         System.out.println("判分方式：L1 = oracle（数据库逐格）、L2 = rule（纯规则指标）、"
+                + "L4 = rule（工具 + 实参逐键比对）、"
                 + "L3/L5/L6 = reference_guided（LLM Judge，读既有 judged 产物，⛔ 不重新调用付费 API）");
 
         if (!write) {
@@ -489,10 +517,14 @@ public final class HarnessCli {
     private static void printUsage() {
         System.out.println("评测 Harness CLI（第 4 周第 4 项）");
         System.out.println("  --selftest                 对真实库做写入→读回→唯一约束→清理 往返自检");
-        System.out.println("  --ingest --run-id <id>     把 L1/L2 已有产物读成 eval_record 行（默认空跑）");
+        System.out.println("  --ingest --run-id <id>     把六层已有产物读成 eval_record 行（默认空跑）");
         System.out.println("  --write                    真正写库（⛔ 不加则只空跑）");
         System.out.println("  --report --run-id <id>     读库汇总分层通过率");
         System.out.println("  --l1 / --l2-hits / --l2-golden / --primary-k / --json / --git-commit");
         System.out.println("  --l3-judged / --l5-judged / --l6-judged   Judge 三层产物（C-52；不给则用默认路径）");
+        System.out.println("  --l4 <path>                L4 多轮参数继承产物（C-53b；规则判分、零付费，默认 "
+                + DEFAULT_L4 + "）");
+        System.out.println("  --judge-golden <path>      Judge 三层与 L4 题号所在的数据集（⛔ 用它反证题号，"
+                + "拿错版本会当场报错）");
     }
 }

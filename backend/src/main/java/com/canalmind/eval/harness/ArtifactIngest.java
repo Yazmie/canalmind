@@ -277,6 +277,289 @@ public final class ArtifactIngest {
         return rows;
     }
 
+    // ------------------------------------------------------------------ L4（规则判分、零付费）
+    /** L4 只有这一层名；⛔ 不接受别的层（与 `JUDGE_LAYERS` 同一条纪律）。 */
+    private static final String L4_LAYER = "L4";
+
+    /**
+     * L4 层：读 {@code layer-L4-inheritance-v1.json}（多轮参数继承，**规则判分**），**每题一条记录**。
+     *
+     * <p><b>为什么补这条通道</b>：第 4 周任务 4 是「完整评测 Harness + `EvalRecord` 落库」，
+     * 而 L4 的分数一直只存在于 docs 侧产物里 —— 于是《评测报告》§2 与看板 §0.3 都写着
+     * 「**六层全部在库**」，**而这在 `eval_record` 里从来不是真的**：
+     * run `w4-2026-09-22-all6-artifacts-v2` 实测只有 **5 层 135 条**（L1 40 / L2 40 / L3 20 / L5 20 / L6 15），
+     * **L4 一条都没有**。本方法把这句话变成可被 SQL 验证的事实。
+     *
+     * <p><b>⚠️ 为什么是"每题一条"而不是"每轮一条"</b>：DDL 的主口径是
+     * 「`SUCCESS` / 该层总题数」，L4 的主口径也是**整题 15/25**（逐轮 36/50 是次要口径）。
+     * 若按轮落库，同一句 SQL 会把 L4 算成 36/50，**与其他五层的分母口径不再可比**。
+     * ⇒ 轮级明细进 `scores`（`turnsPassed` / `turnsTotal` / `turnRate`）与 `judge_reasoning`，
+     * `turn_index` 留 NULL。⛔ 不写两遍（题级 + 轮级）——那会把通过率算重。
+     *
+     * <p><b>⚠️ 刻意留空并在此登记的四个字段</b>（产物里真的没有，⛔ 不编造）：
+     * <ul>
+     *   <li>{@code promptVersion} / {@code modelId}：产物**不记录** Prompt 版本与模型 id
+     *       （顶层键实测只有 layer/dataset/businessToday/…/bySplit）。</li>
+     *   <li>{@code sessionId}：产物不记会话 id。题级行本不需要它，但**C-38 想要的
+     *       "按会话+轮次定位"在 L4 这一层仍无法从产物还原** ⇒ 登记为缺口，⛔ 不用题号硬凑。</li>
+     *   <li>{@code actualOutput}：产物不含答案正文（只有工具与实参）。</li>
+     * </ul>
+     *
+     * <p><b>⚠️ `graderVersion` 的取法</b>：产物**没有**判分器版本号字段，
+     * 而 L4 的判分器就是"工具 + 实参逐键比对"这段代码。故这里用**产物的 sha256 短哈希**锚定
+     * （`rule-tool-args@&lt;short&gt;`）——它至少能回答"这条记录出自哪份产物"，
+     * 比填一个凭记忆的版本号诚实。⚠️ **该缺口已登记**：将来若重跑 L4，应在产物里加 `graderVersion`。
+     *
+     * <p><b>本方法只读既有产物</b>，⛔ 不重新调用任何付费 API（L4 判分本身零付费，
+     * 但**重跑作答**要 53 次模型调用）。
+     *
+     * @param artifact   {@code layer-L4-inheritance-v1.json}
+     * @param goldenFile L4 题号所在的数据集（用于**反证**题号 + 作为 `dataset_version`）
+     */
+    public static List<EvalRecordRow> readL4(Path artifact, Path goldenFile, String runId,
+                                             String gitCommit) throws IOException {
+        JsonNode root = read(artifact);
+        String layer = root.path("layer").asText("");
+        if (!L4_LAYER.equals(layer)) {
+            throw new IllegalArgumentException(
+                    "readL4 只处理 " + L4_LAYER + "，实际为「" + layer + "」：" + artifact);
+        }
+        JsonNode items = root.path("results");
+        if (!items.isArray() || items.isEmpty()) {
+            throw new IllegalStateException("results 数组为空或缺失，拒绝落库（分母为 0 比分子错更难发现）：" + artifact);
+        }
+
+        // ⚠️ 数据集必须**按产物自己声明的那一个**给进来：产物自带 `dataset` 字段，
+        //    若拿另一版数据集来"反证"，题号照样能找到、于是静默错配 ⇒ 这里直接比文件名。
+        String declaredDataset = root.path("dataset").asText("");
+        if (!declaredDataset.equals(goldenFile.getFileName().toString())) {
+            throw new IllegalStateException("产物声明的 dataset=「" + declaredDataset + "」，与传入的数据集「"
+                    + goldenFile.getFileName() + "」不一致（不同版数据集？）——⛔ 不静默落库");
+        }
+
+        // ---- 声明值 vs 逐条累加：四组都必须对上 ----
+        int declaredItemCount = root.path("itemCount").asInt(-1);
+        int declaredItemPass = root.path("itemPass").asInt(-1);
+        int declaredTurns = root.path("judgedCount").asInt(-1);
+        int declaredTurnPass = root.path("turnPass").asInt(-1);
+        int realItemPass = 0;
+        int realTurns = 0;
+        int realTurnPass = 0;
+        for (JsonNode it : items) {
+            if (it.path("itemPass").asBoolean(false)) {
+                realItemPass++;
+            }
+            // ⚠️ **题级**一致性检查放在这里（而不是循环之后）：否则注入一条
+            //    "turnsTotal 与 turns 条数不符"的坏产物时，会先撞上累计检查、
+            //    报出 `judgedCount` 这个**不相干的字段名**，排错方向被带偏。
+            int turnsTotal = it.path("turnsTotal").asInt(0);
+            int turnsReal = it.path("turns").size();
+            if (turnsTotal != turnsReal) {
+                throw new IllegalStateException("L4 题「" + it.path("taskId").asText() + "」turnsTotal="
+                        + turnsTotal + " 与 turns 实际条数=" + turnsReal + " 不一致——⛔ 不静默落库");
+            }
+            realTurns += turnsTotal;
+            realTurnPass += it.path("turnsPassed").asInt(0);
+        }
+        requireEqual("itemCount", declaredItemCount, items.size(), artifact);
+        requireEqual("itemPass", declaredItemPass, realItemPass, artifact);
+        requireEqual("judgedCount", declaredTurns, realTurns, artifact);
+        requireEqual("turnPass", declaredTurnPass, realTurnPass, artifact);
+
+        // `failed` 是产物自带的失败题号清单。它与逐条 `itemPass` 必须一致——
+        // 两处不一致时"哪些题没过"会有两个答案，而下游 badcase 聚类只读其中一个。
+        java.util.Set<String> declaredFailed = new java.util.LinkedHashSet<>();
+        for (JsonNode f : root.path("failed")) {
+            declaredFailed.add(f.asText());
+        }
+        java.util.Set<String> realFailed = new java.util.LinkedHashSet<>();
+        for (JsonNode it : items) {
+            if (!it.path("itemPass").asBoolean(false)) {
+                realFailed.add(it.path("taskId").asText());
+            }
+        }
+        if (!declaredFailed.equals(realFailed)) {
+            throw new IllegalStateException("产物 failed=" + declaredFailed
+                    + " 与逐条 itemPass=false 的题号=" + realFailed + " 不一致：" + artifact);
+        }
+
+        JsonNode goldenRoot = read(goldenFile);
+        Map<String, JsonNode> byId = new LinkedHashMap<>();
+        for (JsonNode it : goldenRoot.path("items")) {
+            byId.put(it.path("id").asText(), it);
+        }
+        String datasetVersion = shortVersion(sha256HexFile(goldenFile));
+        LocalDate taskAsOf = parseDateOrNull(root.path("businessToday").asText(null));
+        String graderVersion = "rule-tool-args@" + shortVersion(sha256HexFile(artifact));
+        String evidence = artifact.getFileName() + "@" + shortVersion(sha256HexFile(artifact))
+                + " ← L4RunCli（工具+实参逐键比对，规则判分、零付费）";
+
+        List<EvalRecordRow> rows = new ArrayList<>();
+        for (JsonNode it : items) {
+            String taskId = it.path("taskId").asText();
+            if (taskId.isBlank()) {
+                throw new IllegalStateException("results 条目缺 taskId：" + artifact);
+            }
+            JsonNode goldenItem = byId.get(taskId);
+            if (goldenItem == null) {
+                throw new IllegalStateException("L4 题号「" + taskId + "」在数据集 "
+                        + goldenFile.getFileName() + " 中找不到（数据集不同版？）——⛔ 不静默落库");
+            }
+            String question = goldenItem.path("question").asText(null);
+            // 题面逐字比对：题号对得上但题面变了，说明产物与数据集不是同一版
+            if (question == null || !question.equals(it.path("question").asText(""))) {
+                throw new IllegalStateException("L4 题「" + taskId + "」的题面与数据集不一致"
+                        + "（产物 ← 旧版数据集？）——⛔ 不静默落库");
+            }
+            String split = it.path("split").asText("dev");
+            String goldenSplit = goldenItem.path("split").asText("dev");
+            if (!split.equals(goldenSplit)) {
+                throw new IllegalStateException("L4 题「" + taskId + "」的 split=「" + split
+                        + "」与数据集「" + goldenSplit + "」不一致——保留集纪律的落库形态必须可信");
+            }
+            JsonNode turns = it.path("turns");
+            int turnsTotal = it.path("turnsTotal").asInt(0);
+
+            List<JsonNode> failing = new ArrayList<>();
+            StringBuilder route = new StringBuilder();
+            for (JsonNode t : turns) {
+                if (route.length() > 0) {
+                    route.append("; ");
+                }
+                route.append("轮").append(t.path("turn").asInt()).append(' ')
+                        .append(t.path("actualTool").asText("?"))
+                        .append('/').append(t.path("extractionStatus").asText("?"));
+                if (!t.path("turnPass").asBoolean(false)) {
+                    failing.add(t);
+                }
+            }
+            int turnsPassed = it.path("turnsPassed").asInt(0);
+            boolean itemPass = it.path("itemPass").asBoolean(false);
+            int argFailCount = 0;
+            for (JsonNode t : failing) {
+                argFailCount += t.path("argFails").size();
+            }
+
+            Map<String, Object> scores = new LinkedHashMap<>();
+            scores.put("itemPass", itemPass ? 1 : 0);
+            scores.put("turnsPassed", turnsPassed);
+            scores.put("turnsTotal", turnsTotal);
+            scores.put("turnRate", turnsTotal == 0 ? 0d : round6((double) turnsPassed / turnsTotal));
+            scores.put("argFailCount", argFailCount);
+            scores.put("summarizerCalls", it.path("summarizerCalls").asInt(0));
+
+            String status = itemPass ? "SUCCESS" : "FAILED";
+            L4Fail fail = failing.isEmpty() ? null : classifyL4Fail(failing);
+
+            rows.add(new EvalRecordRow(
+                    runId, taskId, 1, null,
+                    L4_LAYER, split, "rule",
+                    null, null, datasetVersion,
+                    taskAsOf, null,
+                    evidence, sha256Hex(question),
+                    question, it.path("rubric").asText(null), null,
+                    null, route.toString(), null,
+                    status, scores,
+                    null, graderVersion, describeL4Fail(failing),
+                    fail == null ? null : fail.category(),
+                    fail == null ? null : fail.rootCause(),
+                    null, gitCommit));
+        }
+        return rows;
+    }
+
+    /** 声明值与实际值必须相等；⛔ 不一致就炸，不静默跳过（同 `readJudge` 的 judgedCount 纪律）。 */
+    private static void requireEqual(String field, int declared, int real, Path artifact) {
+        if (declared != real) {
+            throw new IllegalStateException("产物的 " + field + "=" + declared
+                    + " 与逐条累加=" + real + " 不一致：" + artifact);
+        }
+    }
+
+    /** L4 失败现象 + 归因层（**规则判分没有 Judge**，故按工具自己的状态派生）。 */
+    private record L4Fail(String category, String rootCause) {
+    }
+
+    /**
+     * 失败归因：**顺序即优先级**，且只用于打**一个**标签。
+     *
+     * <p>优先级依据与 `errorCategory(String)` 同源——**以工具的实际状态为主**，
+     * 而不是以"我觉得哪里错了"为主：`extractionStatus` / `toolStatus` 报
+     * `NEEDS_CLARIFICATION` 就是「该答却追问」，即使它的 `argFails` 里同时列着缺失参数
+     * （实测 `L4-007` / `L4-019` / `L4-023` 都是这个形态：参数缺失是**结果是**，追问是**现象**）。
+     *
+     * <p>⚠️ 工具选错**有两处证据**：`actualTool != expectTool`，以及 `argFails` 里以
+     * 「工具错」开头的那条（实测 `L4-015` 两者同时出现）。**两处都认**，
+     * 否则只认前者的实现会在产物形态变化时静默漏判。
+     *
+     * <p>⛔ 打标签**不会丢信息**：全部逐键差异都写进 `judgeReasoning`，
+     * 这个 `category` 只服务于 badcase 聚类。
+     */
+    private static L4Fail classifyL4Fail(List<JsonNode> failingTurns) {
+        boolean clarification = false;
+        boolean degraded = false;
+        boolean toolWrong = false;
+        boolean argWrong = false;
+        for (JsonNode t : failingTurns) {
+            if (t.path("needsClarification").asBoolean(false)
+                    || "NEEDS_CLARIFICATION".equals(t.path("extractionStatus").asText())
+                    || "NEEDS_CLARIFICATION".equals(t.path("toolStatus").asText())) {
+                clarification = true;
+            }
+            if (t.path("degraded").asBoolean(false)) {
+                degraded = true;
+            }
+            if (!t.path("actualTool").asText().equals(t.path("expectTool").asText())) {
+                toolWrong = true;
+            }
+            for (JsonNode f : t.path("argFails")) {
+                if (f.asText().startsWith("工具错")) {
+                    toolWrong = true;
+                } else {
+                    argWrong = true;
+                }
+            }
+        }
+        if (clarification) {
+            return new L4Fail("该答却追问", "MODEL");
+        }
+        if (degraded) {
+            return new L4Fail("通道降级", "AGENT");
+        }
+        if (toolWrong) {
+            return new L4Fail("工具选择错误", "ROUTER");
+        }
+        if (argWrong) {
+            return new L4Fail("参数继承错误", "MODEL");
+        }
+        return new L4Fail("答案不符", "MODEL");
+    }
+
+    /** 失败逐键差异（**全部**失败轮，不只第一条）——这是 L4 唯一能拿到的判分理由。 */
+    private static String describeL4Fail(List<JsonNode> failingTurns) {
+        if (failingTurns.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode t : failingTurns) {
+            if (sb.length() > 0) {
+                sb.append(" | ");
+            }
+            sb.append("轮").append(t.path("turn").asInt()).append("未通过：");
+            JsonNode af = t.path("argFails");
+            if (af.isArray() && !af.isEmpty()) {
+                List<String> parts = new ArrayList<>();
+                for (JsonNode f : af) {
+                    parts.add(f.asText());
+                }
+                sb.append(String.join("；", parts));
+            } else {
+                sb.append("argFails 为空（工具与实参照契约都对上但仍判失败，属 D 类判据缺口）");
+            }
+        }
+        return sb.toString();
+    }
+
     static int rankOfFirstGold(List<String> ranked, List<String> gold) {
         for (int i = 0; i < ranked.size(); i++) {
             if (gold.contains(ranked.get(i))) {
