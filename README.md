@@ -116,7 +116,7 @@ flowchart TB
 | 嵌入 | **Ollama + `bge-m3`**（本地，1024 维） | 决策 **C-22**。⚠️ **索引与查询必须同一模型**，混用会"测试正常、上线召回率腰斩" |
 | 数据库 | PostgreSQL **18.4** + pgvector **0.8.0** + btree_gist | 决策 **C-15**（PG18 不兼容 pgvector 0.7 及以下） |
 | 分词 | jieba-analysis 1.0.2 + **自建航运词典**（164 词） | 决策 **C-25**。⚠️ 本机 PG18 扩展目录里**没有任何中文分词器** |
-| 观测 | Micrometer / OpenTelemetry (OTLP) | ⏳ 第 5 周（当前仅 `spring-boot-starter-actuator`） |
+| 观测 | Micrometer Observation / OpenTelemetry (OTLP) | 🚧 业务 Span 用 **Micrometer Observation API**（实测类路径已有 `micrometer-observation` 1.15.7）；⛔ **OTLP 导出与 tracing bridge 未接入**（D15 待决） |
 | 部署 | 本机 PostgreSQL + Redis（**不使用 Docker**，决策 **C-12**） | 仓库内 `docker-compose.yml` 保留给他人 clone 后试用，**不是本项目主路径** |
 
 ## 快速开始
@@ -254,7 +254,7 @@ canalmind/
 | # | 限制 | 锚点 / 量化 |
 |---|---|---|
 | 1 | **前端未实现**：`frontend/` 只有 `.gitkeep`。规格书明写"复杂前端不做，单页聊天足够，甚至只做 Swagger" | 后端接口与演示脚本已可用 |
-| 2 | **OTLP 未接入**：第 5 周任务；当前只有 `spring-boot-starter-actuator` | `pom.xml` |
+| 2 | **Trace 导出未接入（OTLP / 任何后端都没有）**：规格书第 661 行属第 5 周任务，观测平台选型是 **D15 待决**。 ⚠️ **实测类路径**（2026-09-22）：**有** `spring-boot-starter-actuator 3.5.9`、`micrometer-observation 1.15.7`、`context-propagation 1.1.3`；**没有** `micrometer-tracing`、`micrometer-tracing-bridge-otel`、`opentelemetry-instrumentation-annotations`（⇒ **`@WithSpan` 用不了**）；`spring-boot-starter-opentelemetry` 在**本机两个 Maven 仓库里都不存在**（知识库第 424 行称其为 Spring Boot 4 的用法，本项目 3.5.9）。⚠️ 易看走眼处：`micrometer-tracing-bom` 目录**在**（15 个版本），但**实测含 `0` 个 JAR**——**那只是版本清单**，⛔ 别把"BOM 在"当成"实现可用" | ⇒ 业务 Span **只能用 Micrometer Observation API**；且**目前只能在测试内用 `ObservationHandler` 断言，没有任何 Trace 后端可看** | `pom.xml` + `AiObservabilityTest` |
 | 3 | **HNSW 索引"可用且结果正确"，但当前规模下规划器不选它**（实测 **≥1000 行才自发选**）| ⛔ 不得对外说"线上在用 HNSW" |
 | 4 | **`L6` 有 5 类实现缺口 + 1 类未登记缺口**：其中 `group_by` **注入实测未被拦住**（返回 `OK`），**属安全相关** | 报告 §5.5 + `badcase记录.md` |
 | 5 | **Judge 与被测系统同模型** ⇒ 自增强偏差**未排除**（本机端点无法换裁判模型） | 报告 §5.1 |
@@ -263,6 +263,7 @@ canalmind/
 | 8 | **`reference_output` / `actual_output` 对 L3/L5/L6 仍为 null**（作答在 `layer-L*-answers-*.json`，未接入落库）；⚠️ **L4 的 `prompt_version` / `model_id` / 会话 id 也均为 null**（L4 产物**不记录**这些字段，⛔ 不编造） | 报告 §2；缺口登记在 `ArtifactIngest.readL4` 注释里 |
 | 9 | **SSE 流式下 HTTP Span 挂不到模型 Span 下**（Spring AI 官方记录的当前限制） | 属框架限制，**记录而非当 bug 修**；留痕 `DECISIONS.md` |
 | 10 | **仿真数据有 18 / 71 个费率档位无数据触发**（船队吨位不足以触及最高两档），**6 项条款不可实现**（逐条登记原因） | `verify_corpus_db_rates.py` 的 `UNIMPLEMENTED` |
+| 11 | **`ai.output.validate` 这个 Span 没有埋点**——规格书 §7.2 的树里列了它，但本项目运行时**没有"最终输出校验"这个环节**：`SchemaGate` 校验的是**工具参数**（对应 `ai.tool.param.validate`），把它再报一次就是知识库第 459 行明令禁止的"**名称不同、内容相同的两层节点**"。⇒ **如实记为未埋，⛔ 不造一个空壳 Span 充数**（是否新增该环节属待决 **D23**） | `AiSpans.OUTPUT_VALIDATE` 的 javadoc；`DECISIONS.md` D23 |
 
 ### 已知建模缺口（记录而非隐藏）
 
