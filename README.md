@@ -6,7 +6,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-green)]()
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4%20%2B%20pgvector%200.8.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-608%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-624%20passing-brightgreen)]()
 
 ---
 
@@ -201,7 +201,7 @@ mvn -o -s ..\.proto\settings.xml -gs ..\.proto\settings.xml `
   "-DargLine=-javaagent:.m2repo\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar" test
 ```
 
-**实测 `Tests run: 608, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
+**实测 `Tests run: 624, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
 ⚠️ 这个数字**跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
 本项目实测撞到过"源码编译不过而构建仍绿"，见 `docs/工程复盘/工程方法/编译错误被静默放过/README.md`）。
 
@@ -279,6 +279,7 @@ canalmind/
 | 15 | **限流/退避/降级（C-58）只包住"最终作答"这一次调用**：重排与结构化抽取路径**未接**守卫。⚠️ **知识库第 55 行要求的"每次重试新建 Span"未做**——重试次数只在退避告警行与降级 Span 上可见，**没有逐次重试的子 Span**。⚠️ **TPM / Token 预算 / 熔断未做**（知识库第 442、459 行要求"不能只按 QPS 看"，本轮只落了 **RPM + 并发**两维）。⚠️ 作答/评测路径**刻意"不降级成话术、直接抛错"**（只把原因写进 Span），因为把"系统繁忙"当答案写进评测会被判分器记成"模型答错"、归因全错——降级成提示语那条路留给将来的在线服务路径 | `LlmCallGuard` 的 javadoc；`LlmCallGuardTest`（17 例）；`AnswerComposerGuardWiringTest`（3 例）；`docs/进度看板.md` §0.4.6 |
 
 | 16 | **两档模型（C-56）只接了评测 / CLI 那条路**：强档 `deepseek-v4-pro` 只用于**最终生成**（`QuestionPipeline` 的两档装配重载）；**Web 流式聊天那条路未接**（它不走 `QuestionPipeline`，仍是小档）。⚠️ 接线本身已有**零付费端到端证据**（本地回显桩 `backend/scripts/stub_deepseek.py` + `LayerRunCli --smoke`：抽取 3 次走 `deepseek-v4-flash`、最终生成 1 次走 `deepseek-v4-pro`），但 `AnswerModelTierTest` 仍只覆盖配置解析与一键回退。⚠️ 另：本项目**小档实为 `deepseek-v4-flash`**（`.env` 的 `DEEPSEEK_CHAT_MODEL`），`application.yml` 里的 `deepseek-chat` 只是官方直连端点的兜底默认值——实测本项目中继**不提供** `deepseek-chat`（3/3 HTTP 503） | `LlmRerankerFactory` 的 `DEFAULT_ANSWER_MODEL` javadoc；`AnswerModelTierTest`（5 例）；`docs/进度看板.md` §0.4.7 |
+| 17 | **作答缓存（C-55）机制齐备但尚无调用方开启**：AnswerCache 接口 + Redis/内存两种实现 + 开关 + 14 例测试都在，**默认关**，且**评测/CLI 路径不调用 ttachAnswerCache**（⇒ 现有分层数字零影响，也⇒**没有任何生产路径在用**）；Web 流式聊天路径**未接**。⚠️ **不用向量相似度**（确定性规则/费率类必须精确命中，比知识库允许的更保守）；⚠️ ag_chunk 只进**行数**不进内容哈希 ⇒ **若把缓存扩到检索类问句，必须先换掉数据版本取法**；⚠️ spring-boot-starter-cache（注解式）**未使用**——评测/CLI 路径没有 Spring 容器，注解式缓存拿不到也没法断言 | AnswerCache/CacheKey/AnswerCacheFactory 的 javadoc；AnswerCacheTest（10 例，含真跑本机 Redis）；AnswerComposerCacheTest（6 例）；docs/进度看板.md §0.4.8 |
 
 ### 已知建模缺口（记录而非隐藏）
 
