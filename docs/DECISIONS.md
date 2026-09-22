@@ -758,5 +758,7 @@ D23 与 D24 都是"缺功能"，一次裁示比零散两次决定更省你的时
 
 | 2026-09-22 | **C-58 限流/退避/降级「最小可验证版」已实现**（C-54 / C-59 亦已实现） | 按裁示"最小可验证版"落地，且**先取证再动手**——三步零付费实验测出三件事：①框架**不重试** 429（桩只收到 1 个请求）；②429 抛 `NonTransientAiException`，**没有 cause 链、没有状态码访问器**，状态码只在消息文本里 ⇒ 想按 429 判"要不要退避"就只剩"解析散文"（本项目明令禁止）这条路；③`javap` 实测 `DeepSeekApi.Builder` 有 `responseErrorHandler(...)` ⇒ 改在 **HTTP 层**如实取状态码与 `Retry-After`。落地：`LlmHttpFailure` / `DeepSeekHttpErrorHandler` / `LlmCallGuard`（令牌桶 + 并发信号量 + 指数退避 + 等量抖动 + 总体截止 + 降级信号），接线 3 处。**实测**：干净构建 **603 例 / 0 失败 / 0 错误 / 1 跳过**（583 + 20）、独立全树 `javac` **114 源 exit 0**、`audit_java_escapes.py` PASS、**零付费调用**。⚠️ 边界如实记入 `README.md` 第 15 条与 `docs/进度看板.md` §0.4.6（只包最终作答、无逐次重试子 Span、TPM/预算/熔断未做、评测路径刻意不降级成话术）|
 
+| 2026-09-22 | **C-56 两档模型已实现**（强档 `deepseek-v4-pro` 只接最终生成） | 用户批准 ≤6 次付费调用，**实测用满 6 次**：`deepseek-v4-pro` **3/3 成功**且响应**回显该模型名**（未被中继静默回落）、2.8–3.9 s、约 200 token；字面量 `deepseek-chat` **3/3 HTTP 503**（本项目中继不提供它）。⇒ **更正一处文档级误解**：本项目小档其实是 `.env` 里的 `DEEPSEEK_CHAT_MODEL=deepseek-v4-flash`，`application.yml` 的 `deepseek-chat` 只是官方直连端点的兜底值。落地：`LlmRerankerFactory` 新增 `DEEPSEEK_ANSWER_MODEL`（**显式置空即一键回退小档**）+ `QuestionPipeline` 两档装配重载（既有重载一字未改）。**实测**：干净构建 **608 例 / 0 失败 / 0 错误 / 1 跳过**（603 + 5）、全树 `javac` 114 源 exit 0、转义审计 PASS。⚠️ **缺口如实记**：`AnswerModelTierTest` 只证明配置解析与回退，**"CLI 真的把强档传给作答器"尚无端到端证据**（补证需 1~2 次付费冒烟或本地桩回显模型名）；Web 流式聊天路径未接 ⇒ 见 `README.md` 第 16 条与看板 §0.4.7 |
+
 ---
 
