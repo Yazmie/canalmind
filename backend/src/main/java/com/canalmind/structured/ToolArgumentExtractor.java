@@ -3,11 +3,17 @@ package com.canalmind.structured;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * 参数抽取：模型出参数 → 服务端校验 → 错了把**具体错误**喂回重试（≤{@value #DEFAULT_MAX_RETRIES} 次）→ 仍不行就降级。
@@ -39,6 +45,8 @@ public final class ToolArgumentExtractor {
     private final ObjectMapper mapper;
     private final int maxRetries;
     private final String businessToday;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.tool.param.extract}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     public ToolArgumentExtractor(ToolCatalog catalog, SchemaGate gate, JsonChatInvoker invoker,
                                  int maxRetries, String businessToday) {
@@ -47,12 +55,37 @@ public final class ToolArgumentExtractor {
 
     public ToolArgumentExtractor(ToolCatalog catalog, SchemaGate gate, JsonChatInvoker invoker,
                                  ObjectMapper mapper, int maxRetries, String businessToday) {
+        this(catalog, gate, invoker, mapper, maxRetries, businessToday, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 的 {@code ai.tool.param.extract}）。
+     *
+     * <p>⚠️ 既有两个构造器保持不变、一律委托给 {@link ObservationRegistry#NOOP}：
+     * 它们被 {@code StructuredQueryCli}（含 {@code --selftest} 的 5 处桩装配）、
+     * {@code ExecutionAccuracyRunTest}、{@code ToolArgumentExtractorTest}、
+     * {@code StructuredQueryServiceTest} 使用，**旧路径零变化**。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public ToolArgumentExtractor(ToolCatalog catalog, SchemaGate gate, JsonChatInvoker invoker,
+                                 int maxRetries, String businessToday,
+                                 ObservationRegistry observationRegistry) {
+        this(catalog, gate, invoker, new ObjectMapper(), maxRetries, businessToday,
+                observationRegistry);
+    }
+
+    /** 全参构造器（唯一给字段赋值的地方）。 */
+    public ToolArgumentExtractor(ToolCatalog catalog, SchemaGate gate, JsonChatInvoker invoker,
+                                 ObjectMapper mapper, int maxRetries, String businessToday,
+                                 ObservationRegistry observationRegistry) {
         this.catalog = catalog;
         this.gate = gate;
         this.invoker = invoker;
         this.mapper = mapper;
         this.maxRetries = Math.max(0, maxRetries);
         this.businessToday = businessToday;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     public ExtractionOutcome extract(String question) {
@@ -65,57 +98,30 @@ public final class ToolArgumentExtractor {
 
         for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
             attempts = attempt;
-            String reply;
-            try {
-                reply = invoker.invoke(system, withFeedback(baseUser, errors));
-            } catch (Exception e) {
-                errors = List.of("调用模型失败：" + e.getClass().getSimpleName()
-                        + (e.getMessage() == null ? "" : " - " + e.getMessage()));
-                log.warn("参数抽取：第 {} 次调用模型失败：{}", attempt, errors.get(0));
-                continue;
+            // ⚠️ 两个**final 副本**：`errors` 与 `attempt` 在循环里都会被改写，
+            //    直接用它们做 lambda 捕获会编译不过（"must be final or effectively final"）。
+            //    ⚠️ 实测教训：这条编译错误在本机曾被静默放过（主源码编译报 0 错、
+            //    运行时才以 Unresolved compilation problems 抛 Error），故这里写开、不再耍花招。
+            final List<String> errorsSoFar = errors;
+            final int attemptNo = attempt;
+            // ⚠️⚠️ **每次重试各建一个 Span**，并把本次序号写进高基数属性 attempt
+            // （规格书 §7.2 的 ai.tool.param.extract；知识库第 55 行原文
+            // "每次重试都新建 Span 并用 attempt 标明次数"，第 269 行同）。
+            // 理由：不这么做，"第一次超时、第二次成功"会被压成**一条**记录，
+            // 于是"链路不稳"与"一次就成"在产物里长得一样——正是本项目最想避免的
+            // 「没跑成看起来像没失败」。attempt 从 1 起（见 AiObservation.attempt 的注释）。
+            //
+            // ⚠️⚠️ 一律 observe(...)，⛔ 不手工 start()/stop()：手工写法下父指针全是 null，
+            // 整棵树静默变平（实测见 docs/工程复盘/工程方法/观测埋点的父指针会静默丢失.md）。
+            Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_EXTRACT,
+                    observationRegistry);
+            AiObservation.attempt(observation, attempt);
+            AttemptOutcome outcome = observation.observe(
+                    () -> attemptOnce(system, baseUser, errorsSoFar, attemptNo, raw, start));
+            if (outcome.finalOutcome() != null) {
+                return outcome.finalOutcome();
             }
-            raw.add(reply);
-
-            JsonNode node = parseJson(reply);
-            if (node == null) {
-                errors = List.of("应答不是合法 JSON（必须是单个 JSON 对象，不要代码块围栏、不要解释文字）");
-                continue;
-            }
-
-            errors = gate.validateEnvelope(node);
-            if (!errors.isEmpty()) {
-                continue;
-            }
-            String tool = node.path("tool").asText("");
-            if (ToolCatalog.NONE_TOOL.equals(tool)) {
-                // 不属于工具集：这是**正确的降级**（该走文档检索通道），不算失败
-                return ExtractionOutcome.degraded(ExtractionOutcome.KIND_TOOL_NONE, List.of(), attempts,
-                        raw, ms(start), null);
-            }
-            if (!catalog.hasTool(tool)) {
-                errors = List.of("未知工具名：" + tool + "（合法取值：" + catalog.tools().keySet() + "）");
-                continue;
-            }
-
-            List<String> missing = readStringArray(node.path("missing"));
-            JsonNode args = node.path("arguments");
-            String reason = node.path("reason").asText("");
-            if (!missing.isEmpty()) {
-                // 模型申报缺参：**不逼它编值**，直接追问；此路径不再校 arguments 的 required
-                // （模型已明确说"这个参数用户没给"，此时校 required 只会逼它虚构）
-                ToolCall partial = new ToolCall(tool, args, missing, reason);
-                return ExtractionOutcome.clarify(partial, ExtractionOutcome.KIND_MISSING_PARAMS, null,
-                        List.of(), attempts, raw, ms(start));
-            }
-
-            List<String> argErrors = gate.validateArguments(tool, args);
-            if (!argErrors.isEmpty()) {
-                errors = argErrors;
-                continue;
-            }
-
-            ToolCall call = new ToolCall(tool, args, missing, reason);
-            return ExtractionOutcome.success(call, attempts, raw, ms(start));
+            errors = outcome.errors();
         }
 
         String kind = errors.isEmpty() ? ExtractionOutcome.KIND_MODEL_ERROR
@@ -123,6 +129,93 @@ public final class ToolArgumentExtractor {
                 : (errors.get(0).startsWith("应答不是合法 JSON") ? ExtractionOutcome.KIND_NOT_JSON
                 : ExtractionOutcome.KIND_SCHEMA_INVALID));
         return ExtractionOutcome.degraded(kind, errors, attempts, raw, ms(start), null);
+    }
+
+    /**
+     * 一次尝试（原来的循环体）。
+     *
+     * <p>⚠️ <b>为什么必须把它抽出来</b>：埋点要求"每次尝试各一个 Span"，而 Span 必须用
+     * {@code observe(...)} 包住<b>一整段</b>业务（见 {@link #extract(String)} 的注释），
+     * 于是循环体必须是"一个有返回值的表达式"。抽出来之后 {@code continue} 变成
+     * {@link AttemptOutcome#retry}、{@code return} 变成 {@link AttemptOutcome#done}，
+     * <b>判定分支一条没动</b>（逐条对照原实现：模型异常 / 非 JSON / envelope 不合规 /
+     * TOOL_NONE / 未知工具 / 申报缺参 / arguments 不合规 / 成功）。
+     *
+     * @param errorsSoFar 上一次尝试留下的错误（用于 {@link #withFeedback}）；⛔ 不是本次的
+     * @param raw         原始应答累积器（**穿透**：重试时也要把畸形那次留下，
+     *                    否则"模型输出过一次畸形"这件事不留痕）
+     */
+    private AttemptOutcome attemptOnce(String system, String baseUser, List<String> errorsSoFar,
+                                       int attempt, List<String> raw, long startNanos) {
+        String reply;
+        try {
+            reply = invoker.invoke(system, withFeedback(baseUser, errorsSoFar));
+        } catch (Exception e) {
+            List<String> errs = List.of("调用模型失败：" + e.getClass().getSimpleName()
+                    + (e.getMessage() == null ? "" : " - " + e.getMessage()));
+            log.warn("参数抽取：第 {} 次调用模型失败：{}", attempt, errs.get(0));
+            return AttemptOutcome.retry(errs);
+        }
+        raw.add(reply);
+
+        JsonNode node = parseJson(reply);
+        if (node == null) {
+            return AttemptOutcome.retry(List.of(
+                    "应答不是合法 JSON（必须是单个 JSON 对象，不要代码块围栏、不要解释文字）"));
+        }
+
+        List<String> envelopeErrors = gate.validateEnvelope(node);
+        if (!envelopeErrors.isEmpty()) {
+            return AttemptOutcome.retry(envelopeErrors);
+        }
+        String tool = node.path("tool").asText("");
+        if (ToolCatalog.NONE_TOOL.equals(tool)) {
+            // 不属于工具集：这是**正确的降级**（该走文档检索通道），不算失败
+            return AttemptOutcome.done(ExtractionOutcome.degraded(
+                    ExtractionOutcome.KIND_TOOL_NONE, List.of(), attempt, raw, ms(startNanos), null));
+        }
+        if (!catalog.hasTool(tool)) {
+            return AttemptOutcome.retry(List.of(
+                    "未知工具名：" + tool + "（合法取值：" + catalog.tools().keySet() + "）"));
+        }
+
+        List<String> missing = readStringArray(node.path("missing"));
+        JsonNode args = node.path("arguments");
+        String reason = node.path("reason").asText("");
+        if (!missing.isEmpty()) {
+            // 模型申报缺参：**不逼它编值**，直接追问；此路径不再校 arguments 的 required
+            // （模型已明确说"这个参数用户没给"，此时校 required 只会逼它虚构）
+            ToolCall partial = new ToolCall(tool, args, missing, reason);
+            return AttemptOutcome.done(ExtractionOutcome.clarify(partial,
+                    ExtractionOutcome.KIND_MISSING_PARAMS, null, List.of(), attempt, raw,
+                    ms(startNanos)));
+        }
+
+        List<String> argErrors = gate.validateArguments(tool, args);
+        if (!argErrors.isEmpty()) {
+            return AttemptOutcome.retry(argErrors);
+        }
+
+        ToolCall call = new ToolCall(tool, args, missing, reason);
+        return AttemptOutcome.done(ExtractionOutcome.success(call, attempt, raw, ms(startNanos)));
+    }
+
+    /**
+     * 一次尝试的结果：要么**终局**（给出结论、直接返回），要么**带错误继续重试**。
+     *
+     * <p>⛔ 为什么不直接返回 {@link ExtractionOutcome} 并用 {@code null} 表示"继续重试"：
+     * 那样无法区分"要继续重试"与"这次真的产出了 null"（后者是 bug 而非流程）。
+     * 用两个字段把两种意图写开，读的人不必靠约定去猜。
+     */
+    private record AttemptOutcome(ExtractionOutcome finalOutcome, List<String> errors) {
+
+        static AttemptOutcome done(ExtractionOutcome outcome) {
+            return new AttemptOutcome(Objects.requireNonNull(outcome, "outcome"), List.of());
+        }
+
+        static AttemptOutcome retry(List<String> errors) {
+            return new AttemptOutcome(null, List.copyOf(errors));
+        }
     }
 
     /**

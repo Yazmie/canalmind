@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -14,6 +16,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 
 import com.canalmind.config.PromptVersions;
 import com.canalmind.intent.RouteDecision;
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 import com.canalmind.structured.ToolResult;
 
 /**
@@ -64,9 +68,12 @@ public final class AnswerComposer {
      */
     private final boolean citationV2;
 
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.llm.generate}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
+
     /** 既有构造器：**不启用 v2**（保持既有行为零变化）。 */
     public AnswerComposer(ChatModel chatModel) {
-        this(chatModel, null, Map.of());
+        this(chatModel, null, Map.of(), ObservationRegistry.NOOP);
     }
 
     /**
@@ -80,8 +87,34 @@ public final class AnswerComposer {
      * @param env   进程环境（读 {@code CANALMIND_SYSTEM_PROMPT_VERSION}）
      */
     public AnswerComposer(ChatModel chatModel, String layer, Map<String, String> env) {
+        this(chatModel, layer, env, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 第 562 行的 {@code ai.llm.generate}）。
+     *
+     * <p>⚠️ 既有两个构造器保持不变、一律委托给 {@link ObservationRegistry#NOOP}
+     * （使用方：{@code QuestionPipeline.create}、{@code LayerRunCli} / {@code L4RunCli}、
+     * {@code AnswerComposerPromptVersionTest}），**旧路径零变化**。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public AnswerComposer(ChatModel chatModel, String layer, Map<String, String> env,
+                          ObservationRegistry observationRegistry) {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
         this.citationV2 = PromptVersions.appliesToLayer(layer, env);
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
+    }
+
+    /**
+     * 本次作答所用的**提示词版本名**（写进 Trace 的高基数 {@code ai.config.version}）。
+     *
+     * <p>⚠️ 版本名的来源必须是**同一个判据**（{@code citationV2}）：
+     * 另写一套"按 layer+env 重算"的逻辑早晚与它分叉，而分叉的表现是
+     * 「产物说 v1、实际发的是 v2」——不会报错（这正是 C-51 记录过的那类错）。
+     */
+    String promptVersion() {
+        return citationV2 ? PromptVersions.V2 : PromptVersions.V1;
     }
 
     /** 本次作答是否启用了 v2（供产物落盘时标注 Prompt 版本，便于溯源）。 */
@@ -165,26 +198,55 @@ public final class AnswerComposer {
         };
     }
 
+    /**
+     * 作答。
+     *
+     * <p>规格书 §7.2 第 562 行给模型调用一个 Span（{@code ai.llm.generate}）。
+     * 这里记两个属性：
+     * <ul>
+     *   <li><b>高基数</b> {@code ai.config.version} = 本次的提示词版本名（{@code v1}/{@code v2}）——
+     *       "这条 Trace 是哪一版提示词产出的"必须能从 Trace 直接看出来，
+     *       否则 C-51 那种"同一次运行里 L5 用 v2、其余层用 v1"的对比就无法归因；</li>
+     *   <li><b>高基数</b> {@code attempt} = **实际调用了几次模型**（1 或 2）。</li>
+     * </ul>
+     *
+     * <p>⚠️ 为什么连 {@code attempt} 也记（规格书只要求了版本）：下面的重试是
+     * 「模型返回空正文就再调一次」，而**空正文曾经是一处静默失败**——
+     * 第 4 周 L5 首次批量实测 20 题里 <b>7 题返回空串</b>，运行器把它当成"成功作答"
+     * （见本方法内注释）。只把重试写进 stderr 的 WARN 是不够的：
+     * 那次告警**没有任何产物承载**，事后翻 Trace 只会看到"这条作答正常"。
+     * 记下 {@code attempt=2} 就等于把"这一次作答其实重试过"钉进 Trace。
+     * <p>⛔ 但**不**为两次尝试各建一个 Span（与 {@code ai.tool.param.extract} 的逐次不同）：
+     * 这里两次尝试的**输入完全相同**（同一提示词、同一参数），
+     * 分不出的信息（哪一次"更快/更省"）并不存在；要区分的是"有没有重试过"，
+     * 而那一个 {@code attempt} 就够了。⚠️ 如实记这笔差异，而不是假装两处口径一致。
+     */
     public String compose(String question, RouteDecision route, ToolResult tool, String context) {
-        // ⚠️ 空作答**必须重试一次、再不行就抛**，⛔ 绝不允许返回空串。
-        //    实测踩到（第 4 周 L5 首次批量）：20 题里 **7 题返回了空串**，
-        //    而作答运行器把它当成"成功作答"，于是 `failed=0` 报 PASS——
-        //    空答案随后会被判分器记成"答错"，**归因就全错了**（这是"模型不会答"还是"链路没发出请求"？）。
-        //    这类"静默成功"正是 `工程复盘/工程方法/验证工具本身也要被验证/` 那一类。
-        //    最可能的原因：长提示词（数据表 + 5 条片段）把 token 预算吃在推理上，
-        //    正文没剩额度 ⇒ 接口返回了**内容为空但并非错误**的响应。
-        for (int attempt = 1; attempt <= 2; attempt++) {
-            String text = callOnce(question, route, tool, context);
-            if (text != null && !text.isBlank()) {
-                return text.strip();
-            }            System.err.println("  [WARN] 作答第 " + attempt + " 次返回空内容，"
-                    + (attempt == 1 ? "重试一次" : "放弃并抛错") + "（prompt 长度 "
-                    + userPrompt(question, route, tool, context).length() + " 字符）");
-        }
-        throw new IllegalStateException(
-                "作答模型连续两次返回空内容（question=" + question + "）。"
-                        + "⛔ 这**不是**答错，是链路未能产出作答：请先查 token 预算与提示词长度，"
-                        + "别把空答案当成「模型答错」记进评测。");
+        Observation observation = AiObservation.start(AiSpans.LLM_GENERATE, observationRegistry);
+        return observation.observe(() -> {
+            AiObservation.highCardinality(observation, AiSpans.KEY_CONFIG_VERSION, promptVersion());
+            // ⚠️ 空作答**必须重试一次、再不行就抛**，⛔ 绝不允许返回空串。
+            //    实测踩到（第 4 周 L5 首次批量）：20 题里 **7 题返回了空串**，
+            //    而作答运行器把它当成"成功作答"，于是 `failed=0` 报 PASS——
+            //    空答案随后会被判分器记成"答错"，**归因就全错了**（这是"模型不会答"还是"链路没发出请求"？）。
+            //    这类"静默成功"正是 `工程复盘/工程方法/验证工具本身也要被验证/` 那一类。
+            //    最可能的原因：长提示词（数据表 + 5 条片段）把 token 预算吃在推理上，
+            //    正文没剩额度 ⇒ 接口返回了**内容为空但并非错误**的响应。
+            for (int attempt = 1; attempt <= 2; attempt++) {
+                String text = callOnce(question, route, tool, context);
+                if (text != null && !text.isBlank()) {
+                    AiObservation.attempt(observation, attempt);
+                    return text.strip();
+                }
+                System.err.println("  [WARN] 作答第 " + attempt + " 次返回空内容，"
+                        + (attempt == 1 ? "重试一次" : "放弃并抛错") + "（prompt 长度 "
+                        + userPrompt(question, route, tool, context).length() + " 字符）");
+            }
+            throw new IllegalStateException(
+                    "作答模型连续两次返回空内容（question=" + question + "）。"
+                            + "⛔ 这**不是**答错，是链路未能产出作答：请先查 token 预算与提示词长度，"
+                            + "别把空答案当成「模型答错」记进评测。");
+        });
     }
 
     private String callOnce(String question, RouteDecision route, ToolResult tool, String context) {

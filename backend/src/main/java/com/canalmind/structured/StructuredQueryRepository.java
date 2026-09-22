@@ -1,12 +1,18 @@
 package com.canalmind.structured;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import javax.sql.DataSource;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * 结构化通道的 SQL 层：**全部参数化**，且分组/口径只能取白名单（决策 C-33 第 2 条）。
@@ -27,13 +33,36 @@ public final class StructuredQueryRepository implements StructuredDataLookup {
     public static final LocalDate BUSINESS_END = LocalDate.of(2027, 9, 15);
 
     private final JdbcTemplate jdbc;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code db.sql.execute}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     public StructuredQueryRepository(DataSource dataSource) {
-        this(dataSource == null ? null : new JdbcTemplate(dataSource));
+        this(dataSource == null ? null : new JdbcTemplate(dataSource), ObservationRegistry.NOOP);
     }
 
     public StructuredQueryRepository(JdbcTemplate jdbc) {
+        this(jdbc, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 的 {@code db.sql.execute}）。
+     *
+     * <p>规格书第 553 行要求这一步记"耗时、行数"。耗时<b>由 Micrometer 自动计时</b>
+     * （Span 的起止就是耗时的定义），故这里只显式记<b>行数</b>（高基数 {@code db.rows}）
+     * ——⛔ 绝不再自己塞一个"耗时"属性：那样会出现两个口径不同的耗时（一个由框架测、
+     * 一个由人肉测），而它们必然会漂。
+     *
+     * <p>⚠️ 既有两个构造器保持不变、委托给 {@link ObservationRegistry#NOOP}：
+     * 它们被 {@code StructuredQueryCli}、{@code ExecutionAccuracyRunTest}、
+     * {@code QuestionPipeline.create} 使用，**旧路径零变化**。
+     *
+     * <p>⚠️ 重载是 <b>public</b> 而非包内可见：SQL 执行的埋点若只能从 Spring 装配路径接入，
+     * 那么"没有 Spring 的评测路径"（CLI / 评测运行器）就永远拿不到 Span——
+     * 而 Trace 的主要来源恰恰是那条路径。
+     */
+    public StructuredQueryRepository(JdbcTemplate jdbc, ObservationRegistry observationRegistry) {
         this.jdbc = jdbc;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     /** 结果集就是"标签 + 值 + 计数"三列，与分组维度无关——这样上层只有一种渲染逻辑。 */
@@ -125,9 +154,17 @@ public final class StructuredQueryRepository implements StructuredDataLookup {
         sql.append(" LIMIT ?");
         params.add(topN);
 
-        return jdbc.query(sql.toString(),
-                (rs, i) -> new GroupRow(rs.getString("label"), rs.getString("value"), rs.getLong("n")),
-                params.toArray());
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            // ⚠️ 属性必须在 lambda **内部**写：observe(...) 退出时 Span 就已 stop，
+            // 之后再调 highCardinality 只改了一个已经上报完的 context（不会出现在任何 handler 里）。
+            List<GroupRow> rows = jdbc.query(sql.toString(),
+                    (rs, i) -> new GroupRow(rs.getString("label"), rs.getString("value"), rs.getLong("n")),
+                    params.toArray());
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS,
+                    Integer.toString(rows.size()));
+            return rows;
+        });
     }
 
     /** 费用金额合计（按费种分列），用于"费用构成"类问题。 */
@@ -142,9 +179,15 @@ public final class StructuredQueryRepository implements StructuredDataLookup {
                  GROUP BY f.fee_type
                  ORDER BY round(sum(f.amount), 2) DESC, f.fee_type ASC
                 """;
-        return jdbc.query(sql,
-                (rs, i) -> new GroupRow(rs.getString("label"), rs.getString("value"), rs.getLong("n")),
-                from.toString(), to.toString());
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            List<GroupRow> rows = jdbc.query(sql,
+                    (rs, i) -> new GroupRow(rs.getString("label"), rs.getString("value"), rs.getLong("n")),
+                    from.toString(), to.toString());
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS,
+                    Integer.toString(rows.size()));
+            return rows;
+        });
     }
 
     /** 运单明细（含货种/货类/单证汇总）；所有过滤条件都可空，但服务层保证至少一个条件。 */
@@ -199,13 +242,19 @@ public final class StructuredQueryRepository implements StructuredDataLookup {
         sql.append(" ORDER BY w.created_at DESC, w.waybill_no ASC LIMIT ?");
         params.add(limit);
 
-        return jdbc.query(sql.toString(), (rs, i) -> {
-            List<String> row = new ArrayList<>();
-            for (int c = 1; c <= 11; c++) {
-                row.add(rs.getString(c));
-            }
-            return List.copyOf(row);
-        }, params.toArray());
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            List<List<String>> rows = jdbc.query(sql.toString(), (rs, i) -> {
+                List<String> row = new ArrayList<>();
+                for (int c = 1; c <= 11; c++) {
+                    row.add(rs.getString(c));
+                }
+                return List.copyOf(row);
+            }, params.toArray());
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS,
+                    Integer.toString(rows.size()));
+            return rows;
+        });
     }
 
     /** 船舶明细。 */
@@ -240,36 +289,55 @@ public final class StructuredQueryRepository implements StructuredDataLookup {
         }
         sql.append(" ORDER BY ve.vessel_id ASC LIMIT ?");
         params.add(limit);
-        return jdbc.query(sql.toString(), (rs, i) -> {
-            List<String> row = new ArrayList<>();
-            for (int c = 1; c <= 8; c++) {
-                row.add(rs.getString(c));
-            }
-            return List.copyOf(row);
-        }, params.toArray());
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            List<List<String>> rows = jdbc.query(sql.toString(), (rs, i) -> {
+                List<String> row = new ArrayList<>();
+                for (int c = 1; c <= 8; c++) {
+                    row.add(rs.getString(c));
+                }
+                return List.copyOf(row);
+            }, params.toArray());
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS,
+                    Integer.toString(rows.size()));
+            return rows;
+        });
     }
 
     @Override
     public Boolean cargoCategoryDangerous(String cargoCategory) {
-        // count(DISTINCT is_dangerous) = 1 ⇒ 该货类内部属性一致，可安全推导；= 2 ⇒ 无法推导（须追问货种）
-        var row = jdbc.queryForMap("""
-                SELECT count(DISTINCT is_dangerous) AS kinds, bool_and(is_dangerous) AS uniform
-                  FROM cargo_type
-                 WHERE category = ?
-                """, cargoCategory);
-        if (row.isEmpty() || ((Number) row.get("kinds")).intValue() == 0) {
-            throw new IllegalArgumentException("未知货类：" + cargoCategory);
-        }
-        if (((Number) row.get("kinds")).intValue() > 1) {
-            return null;
-        }
-        return (Boolean) row.get("uniform");
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            // count(DISTINCT is_dangerous) = 1 ⇒ 该货类内部属性一致，可安全推导；= 2 ⇒ 无法推导（须追问货种）
+            var row = jdbc.queryForMap("""
+                    SELECT count(DISTINCT is_dangerous) AS kinds, bool_and(is_dangerous) AS uniform
+                      FROM cargo_type
+                     WHERE category = ?
+                    """, cargoCategory);
+            // ⚠️ 这是**聚合查询**，结果集恒为 1 行。如实记 1（而不是硬凑一个"受影响行数"）：
+            //    db.rows 的含义是"这条 SQL 返回了几行"，聚合的答案就是 1 行——
+            //    想知道"覆盖了多少货种"要另建属性，⛔ 不许把 kinds 塞进 db.rows（那是两个口径）。
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS,
+                    row.isEmpty() ? "0" : "1");
+            if (row.isEmpty() || ((Number) row.get("kinds")).intValue() == 0) {
+                throw new IllegalArgumentException("未知货类：" + cargoCategory);
+            }
+            if (((Number) row.get("kinds")).intValue() > 1) {
+                return null;
+            }
+            return (Boolean) row.get("uniform");
+        });
     }
 
     /** 业务窗口内的运单总数（用于"窗口外无数据"的如实说明）。 */
     public long waybillCountInWindow() {
-        Long n = jdbc.queryForObject("SELECT count(*) FROM waybill WHERE created_at::date >= ?::date AND created_at::date <= ?::date",
-                Long.class, BUSINESS_START.toString(), BUSINESS_END.toString());
-        return n == null ? 0L : n;
+        Observation observation = AiObservation.start(AiSpans.DB_SQL_EXECUTE, observationRegistry);
+        return observation.observe(() -> {
+            Long n = jdbc.queryForObject("SELECT count(*) FROM waybill WHERE created_at::date >= ?::date AND created_at::date <= ?::date",
+                    Long.class, BUSINESS_START.toString(), BUSINESS_END.toString());
+            // 同 cargoCategoryDangerous：聚合查询的结果集恒为 1 行（无匹配时 count=0 仍是 1 行）
+            AiObservation.highCardinality(observation, AiSpans.KEY_DB_ROWS, "1");
+            return n == null ? 0L : n;
+        });
     }
 }

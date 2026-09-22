@@ -185,6 +185,27 @@ public final class LlmRerankerFactory {
     public static LlmReranker fromEnvironment(Map<String, String> env, ChunkSnippetProvider snippets,
                                               int maxRetries,
                                               UnaryOperator<PromptCompleter> completerWrapper) {
+        // ⚠️ 缺省给一个**真的**注册表（不是 NOOP）：CLI / 评测路径没有 Spring 容器，
+        //    `LlmRerankerFactory` 就是那条路径的依赖注入根——若这里给 NOOP，
+        //    那么"真实运行时到底有没有 ai.rag.rerank 这个节点"就永远无法回答
+        //    （与 QuestionPipeline.create 的既有重载同一理由）。
+        return fromEnvironment(env, snippets, maxRetries, completerWrapper,
+                ObservationRegistry.create());
+    }
+
+    /**
+     * 同上，但**显式给出观测注册表**（规格书 §7.2 第 559 行的 {@code ai.rag.rerank}）。
+     *
+     * <p>⚠️ 既有 4 参重载保持不变（委托给本方法并传 {@link ObservationRegistry#create()}），
+     * 故既有调用点（{@code RetrievalQueryCli} 与 {@code LlmRerankerFactoryTest}）
+     * **行为零变化**。
+     *
+     * @param observationRegistry 由装配点注入；传 {@link ObservationRegistry#NOOP} 表示"本次不埋点"
+     */
+    public static LlmReranker fromEnvironment(Map<String, String> env, ChunkSnippetProvider snippets,
+                                              int maxRetries,
+                                              UnaryOperator<PromptCompleter> completerWrapper,
+                                              ObservationRegistry observationRegistry) {
         String apiKey = requireApiKey(env);
         String baseUrl = value(env, "DEEPSEEK_BASE_URL", DEFAULT_BASE_URL);
         String model = value(env, "DEEPSEEK_CHAT_MODEL", DEFAULT_MODEL);
@@ -193,7 +214,11 @@ public final class LlmRerankerFactory {
         PromptCompleter completer = completerWrapper == null
                 ? deepSeekCompleter(apiKey, baseUrl, model, maxTokens)
                 : completerWrapper.apply(deepSeekCompleter(apiKey, baseUrl, model, maxTokens));
-        return new LlmReranker(completer, snippets, model)
+        // ⚠️ 三个上限（超时/候选数/片段长度）取与既有 3 参构造器**同源的常量**，
+        //    只是多了注册表——⛔ 不在这里另写一套默认值（两处各写一遍必然分叉）。
+        return new LlmReranker(completer, snippets, model,
+                LlmReranker.DEFAULT_TIMEOUT, LlmReranker.DEFAULT_MAX_CANDIDATES,
+                LlmReranker.DEFAULT_SNIPPET_CHARS, observationRegistry)
                 .withMaxRetries(maxRetries)
                 // ⚠️ 必须真的落进重排器：漏掉这一行时不会有任何报错，
                 //    只会在真实链路里"重排老是超时降级"，而产物与"重排没效果"一样。

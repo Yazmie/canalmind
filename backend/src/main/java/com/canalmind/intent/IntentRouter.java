@@ -3,9 +3,15 @@ package com.canalmind.intent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 import com.canalmind.structured.JsonChatInvoker;
 
 /**
@@ -166,14 +172,33 @@ public final class IntentRouter {
 
     private final JsonChatInvoker classifier;
     private final String classifierSystemPrompt;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.intent.route}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     /**
      * @param classifier 小模型分类器；传 {@code null} 表示**不可用**
      *                   （离线自检、或未配置模型时）⇒ 未命中规则的问题直接走 {@link #RULE_R6_FALLBACK}
      */
     public IntentRouter(JsonChatInvoker classifier) {
+        this(classifier, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 的 {@code ai.intent.route}）。
+     *
+     * <p>⚠️ <b>为什么是"新增一个重载"而不是改既有签名的默认值</b>：
+     * 既有构造器被 {@code IntentRouterCli}、{@code QuestionPipeline} 与
+     * {@code IntentRouterTest} 十几处使用，改签名会让"没传注册表"这件事无从表达；
+     * 而新增重载后，**旧路径零变化**（委托给 {@link ObservationRegistry#NOOP}），
+     * 埋点的接入面被限制在装配点上（见 {@code QuestionPipeline.create}）。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     *                            （需要"不埋点"就显式传 {@link ObservationRegistry#NOOP}）
+     */
+    public IntentRouter(JsonChatInvoker classifier, ObservationRegistry observationRegistry) {
         this.classifier = classifier;
         this.classifierSystemPrompt = classifierPrompt();
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     /** 只做规则路由，不走分类器（离线/自检用）。 */
@@ -181,8 +206,45 @@ public final class IntentRouter {
         return new IntentRouter(null);
     }
 
-    /** 路由一条问题。**必须在发起任何通道调用之前调用**，结论要落 Trace。 */
+    /**
+     * 路由一条问题。**必须在发起任何通道调用之前调用**，结论要落 Trace。
+     *
+     * <p>规格书 §7.2 第 549 行要求这一步有自己的 Span（{@code ai.intent.route}）并记录
+     * {@code route_reason}。本方法按 §7.2/§7.3 记两件事：
+     * <ul>
+     *   <li><b>低基数</b> {@code ai.intent.type} = {@link RouteDecision#channel()}——
+     *       它是封闭枚举（STRUCTURED / RETRIEVAL / COMPOSITE），故可以进 Metrics，
+     *       "路由判了多少条结构化"这类话才有一份能聚合的数据；</li>
+     *   <li><b>高基数</b> {@code ai.config.version} = {@link RouteDecision#ruleId()}——
+     *       规则 id 只说"命中了哪一条规则"，而<b>哪条规则命中是随规则表版本变的</b>：
+     *       规则表一改，"R2 命中率"的含义就变了。把它记成版本标识，事后才能回答
+     *       "这份 Trace 出自哪一版规则表"（本项目"每轮只改少量变量"的纪律需要它）。</li>
+     * </ul>
+     *
+     * <p>⚠️⚠️ <b>写法纪律：一律 {@code observe(...)}，⛔ 不手工 {@code start()}/{@code stop()}</b>。
+     * 手工写法会得到一棵<b>父全为 null 的平树</b>——Span 一条不少、名字全对、<b>不报错</b>，
+     * 只是"谁调用了谁"的边全断（实测见
+     * {@code docs/工程复盘/工程方法/观测埋点的父指针会静默丢失.md}）。
+     *
+     * <p>⚠️ {@code route_reason}（{@code reason} 字段）<b>不进属性</b>：它含中文、可能含
+     * 用户问句里的片段，属"自由文本"，进低基数位会被闸门拒绝、进高基数位又是正文级体积。
+     * 它另有归宿——{@code RouteDecision.traceLine()} 与 {@code eval_record.route_reason}。
+     */
     public RouteDecision route(String question) {
+        Observation observation = AiObservation.start(AiSpans.INTENT_ROUTE, observationRegistry);
+        return observation.observe(() -> {
+            RouteDecision decision = decide(question);
+            AiObservation.lowCardinality(observation, AiSpans.KEY_INTENT_TYPE, decision.channel());
+            String ruleId = decision.ruleId();
+            if (ruleId != null && !ruleId.isBlank()) {
+                AiObservation.highCardinality(observation, AiSpans.KEY_CONFIG_VERSION, ruleId);
+            }
+            return decision;
+        });
+    }
+
+    /** 真正的判定逻辑（与埋点分开，便于一眼看出"埋点没有改动任何判定分支"）。 */
+    private RouteDecision decide(String question) {
         String q = normalize(question);
         if (q.isEmpty()) {
             return single(RouteDecision.CHANNEL_RETRIEVAL, question, RULE_R6_FALLBACK,

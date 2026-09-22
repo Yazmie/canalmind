@@ -6,7 +6,14 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * RRF（Reciprocal Rank Fusion）融合（第 2 周第 5 项，决策 C-26 的主实现）。
@@ -66,19 +73,42 @@ public final class RrfFusion implements FusionStrategy {
     public static final int DEFAULT_K = 60;
 
     private final int k;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.rag.hybrid}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     /** 用 C-26 的默认 k=60。 */
     public RrfFusion() {
-        this(DEFAULT_K);
+        this(DEFAULT_K, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 带上观测注册表 + 默认 k=60（规格书 §7.2 第 556 行的 {@code ai.rag.hybrid}）。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public RrfFusion(ObservationRegistry observationRegistry) {
+        this(DEFAULT_K, observationRegistry);
     }
 
     public RrfFusion(int k) {
+        this(k, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 全参构造：指定 k 并带上观测注册表。
+     *
+     * <p>⚠️ 既有的 {@code RrfFusion()} / {@code RrfFusion(int)} 保持不变、
+     * 一律委托给 {@link ObservationRegistry#NOOP}（使用方：{@code RetrievalQueryCli} 与
+     * 多处测试桩），**旧路径零变化**。
+     */
+    public RrfFusion(int k, ObservationRegistry observationRegistry) {
         if (k < 1) {
             throw new IllegalArgumentException(
                     "rrfK 必须 >= 1，实际：" + k + "（k 是分母里的常数，"
                             + "取 0 会让 rank=1 的候选得 1/1=1 分、并让 1/(0+0) 这类无意义表达式成为可能）");
         }
         this.k = k;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     /** 本次使用的 k。 */
@@ -93,6 +123,24 @@ public final class RrfFusion implements FusionStrategy {
 
     @Override
     public List<RetrievalCandidate> fuse(List<List<RetrievalCandidate>> rankedLists, int topK) {
+        // 规格书 §7.2 第 556 行：ai.rag.hybrid ← "BM25 + 向量 + RRF"。
+        // ⚠️ 名字已说明它是**融合**这一步，故这里只记两件事：
+        //    低基数 ai.rag.strategy = 融合策略名（rrf，封闭枚举——换了策略这个键就要跟着变）；
+        //    高基数 ai.rag.result_count = **融合后**条数（含 topK 截断，即真正交给下游的条数）。
+        // ⛔ 不记 k：k 是实验条件、取值随人调，且它已在 RetrievalConfig 里（产物会带），
+        //    塞进属性只会让"同一策略"分裂成多个取值。
+        Observation observation = AiObservation.start(AiSpans.RAG_HYBRID, observationRegistry);
+        return observation.observe(() -> {
+            List<RetrievalCandidate> fused = doFuse(rankedLists, topK);
+            AiObservation.lowCardinality(observation, AiSpans.KEY_RAG_STRATEGY, NAME);
+            AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
+                    Integer.toString(fused.size()));
+            return fused;
+        });
+    }
+
+    /** 真正的融合（原 {@code fuse} 的实现）：与埋点分开，便于核对"埋点没动过算法"。 */
+    private List<RetrievalCandidate> doFuse(List<List<RetrievalCandidate>> rankedLists, int topK) {
         if (topK < 1) {
             throw new IllegalArgumentException("topK 必须 >= 1，实际：" + topK);
         }

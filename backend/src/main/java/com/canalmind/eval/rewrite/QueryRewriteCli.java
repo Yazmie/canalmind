@@ -1,11 +1,15 @@
 package com.canalmind.eval.rewrite;
 
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 import com.canalmind.rag.retrieve.LlmRerankerFactory;
 import com.canalmind.structured.DeepSeekJsonInvoker;
 import com.canalmind.structured.JsonChatInvoker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.model.ChatModel;
 
 import java.io.IOException;
@@ -16,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * C-50 的 **C 臂**：用 LLM 把多轮里的省略问句改写成独立可检索问句（**付费**）。
@@ -59,6 +64,22 @@ public final class QueryRewriteCli {
     }
 
     static int run(String[] args) throws IOException {
+        // ⚠️ CLI / 评测路径**没有 Spring 容器**，故这里自己建一个注册表当"依赖注入根"：
+        // 若传 NOOP，"这条离线改写链路到底有没有 ai.rag.rewrite 节点"就永远无法回答
+        // （与 QuestionPipeline.create 的既有重载同一理由）。
+        return run(args, ObservationRegistry.create());
+    }
+
+    /**
+     * 同上，但**显式给出观测注册表**（规格书 §7.2 第 555 行的 {@code ai.rag.rewrite}）。
+     *
+     * <p>⚠️ 既有 {@code run(String[])} 保持不变（委托给本方法并传
+     * {@link ObservationRegistry#create()}），故既有调用点与测试**行为零变化**。
+     *
+     * @param observationRegistry 由调用方注入；传 {@link ObservationRegistry#NOOP} 表示不埋点
+     */
+    static int run(String[] args, ObservationRegistry observationRegistry) throws IOException {
+        Objects.requireNonNull(observationRegistry, "observationRegistry");
         Path dataset = null;
         Path out = null;
         Path queriesOut = null;
@@ -133,7 +154,9 @@ public final class QueryRewriteCli {
             Map<String, String> env = LlmRerankerFactory.environmentWithDotEnv(
                     List.of(Path.of(".env"), Path.of("../.env")));
             chatModel = LlmRerankerFactory.chatModelFromEnvironment(env, MAX_TOKENS);
-            invoker = new DeepSeekJsonInvoker(chatModel, MAX_TOKENS);
+            // 把注册表传给 invoker：于是 ai.llm.generate 会挂在本条 ai.rag.rewrite 之下，
+            // 而不是另起一棵无父的树（⛔ 两处都用 NOOP 会让"模型调用花了多久"永远查不到）。
+            invoker = new DeepSeekJsonInvoker(chatModel, MAX_TOKENS, observationRegistry);
         }
 
         int failCount = 0;
@@ -146,9 +169,29 @@ public final class QueryRewriteCli {
             String turn2 = it.path("turns").path(1).path("question").asText("");
             String raw = "";
             String rewritten = null;
+            // ⚠️ 规格书 §7.2 第 555 行把 ai.rag.rewrite 画在文档通道之下。
+            //    ⚠️⚠️ **如实记一笔实际结构**：默认问答链路里**没有**改写环节
+            //    （C-50 尚未并入 `/api/chat`），该节点只存在于这条离线消融 CLI 里，
+            //    故它在 Trace 里是**一棵自己的根**（父为 null），⛔ 不是 ai.rag.retrieve 的子节点。
+            //    这不影响它的用途：改写这一步消耗了多少次付费调用、花了多久，照样单独可查。
+            //    若将来把改写接进默认链路，**必须**把它挪进 ai.rag.retrieve 的 observe 之内，
+            //    否则它会与检索并成两棵树（父指针错），而两种错都不会报错。
+            Observation rewriteObservation = AiObservation.start(AiSpans.RAG_REWRITE,
+                    observationRegistry);
+            // ⚠️ `invoker` 是先声明后赋值的（`JsonImport` 之外还要等 `anyCall` 判定），
+            //    故它**不是** effectively final —— lambda 捕获它编译不过。
+            //    这里取一个 final 副本：语义完全不变（循环内它不再被改写）。
+            final JsonChatInvoker activeInvoker = invoker;
             try {
-                raw = invoker.invoke(QueryRewritePrompt.systemPrompt(),
-                        QueryRewritePrompt.userPrompt(turn1, turn2));
+                // ⚠️ 用 observeChecked 而不是 observe：invoker.invoke 声明了受检异常，
+                //    而 Micrometer 1.12 的 observe(Supplier) 不接受它（实测 javap）。
+                //    两者在"异常处置"上一致：记进 Span 的 error 后**原样上抛**。
+                raw = rewriteObservation.observeChecked(() -> {
+                    AiObservation.highCardinality(rewriteObservation, AiSpans.KEY_CONFIG_VERSION,
+                            QueryRewritePrompt.PROMPT_VERSION);
+                    return activeInvoker.invoke(QueryRewritePrompt.systemPrompt(),
+                            QueryRewritePrompt.userPrompt(turn1, turn2));
+                });
                 JsonNode parsed = MAPPER.readTree(raw);
                 rewritten = QueryRewritePrompt.parseRewritten(parsed);
             } catch (Exception ex) {
@@ -217,7 +260,7 @@ public final class QueryRewriteCli {
                                  Map<String, String> rawById) throws IOException {
         ObjectNode o = MAPPER.createObjectNode();
         o.put("source", "docs/评测报告/golden-rewrite-dev-v1.json");
-        o.put("promptVersion", "query-rewrite-v1");
+        o.put("promptVersion", QueryRewritePrompt.PROMPT_VERSION);
         o.put("purpose", "C-50 的 C 臂：LLM 把多轮省略问句改写为独立可检索问句");
         int fallback = 0;
         for (Map.Entry<String, String> e : done.entrySet()) {

@@ -30,16 +30,19 @@ package com.canalmind.observability;
  * <table border="1">
  *   <caption>两类键的边界</caption>
  *   <tr><th>类别</th><th>键</th><th>去向</th></tr>
- *   <tr><td rowspan="3">低基数（{@link #LOW_CARDINALITY_KEYS}）</td>
+ *   <tr><td rowspan="4">低基数（{@link #LOW_CARDINALITY_KEYS}）</td>
  *       <td>{@code ai.rag.strategy}、{@code ai.rag.result}</td>
  *       <td>Metrics + Trace</td></tr>
  *   <tr><td>{@code ai.intent.type}</td><td>Metrics + Trace</td></tr>
+ *   <tr><td>{@code ai.rag.rerank.changed}、{@code ai.rag.fallback}（布尔式封闭枚举）</td>
+ *       <td>Metrics + Trace</td></tr>
  *   <tr><td colspan="2">取值必须是<b>封闭枚举</b>（如 {@code hit}/{@code empty}）</td></tr>
- *   <tr><td rowspan="3">高基数（{@link #HIGH_CARDINALITY_KEYS}）</td>
+ *   <tr><td rowspan="4">高基数（{@link #HIGH_CARDINALITY_KEYS}）</td>
  *       <td>{@code ai.rag.result_count}、文档 ID、{@code knowledge_base_id}</td>
  *       <td>只进 Trace</td></tr>
  *   <tr><td>{@code attempt}（重试次数）</td><td>只进 Trace</td></tr>
  *   <tr><td>{@code db.rows}（SQL 行数）</td><td>只进 Trace</td></tr>
+ *   <tr><td>{@code ai.config.version}（配置/提示词/模型版本）</td><td>只进 Trace</td></tr>
  * </table>
  *
  * <p>⛔⛔ <b>绝对不允许进属性的一类东西</b>（知识库第 200、451、531–533 行）：
@@ -106,7 +109,18 @@ public final class AiSpans {
     public static final String FEE_CALCULATE = "ai.fee.calculate";
     /** 模型调用（通用约定优先，知识库第 109 行：{@code gen_ai.client.operation}）。 */
     public static final String LLM_GENERATE = "ai.llm.generate";
-    /** 输出校验（知识库第 443 行列为"必须自己补"的第 ④ 项：输出结构化校验与安全检查）。 */
+    /**
+     * 输出校验（知识库第 443 行列为"必须自己补"的第 ④ 项：输出结构化校验与安全检查）。
+     *
+     * <p>⚠️⚠️ <b>本项目暂未埋点：运行时无该环节，用户 2026-09-22 裁示挂起</b>。
+     * 名字保留在 {@link #ALL} 里（{@code AiObservabilityTest} 要与规格书 §7.2 逐字比对），
+     * 但<b>没有任何宿主类会产出它</b>——本项目里唯一那个"服务端 Schema 校验"
+     * （{@code SchemaGate}）校的是<b>工具参数</b>，对应 {@link #TOOL_PARAM_VALIDATE}，
+     * ⛔ 不是"最终输出校验"。
+     * <p>⛔ <b>不要为了凑齐 §7.2 的节点数而造一个空壳 Span</b>：一个恒不触发、
+     * 或只在某个无实质动作的地方触发的 Span，在 Trace 里看起来"这一步做了"，
+     * 是<b>假证据</b>——比不埋更坏（同 {@code NoopReranker} 不埋点的理由）。
+     */
     public static final String OUTPUT_VALIDATE = "ai.output.validate";
 
     // ==================== 低基数属性键（进 Metrics + Trace） ====================
@@ -118,6 +132,42 @@ public final class AiSpans {
     /** 意图类型（封闭枚举，对应 {@code RouteDecision.CHANNEL_*}）。 */
     public static final String KEY_INTENT_TYPE = "ai.intent.type";
 
+    /**
+     * 重排是否**改变了候选顺序**（封闭枚举：{@code true} / {@code false}）。
+     *
+     * <p><b>为什么它是低基数（进 Metrics）</b>：规格书 §7.2 第 559 行要求
+     * {@code ai.rag.rerank} "记录<b>重排前后顺序对比</b>"，而这句要求可以被归约成一个
+     * <b>只有两种取值</b>的问题——"这次重排到底改没改顺序"。于是它可以参与聚合：
+     * "重排改变顺序的比例"是一句**能算出来的**话，而"把前后两份列表都写进属性"既放不下
+     * （列表是正文级体积）也无法聚合。
+     *
+     * <p>取值封闭性由构造保证：调用点只写 {@code "true"} / {@code "false"} 两个字面量
+     * （见 {@code LlmReranker}），⛔ 不写"改了 3 条"这种开放取值。
+     *
+     * <p>⚠️ 语义边界（如实记一笔）：它只说"**顺序变了没有**"，<b>不说"变好还是变坏"</b>——
+     * 后者需要 gold 标注，属评测层（{@code Recall@k}/{@code MRR}）的结论，
+     * ⛔ 不从检索链路内部自报。
+     */
+    public static final String KEY_RAG_RERANK_CHANGED = "ai.rag.rerank.changed";
+
+    /**
+     * 是否发生了 {@code TOOL_NONE} 回退（封闭枚举：{@code true}）。
+     *
+     * <p><b>为什么需要它</b>：结构化通道返回 {@code TOOL_NONE} 时，编排层会把问题
+     * <b>转交检索通道</b>（见 {@code QuestionPipeline.run} 的注释：这条契约在 5 处声明过，
+     * 但很久没有地方真的执行它）。这次转交是**一次内部路由修正**——
+     * {@code Answer.route} 说 STRUCTURED、而答案实际由检索段支撑
+     * （所以 {@code Answer.effectiveChannel()} 专门为此存在）。
+     *
+     * <p>若不记录它，"路由判错"与"回退生效"在 Trace 上长得一模一样，
+     * 而这正是本项目《评测报告》归因时最需要分开的两件事。
+     *
+     * <p>⚠️ 只在<b>真的发生</b>时写 {@code "true"}（⛔ 不写 {@code "false"}）：
+     * 该键的用途是"数一数有多少题发生了回退"，缺失即表示没发生；
+     * 写 false 只会让时间序列多一份恒 0 的冗余数据。
+     */
+    public static final String KEY_RAG_FALLBACK = "ai.rag.fallback";
+
     /** {@link #KEY_RAG_RESULT} 的取值：命中。 */
     public static final String VALUE_RESULT_HIT = "hit";
     /** {@link #KEY_RAG_RESULT} 的取值：空召回。 */
@@ -125,7 +175,8 @@ public final class AiSpans {
 
     /** 低基数键全集——供测试断言"没有高基数的东西混进来"。 */
     public static final java.util.Set<String> LOW_CARDINALITY_KEYS =
-            java.util.Set.of(KEY_RAG_STRATEGY, KEY_RAG_RESULT, KEY_INTENT_TYPE);
+            java.util.Set.of(KEY_RAG_STRATEGY, KEY_RAG_RESULT, KEY_INTENT_TYPE,
+                    KEY_RAG_RERANK_CHANGED, KEY_RAG_FALLBACK);
 
     // ==================== 高基数属性键（只进 Trace） ====================
 
@@ -142,10 +193,27 @@ public final class AiSpans {
     /** 通道降级/回退原因（受控枚举由调用方给，⛔ 不得塞自由文本）。 */
     public static final String KEY_DEGRADE_REASON = "ai.degrade.reason";
 
+    /**
+     * 配置 / 提示词 / 模型的**版本标识**（只进 Trace）。
+     *
+     * <p><b>为什么它必须是高基数</b>：它的取值集合随"我们改过多少版提示词/模型"增长，
+     * 而版本一旦成为 Metrics 标签，"按版本对比指标"就会让时间序列按版本数翻倍——
+     * 版本对比是<b>离线评测</b>的活（本项目有 {@code eval_record} + run_id），
+     * 不该由指标系统承担。故它只进 Trace：排查时能回答"这条 Trace 是哪一版跑出来的"。
+     *
+     * <p><b>取值允许中文</b>（高基数一侧不限制字符集，只禁换行与超长）：
+     * 本项目的规则 id 就是中文（如 {@code R1-数值诉求-结构化}）——
+     * 它是人写给人看的，强行转成英文枚举值只会丢掉"凭什么这么判"的信息。
+     *
+     * <p>⛔ <b>不得用它承载正文</b>：版本串、提示词版本号、模型名都远小于 512 字符，
+     * 一旦有人把提示词原文挂上来，闸门会因超长/换行而拒（这正是它存在的意义）。
+     */
+    public static final String KEY_CONFIG_VERSION = "ai.config.version";
+
     /** 高基数键全集。 */
     public static final java.util.Set<String> HIGH_CARDINALITY_KEYS =
             java.util.Set.of(KEY_RAG_RESULT_COUNT, KEY_KNOWLEDGE_BASE_ID, KEY_DOCUMENT_IDS,
-                    KEY_ATTEMPT, KEY_DB_ROWS, KEY_DEGRADE_REASON);
+                    KEY_ATTEMPT, KEY_DB_ROWS, KEY_DEGRADE_REASON, KEY_CONFIG_VERSION);
 
     /**
      * 规格书 §7.2 要求的 Span 名单（顺序照抄规格书第 548–563 行）。

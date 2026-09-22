@@ -2,6 +2,8 @@ package com.canalmind.rag.retrieve;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -24,6 +26,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * LLM 重排器（第 2 周第 5 项，决策 C-27 的<b>主实现</b>）：让 DeepSeek {@code deepseek-chat}
@@ -334,22 +339,42 @@ public final class LlmReranker implements Reranker {
     private final int maxCandidates;
     private final int snippetChars;
     private final int maxRetries;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.rag.rerank}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     /** 用默认上限/超时/截断长度/重试次数。 */
     public LlmReranker(PromptCompleter completer, ChunkSnippetProvider snippets, String modelName) {
         this(completer, snippets, modelName, DEFAULT_TIMEOUT, DEFAULT_MAX_CANDIDATES,
-                DEFAULT_SNIPPET_CHARS, DEFAULT_MAX_RETRIES);
+                DEFAULT_SNIPPET_CHARS, DEFAULT_MAX_RETRIES, ObservationRegistry.NOOP);
     }
 
     /** 同上，只是把超时/上限/截断长度也显式给出（重试次数仍取默认）。 */
     public LlmReranker(PromptCompleter completer, ChunkSnippetProvider snippets, String modelName,
                        Duration timeout, int maxCandidates, int snippetChars) {
         this(completer, snippets, modelName, timeout, maxCandidates, snippetChars,
-                DEFAULT_MAX_RETRIES);
+                DEFAULT_MAX_RETRIES, ObservationRegistry.NOOP);
     }
 
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 第 559 行的 {@code ai.rag.rerank}）。
+     *
+     * <p>⚠️ 既有两个 public 构造器保持不变、一律委托给 {@link ObservationRegistry#NOOP}
+     * （使用方：{@code LlmRerankerFactory} 与 {@code LlmRerankerTest} 的十余处桩装配），
+     * **旧路径零变化**。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public LlmReranker(PromptCompleter completer, ChunkSnippetProvider snippets, String modelName,
+                       Duration timeout, int maxCandidates, int snippetChars,
+                       ObservationRegistry observationRegistry) {
+        this(completer, snippets, modelName, timeout, maxCandidates, snippetChars,
+                DEFAULT_MAX_RETRIES, observationRegistry);
+    }
+
+    /** 全参构造器（唯一给字段赋值的地方）。 */
     private LlmReranker(PromptCompleter completer, ChunkSnippetProvider snippets, String modelName,
-                        Duration timeout, int maxCandidates, int snippetChars, int maxRetries) {
+                        Duration timeout, int maxCandidates, int snippetChars, int maxRetries,
+                        ObservationRegistry observationRegistry) {
         this.completer = Objects.requireNonNull(completer, "completer");
         this.snippets = Objects.requireNonNull(snippets, "snippets");
         if (modelName == null || modelName.isBlank()) {
@@ -374,6 +399,7 @@ public final class LlmReranker implements Reranker {
         this.maxCandidates = maxCandidates;
         this.snippetChars = snippetChars;
         this.maxRetries = maxRetries;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     /**
@@ -538,8 +564,10 @@ public final class LlmReranker implements Reranker {
 
     /** 调换等超时（返回新实例）：重排的等待上限是实验条件之一，不该只能靠改常量。 */
     public LlmReranker withTimeout(Duration newTimeout) {
+        // ⚠️ 必须把 observationRegistry 一起带过去：漏掉它不会有任何报错，
+        //    只表现为"调过一次超时之后，重排的 Span 就再也不出现了"（静默丢埋点）。
         return new LlmReranker(completer, snippets, modelName, newTimeout, maxCandidates,
-                snippetChars, maxRetries);
+                snippetChars, maxRetries, observationRegistry);
     }
 
     /**
@@ -550,7 +578,7 @@ public final class LlmReranker implements Reranker {
      */
     public LlmReranker withMaxRetries(int newMaxRetries) {
         return new LlmReranker(completer, snippets, modelName, timeout, maxCandidates,
-                snippetChars, newMaxRetries);
+                snippetChars, newMaxRetries, observationRegistry);
     }
 
     @Override
@@ -573,13 +601,72 @@ public final class LlmReranker implements Reranker {
         return maxRetries;
     }
 
+    /**
+     * 重排一批候选。
+     *
+     * <p>规格书 §7.2 第 559 行要求这一步的 Span（{@code ai.rag.rerank}）记
+     * "<b>重排前后顺序对比</b>"。本项目把它记成两个属性：
+     * <ul>
+     *   <li><b>低基数</b> {@code ai.rag.rerank.changed} = {@code true}/{@code false}
+     *       ——"这次重排到底改没改顺序"。它是**封闭的两值**，故能进 Metrics：
+     *       "重排改变顺序的比例"因此是一句能算出来的话；</li>
+     *   <li><b>高基数</b> {@code ai.rag.result_count} = **重排后**条数。</li>
+     * </ul>
+     *
+     * <p>⚠️ <b>为什么降级也算 changed=false</b>：降级路径的产物是"输入的融合原序前缀"
+     * （见 {@code fallback(...)} 与类注释的降级口径），顺序确实没变——
+     * 如实报 false。于是"降级率"可以从 {@code changed=false} 与
+     * {@code RerankOutcome.degraded()} 两个方向交叉核对。
+     *
+     * <p>⛔ <b>不把前后两份候选列表写进属性</b>：那是正文级体积，且无法聚合
+     * （同 {@code AiSpans.KEY_RAG_RERANK_CHANGED} 的注释）。
+     *
+     * <p>⚠️⚠️ 一律 {@code observe(...)}，⛔ 不手工 {@code start()}/{@code stop()}
+     * （实测见 {@code docs/工程复盘/工程方法/观测埋点的父指针会静默丢失.md}）。
+     */
     @Override
     public RerankOutcome rerank(String query, List<RetrievalCandidate> candidates, int topN) {
+        Observation observation = AiObservation.start(AiSpans.RAG_RERANK, observationRegistry);
+        return observation.observe(() -> {
+            List<RetrievalCandidate> in = candidates == null ? List.of() : candidates;
+            RerankOutcome outcome = doRerank(query, in, topN);
+            AiObservation.lowCardinality(observation, AiSpans.KEY_RAG_RERANK_CHANGED,
+                    orderChanged(in, outcome.candidates()) ? "true" : "false");
+            AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
+                    Integer.toString(outcome.candidates().size()));
+            return outcome;
+        });
+    }
+
+    /**
+     * 重排**是否改变了候选顺序**（规格书第 559 行"重排前后顺序对比"的机器可读形式）。
+     *
+     * <p>判据：把结果序列与"输入序列的前 N 条"逐位比较（N = 结果条数）。
+     * 之所以比"前缀"而不是比"等长全序列"，是因为结果本来就被截到 {@code topN}
+     * （输入 30 条、输出 10 条是常态）——"输出是不是输入的原序前缀"才是有意义的问法。
+     *
+     * <p>顺序无关紧要的两种情形都如实为 {@code false}：没有候选可排、以及降级保留原序。
+     */
+    static boolean orderChanged(List<RetrievalCandidate> in, List<RetrievalCandidate> out) {
+        if (out.size() > in.size()) {
+            // 候选只可能变少（重排是"排序 + 截断"）。多出来说明上游实现出了问题，
+            // 此时如实报"变了"，⛔ 不默默返回 false 把一个 bug 说成"顺序没变"。
+            return true;
+        }
+        for (int i = 0; i < out.size(); i++) {
+            if (!Objects.equals(in.get(i).chunkId(), out.get(i).chunkId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 真正的重排（原 {@code rerank} 的实现）：与埋点分开，便于核对"埋点没动过算法"。 */
+    private RerankOutcome doRerank(String query, List<RetrievalCandidate> in, int topN) {
         if (topN < 1) {
             throw new IllegalArgumentException("topN 必须 >= 1，实际：" + topN);
         }
         long started = System.nanoTime();
-        List<RetrievalCandidate> in = candidates == null ? List.of() : candidates;
         if (in.isEmpty()) {
             // 没有候选可排：这不是降级（没坏），只是空输入。不调模型，故延迟记 0。
             return RerankOutcome.ok(List.of(), 0L, modelName);

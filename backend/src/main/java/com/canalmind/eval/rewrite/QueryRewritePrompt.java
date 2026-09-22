@@ -19,6 +19,17 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 public final class QueryRewritePrompt {
 
+    /**
+     * 改写提示词的**版本标识**（写进产物与 Trace）。
+     *
+     * <p>为什么必须有它：改写器的提示词是 C-50 消融的<b>自变量之一</b>——
+     * 同一批题换一版提示词就是另一次实验。产物里的 {@code promptVersion} 与
+     * Trace 的高基数 {@code ai.config.version} 都取这一个常量，
+     * ⛔ 不许两处各写一遍字面量（两处各写一遍必然分叉，而分叉的表现是
+     * "产物说 A 版、Trace 说 B 版"——不会报错）。
+     */
+    public static final String PROMPT_VERSION = "query-rewrite-v1";
+
     /** ⚠️ 真实换行用计算字符，⛔ 不写转义字面量（AGENTS §7.2 的换行纪律）。 */
     private static final String LF = String.valueOf((char) 10);
 

@@ -1,6 +1,8 @@
 package com.canalmind.structured;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -9,7 +11,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * 结构化查询段的服务层：**抽取 → 业务校验 → 参数化执行 → 确定性事实**。
@@ -52,16 +58,36 @@ public final class StructuredQueryService {
     private final StructuredDataLookup queryRepo;
     private final FeeCalculationEngine engine;
     private final String businessToday;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.structured.query}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
     public StructuredQueryService(ToolCatalog catalog, ToolArgumentExtractor extractor,
                                  TariffRuleLookup tariffRepo, StructuredDataLookup queryRepo,
                                  FeeCalculationEngine engine, String businessToday) {
+        this(catalog, extractor, tariffRepo, queryRepo, engine, businessToday,
+                ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 的 {@code ai.structured.query}）。
+     *
+     * <p>⚠️ 既有 6 参构造器保持不变、委托给 {@link ObservationRegistry#NOOP}：
+     * 它被 {@code StructuredQueryCli}、{@code ExecutionAccuracyRunTest}、
+     * {@code StructuredQueryServiceTest} 使用，**旧路径零变化**。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public StructuredQueryService(ToolCatalog catalog, ToolArgumentExtractor extractor,
+                                 TariffRuleLookup tariffRepo, StructuredDataLookup queryRepo,
+                                 FeeCalculationEngine engine, String businessToday,
+                                 ObservationRegistry observationRegistry) {
         this.catalog = catalog;
         this.extractor = extractor;
         this.tariffRepo = tariffRepo;
         this.queryRepo = queryRepo;
         this.engine = engine;
         this.businessToday = businessToday;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     /** 只做抽取（不执行），供评测统计"抽取命中率"。 */
@@ -89,8 +115,20 @@ public final class StructuredQueryService {
      * @param question 用户本轮问题（多轮场景下由评测侧拼入上文，见 L4 运行器）
      */
     public AskOutcome askDetailed(String question) {
-        ExtractionOutcome outcome = extractor.extract(question);
-        return new AskOutcome(outcome, run(outcome));
+        Observation observation = AiObservation.start(AiSpans.STRUCTURED_QUERY, observationRegistry);
+        return observation.observe(() -> {
+            ExtractionOutcome outcome = extractor.extract(question);
+            ToolResult result = run(outcome);
+            // 规格书 §7.3 第 570 行的低基数键 ai.rag.result（hit / empty）在这里表达
+            // "结构化通道这次到底给没给出可用结果"：只有 STATUS_OK 算命中，
+            // NO_DATA / REJECTED / NEEDS_CLARIFICATION / DEGRADED 四种状态一律记 empty
+            // ——它们对下游是同一件事："这一路没有可用的确定性事实"。
+            // ⚠️ 四种状态**不可混为一谈**（AnswerComposer.statusLine 逐条翻译），
+            //    所以它们的区分仍靠 ToolResult.status() 落在 eval_record/traces 里，
+            //    ⛔ 不是靠这个二值属性。
+            AiObservation.ragResult(observation, !ToolResult.STATUS_OK.equals(result.status()));
+            return new AskOutcome(outcome, result);
+        });
     }
 
     /** {@link #askDetailed(String)} 的返回值：抽取（工具 + 实参 + 降级/追问状态）与执行结果。 */

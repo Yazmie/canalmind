@@ -6,11 +6,17 @@ import com.networknt.schema.ExecutionContext;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * 服务端 JSON Schema 校验闸门（决策 C-32 的核心件）。
@@ -31,34 +37,81 @@ public final class SchemaGate {
     private final SchemaRegistry registry;
     private final Schema envelopeSchema;
     private final Map<String, Schema> toolSchemas;
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.tool.param.validate}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
 
-    private SchemaGate(SchemaRegistry registry, Schema envelopeSchema, Map<String, Schema> toolSchemas) {
+    private SchemaGate(SchemaRegistry registry, Schema envelopeSchema, Map<String, Schema> toolSchemas,
+                       ObservationRegistry observationRegistry) {
         this.registry = registry;
         this.envelopeSchema = envelopeSchema;
         this.toolSchemas = Map.copyOf(toolSchemas);
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
     }
 
     public static SchemaGate of(ToolCatalog catalog) {
+        return of(catalog, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 同上，但**带上观测注册表**（规格书 §7.2 的 {@code ai.tool.param.validate}）。
+     *
+     * <p>⚠️ 既有 {@code of(catalog)} 保持不变、委托给 {@link ObservationRegistry#NOOP}：
+     * 它被 {@code StructuredQueryCli}（含 {@code --selftest} 的多处桩装配）、
+     * {@code SchemaGateTest}、{@code ToolArgumentExtractorTest}、
+     * {@code StructuredQueryServiceTest}、{@code ExecutionAccuracyRunTest} 使用，
+     * **旧路径零变化**。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public static SchemaGate of(ToolCatalog catalog, ObservationRegistry observationRegistry) {
         SchemaRegistry reg = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
         Map<String, Schema> toolSchemas = new LinkedHashMap<>();
         for (ToolContract c : catalog.tools().values()) {
             toolSchemas.put(c.name(), reg.getSchema(c.parameters()));
         }
-        return new SchemaGate(reg, reg.getSchema(catalog.envelope()), toolSchemas);
+        return new SchemaGate(reg, reg.getSchema(catalog.envelope()), toolSchemas, observationRegistry);
     }
 
-    /** 校验整体输出形状；返回**人类可读的错误清单**（空 = 通过）。 */
+    /**
+     * 校验整体输出形状；返回**人类可读的错误清单**（空 = 通过）。
+     *
+     * <p>规格书 §7.2 第 552 行要求这一步有自己的 Span（{@code ai.tool.param.validate}），
+     * 并记<b>错误条数</b>（高基数 {@code ai.rag.result_count}）。
+     * <p>⚠️ 为什么是"错误条数"而不是"通过/不通过"：错误条数是**重试预算消耗的直接证据**
+     * ——一次纠错重试里模型改对了 1 处还是 5 处，决定了"该改提示词"还是"该改契约"
+     * （知识库《大模型结构化输出》第 161、177–179 行的反模式正是"只提示不校验"）。
+     * <p>⚠️ <b>错误文案本身不进属性</b>：它是自由文本、可能含模型输出的片段，
+     * 进低基数位会被闸门拒、进高基数位是正文级体积；它另有归宿——原样喂回模型重试
+     * （见 {@code ToolArgumentExtractor.withFeedback}）并落在 {@code ExtractionOutcome.errors()}。
+     */
     public List<String> validateEnvelope(JsonNode node) {
-        return validate(envelopeSchema, node);
+        Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_VALIDATE, observationRegistry);
+        return observation.observe(() -> {
+            List<String> errors = validate(envelopeSchema, node);
+            AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
+                    Integer.toString(errors.size()));
+            return errors;
+        });
     }
 
-    /** 校验所选工具的 arguments；工具名未知时返回一条错误（不抛）。 */
+    /**
+     * 校验所选工具的 arguments；工具名未知时返回一条错误（不抛）。
+     *
+     * <p>与 {@link #validateEnvelope(JsonNode)} 是**两个独立的 Span**（规格书 §7.2 把
+     * "{@code ai.tool.param.validate}" 列为一个节点，而这一层的两次校验是**两次真实的动作**）：
+     * envelope 校的是"模型输出的整体形状"，arguments 校的是"所选工具的每个参数"。
+     * 合并成一个 Span 会让"错在信封还是错在参数"在 Trace 上分不出来，
+     * 而这两者的处置不同（前者多半要改提示词，后者多半是模型没看懂某个参数的契约）。
+     */
     public List<String> validateArguments(String tool, JsonNode arguments) {
-        Schema s = toolSchemas.get(tool);
-        if (s == null) {
-            return List.of("未知工具：" + tool);
-        }
-        return validate(s, arguments);
+        Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_VALIDATE, observationRegistry);
+        return observation.observe(() -> {
+            Schema s = toolSchemas.get(tool);
+            List<String> errors = s == null ? List.of("未知工具：" + tool) : validate(s, arguments);
+            AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
+                    Integer.toString(errors.size()));
+            return errors;
+        });
     }
 
     /** 底层校验（静态，便于单测直接喂 Schema）。 */

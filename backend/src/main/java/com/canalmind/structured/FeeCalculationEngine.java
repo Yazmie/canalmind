@@ -1,11 +1,18 @@
 package com.canalmind.structured;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+
+import com.canalmind.observability.AiObservation;
+import com.canalmind.observability.AiSpans;
 
 /**
  * 费用计算引擎（任务 3：**纯代码，模型只抽参数**）。
@@ -53,6 +60,30 @@ public final class FeeCalculationEngine {
     /** 停泊费按天，其余费种与天数无关。 */
     public static final String PER_DAY_FEE_TYPE = "停泊费";
 
+    /** 业务 Span 的注册表（规格书 §7.2 的 {@code ai.fee.calculate}）；无观测需求时为 NOOP。 */
+    private final ObservationRegistry observationRegistry;
+
+    /**
+     * 默认构造（**不埋点**）：委托给 {@link ObservationRegistry#NOOP}。
+     *
+     * <p>⚠️ 本类原先**没有**任何显式构造器（用隐式默认构造器），
+     * 故这里补一个显式 no-arg 保持既有调用点（{@code StructuredQueryCli}、
+     * {@code StructuredQueryServiceTest}、{@code FeeCalculationEngineTest}、
+     * {@code QuestionPipeline.create}）**零变化**。
+     */
+    public FeeCalculationEngine() {
+        this(ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 带上观测注册表（规格书 §7.2 第 561 行的 {@code ai.fee.calculate}）。
+     *
+     * @param observationRegistry 由装配点注入；⛔ 不得传 {@code null}
+     */
+    public FeeCalculationEngine(ObservationRegistry observationRegistry) {
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
+    }
+
     /** 未实现条款清单（逐条附锚点与原因）——对外必须如实说明。 */
     public static final List<String> UNIMPLEMENTED_CLAUSES = List.of(
             "核定最低计费吨位（06-第十五条 2 / 07-第十三条 2）：全语料未给出核定方法，无法实现",
@@ -96,15 +127,42 @@ public final class FeeCalculationEngine {
     }
 
     /**
-     * 按规则测算金额。
+     * 按规则测算金额（规格书 §7.2 第 561 行的 {@code ai.fee.calculate}）。
+     *
+     * <p>⚠️ 这里**只记"成功/失败"一个低基数键**（{@code ai.rag.result}），⛔ <b>绝不把金额
+     * 写成属性</b>：金额是**高基数业务数据**——它随每一题、每个吨位无界增长，
+     * 进 Metrics 会让时间序列爆炸（知识库第 202、531–533 行），进 Trace 也只是把
+     * 一个本该在 {@code ToolResult.facts()} / 数据库 oracle 里对账的数抄到日志中。
+     * 金额的归宿是**产物与 oracle 对账**（Execution Accuracy），不是 Span 属性。
      *
      * @param rule        命中的费率规则（**必须已按业务日与吨位口径命中**，本方法不再筛档）
      * @param tonnage     计费吨位（口径由 {@code rule.tonnageBasis()} 决定，调用方负责传对）
      * @param days        计费天数（仅停泊费有意义，其余费种忽略）
      * @param dangerous   是否危险货物（由货种推导，**不让模型判断**）
      * @param bizDate     业务发生日（写进结果，便于对账与复现）
+     * @return 计算结果；失败时**抛异常**（见类注释"宁可抛，也不要算出一个看起来合理的数"）
      */
-    public Quote quote(TariffRuleRow rule, BigDecimal tonnage, int days, boolean dangerous, LocalDate bizDate) {
+    public Quote quote(TariffRuleRow rule, BigDecimal tonnage, int days, boolean dangerous,
+                       LocalDate bizDate) {
+        Observation observation = AiObservation.start(AiSpans.FEE_CALCULATE, observationRegistry);
+        return observation.observe(() -> {
+            Quote quote = computeQuote(rule, tonnage, days, dangerous, bizDate);
+            // ⚠️ 如实记一笔：本引擎失败时**抛异常**而不是返回 null，所以 quote == null
+            //    这一支当前不可能发生 ⇒ 该键实际恒为 hit。失败本身由 observe(...) 自动
+            //    记成这个 Span 的 **error 状态**（并带上原始异常），⛔ 不额外造一个"失败"
+            //    枚举值去挤低基数位（那会让它的取值集合不再是封闭的两值）。
+            AiObservation.ragResult(observation, quote == null);
+            return quote;
+        });
+    }
+
+    /**
+     * 真正的计算（原 {@code quote} 的实现，逐行未改）。
+     *
+     * <p>与埋点分成两个方法，是为了让"埋点没有动过任何算术或口径"这件事一眼可核对。
+     */
+    private Quote computeQuote(TariffRuleRow rule, BigDecimal tonnage, int days, boolean dangerous,
+                               LocalDate bizDate) {
         if (rule == null) {
             throw new IllegalArgumentException("费率规则不得为空");
         }
