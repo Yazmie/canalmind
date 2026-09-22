@@ -264,7 +264,8 @@ canalmind/
 | 9 | **SSE 流式下 HTTP Span 挂不到模型 Span 下**（Spring AI 官方记录的当前限制） | 属框架限制，**记录而非当 bug 修**；留痕 `DECISIONS.md` |
 | 10 | **仿真数据有 18 / 71 个费率档位无数据触发**（船队吨位不足以触及最高两档），**6 项条款不可实现**（逐条登记原因） | `verify_corpus_db_rates.py` 的 `UNIMPLEMENTED` |
 | 11 | **`ai.output.validate` 这个 Span 没有埋点**——规格书 §7.2 的树里列了它，但本项目运行时**没有"最终输出校验"这个环节**：`SchemaGate` 校验的是**工具参数**（对应 `ai.tool.param.validate`），把它再报一次就是知识库第 459 行明令禁止的"**名称不同、内容相同的两层节点**"。⇒ **如实记为未埋，⛔ 不造一个空壳 Span 充数**（是否新增该环节属待决 **D23**） | `AiSpans.OUTPUT_VALIDATE` 的 javadoc；`DECISIONS.md` D23 |
-| 12 | **规格书 §7.2 的 Span 树，比"默认运行实际会产生什么"大**：默认装配里是 `RetrievalConfig.defaults().withoutRerank()` + **只挂向量通道**（混合检索按 **C-30** 未启用）+ `new NoopReranker()`，且**没有 Query Rewrite 环节**（改写只存在于**离线消融实验** `QueryRewriteCli`）⇒ **默认运行的 Trace 里不会出现 `db.bm25.search` / `ai.rag.rerank` / `ai.rag.rewrite`**。⛔ **别把"Trace 里没有这个节点"当成埋点没生效**——那三个节点有宿主、只是默认路径不走它们；`ai.output.validate` 则是真的没埋（见第 11 条） | 锚点：`QuestionPipeline.create` 的装配代码（⛔ 不引行号：该文件在改）；`AiSpans` 各类 javadoc |
+| 12 | **三个"单步探针"CLI 仍不埋点**（实测 `IntentRouterCli` / `StructuredQueryCli` / `JudgeRunCli` 只传 2 参构造器 ⇒ 落到 `ObservationRegistry.NOOP`）；但**六层评测主路径有 Span**——`LayerRunCli` 与 `L4RunCli` 都经 `QuestionPipeline.create` 那条"缺省给**真**注册表"的重载。⇒ 从这三个 CLI 跑出来的 Trace **本来就是空的**，这是**如实记录、不是故障**；且当前未接任何导出器（属 **D15** 待决、⛔ 未接 OTLP），Span 只在挂了 `ObservationHandler` 的测试里可见 ⇒ ⛔ **别据此说"埋点没生效"** | 锚点：三个 CLI 里 `new DeepSeekJsonInvoker(...)` 的实参个数；`QuestionPipeline.create` 的重载链 |
+| 13 | **规格书 §7.2 的 Span 树，比"默认运行实际会产生什么"大**：默认装配里是 `RetrievalConfig.defaults().withoutRerank()` + **只挂向量通道**（混合检索按 **C-30** 未启用）+ `new NoopReranker()`，且**没有 Query Rewrite 环节**（改写只存在于**离线消融实验** `QueryRewriteCli`）⇒ **默认运行的 Trace 里不会出现 `db.bm25.search` / `ai.rag.rerank` / `ai.rag.rewrite`**。⛔ **别把"Trace 里没有这个节点"当成埋点没生效**——那三个节点有宿主、只是默认路径不走它们；`ai.output.validate` 则是真的没埋（见第 11 条） | 锚点：`QuestionPipeline.create` 的装配代码（⛔ 不引行号：该文件在改）；`AiSpans` 各类 javadoc |
 
 ### 已知建模缺口（记录而非隐藏）
 
