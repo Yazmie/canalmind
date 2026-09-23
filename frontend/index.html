@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>平陆运河航运助手 · CanalMind</title>
+<style>
+/* ============================================================
+   平陆运河航运助手 —— 内部业务工具样式
+   设计取向：克制、信息密度高、可长时间盯屏。
+   ⛔ 刻意不用渐变 / 发光 / 大圆角 / 大阴影：那是消费级聊天产品的语言，
+      本页要的是航运公司内部系统那种"用了很久、稳定、可信赖"的观感。
+   ⛔ 所有数字（金额、吨位、日期、规则码、版本号）一律等宽字体：
+      等宽让同一列的数值位数对齐，核对金额时不必逐个数字去数位。
+   ============================================================ */
+:root{
+  --navy:#1e3a5f;          /* 主色：深海军蓝，代表专业与水域 */
+  --navy-dark:#16304f;
+  --steel:#4a5568;         /* 辅助色：钢灰 */
+  --bg:#f7fafc;            /* 浅灰页面底色 */
+  --line:#e2e8f0;          /* 分隔线 */
+  --line-strong:#cbd5e0;   /* 输入框/可交互元素边框 */
+  --ink:#1a202c;           /* 正文 */
+  --muted:#718096;         /* 浅灰小字（引用、字段名） */
+  --amber:#b7791f;         /* 强调色：muted 金，只给关键数字 */
+  --amber-soft:#fdf6e7;
+  --panel:#ffffff;
+  --panel-alt:#f7f9fb;     /* 卡片头/表头的浅底 */
+  --hover:#f0f4f8;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Inter",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  /* 最小宽度按需求定 1200px：窄于此时不压缩主区，而是出现横向滚动条，
+     避免把对话区与结构表挤到不可读（业务系统宁可滚动，不可挤扁）。 */
+  min-width:1200px;
+  font-family:var(--sans);
+  font-size:13px;
+  line-height:1.6;
+  color:var(--ink);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+input,textarea,select,button{font-family:inherit}
+.mono{font-family:var(--mono)}
+
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ---------------------------------------------- 左侧边栏（240px） */
+.sidebar{
+  flex:0 0 240px;width:240px;
+  background:var(--panel);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  min-height:0;
+}
+.brand{padding:15px 16px 13px;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:15px;font-weight:600;letter-spacing:.01em;color:var(--navy)}
+.brand .en{margin-top:3px;font-size:11px;color:var(--steel);letter-spacing:.14em;text-transform:uppercase}
+
+/* 历史会话：按时间分组，组头可折叠 */
+.sessions{flex:1;overflow-y:auto;padding:6px 0 10px;min-height:0}
+.group-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px 5px;
+  font-size:11px;color:var(--muted);letter-spacing:.04em;
+  cursor:pointer;user-select:none;
+}
+.group-head:hover{color:var(--steel)}
+.group-head .caret{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.group-collapsed .group-body{display:none}
+.session{
+  display:block;width:100%;text-align:left;
+  padding:7px 14px 7px 13px;
+  border:0;border-left:3px solid transparent;
+  background:none;
+}
+.session:hover{background:var(--hover)}
+/* 当前会话：左侧深蓝竖条 + 浅底 —— 与"被选中"这件事一致，不额外加高亮色 */
+.session.active{background:var(--bg);border-left-color:var(--navy)}
+.session .t{font-size:12.5px;line-height:1.45;color:var(--ink)}
+.session.active .t{font-weight:600;color:var(--navy)}
+.session .s{margin-top:2px;font-size:11px;color:var(--muted)}
+.session .s .mono{font-size:11px}
+
+.side-foot{border-top:1px solid var(--line);padding:10px 16px 12px;background:var(--panel)}
+.src-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.src-row label{font-size:11px;color:var(--muted)}
+.src-row select{
+  font-size:11.5px;padding:2px 4px;color:var(--steel);
+  background:var(--panel);border:1px solid var(--line-strong);border-radius:2px;
+}
+.model{font-size:11px;line-height:1.75;color:var(--steel);border-top:1px solid var(--line);padding-top:8px}
+.model .k{display:inline-block;width:30px;color:var(--muted)}
+.model .v{font-family:var(--mono);font-size:11px;color:var(--steel)}
+.model .ver{margin-top:5px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+
+/* ---------------------------------------------- 主区域 */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+
+.topbar{
+  flex:0 0 52px;height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;
+  background:var(--panel);border-bottom:1px solid var(--line);
+}
+.topbar .topic{font-size:13.5px;font-weight:600;color:var(--navy)}
+.topbar .right{display:flex;align-items:center;gap:14px}
+.topbar .ts{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.btn-text{
+  background:none;border:1px solid var(--line-strong);border-radius:2px;
+  color:var(--steel);font-size:11.5px;padding:3px 9px;
+}
+.btn-text:hover{background:var(--hover);color:var(--navy);border-color:var(--steel)}
+
+/* 对话区：高度自适应并可滚动，⛔ 不随底部输入区一起滚动 */
+.conv{flex:1;overflow-y:auto;padding:20px 22px 6px;min-height:0}
+.conv-inner{max-width:1120px}
+
+/* 用户问题：靠左 + 浅灰底气泡（业务系统里"用户输入"只是一条待处理的请求） */
+.msg-user{display:flex;margin:0 0 14px}
+.msg-user .bubble{
+  max-width:68%;
+  background:var(--panel-alt);border:1px solid var(--line);border-radius:2px;
+  padding:9px 13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+}
+/* 系统回答：通栏白底 + 细边框（信息主体，占满宽度便于放结构表） */
+.msg-sys{
+  margin:0 0 20px;
+  background:var(--panel);border:1px solid var(--line);border-radius:2px;
+  max-width:92%;
+}
+.msg-sys .ans{padding:13px 15px;line-height:1.8;white-space:pre-wrap;word-break:break-word}
+.msg-sys .ans.tight{padding-bottom:4px}
+/* 生成中：只给一行状态，⛔ 不做逐字打字动画（业务系统不需要那个表演）。
+   ⛔ 这里也刻意**不加任何动画**（连呼吸圆点都没有）：需求明确"不要花哨动画"。 */
+.pending{
+  display:flex;align-items:center;gap:7px;
+  padding:11px 15px;font-size:12px;color:var(--muted);
+}
+.pending .dot{width:5px;height:5px;background:var(--steel);border-radius:50%}
+
+/* ---------------------------------------------- 结构化结果卡片 */
+.card{
+  margin:0 15px 15px;
+  border:1px solid var(--line);border-left:3px solid var(--navy);
+  border-radius:2px;background:var(--panel);
+}
+.card.clarify{border-left-color:var(--amber);background:var(--panel)}
+.card.status{border-left-color:var(--steel)}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:7px 13px;background:var(--panel-alt);border-bottom:1px solid var(--line);
+  font-size:11px;color:var(--steel);letter-spacing:.02em;
+}
+.card-head .tag{font-weight:600;color:var(--steel)}
+.card-head .src{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.card-body{padding:13px}
+
+/* 字段网格：单行结果为字段表，多行结果为紧凑表（见 renderFrame） */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px 20px}
+.field .k{font-size:11px;color:var(--muted)}
+.field .v{margin-top:2px;font-family:var(--mono);font-size:12.5px;word-break:break-word}
+
+/* 金额：等宽 + 加大 + muted 金。整页**只有**金额用这个强调色 */
+.amount-row{
+  display:flex;align-items:baseline;gap:9px;
+  margin-top:15px;padding-top:13px;border-top:1px dashed var(--line);
+}
+.amount-row .k{font-size:11.5px;color:var(--steel)}
+.amount{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber);letter-spacing:-.01em}
+.amount-unit{font-family:var(--mono);font-size:12px;color:var(--steel)}
+
+/* 多行结果表 */
+table.res{width:100%;border-collapse:collapse;font-size:12px}
+table.res th{
+  text-align:left;font-weight:600;font-size:11px;color:var(--steel);
+  background:var(--panel-alt);border-bottom:1px solid var(--line);
+  padding:6px 10px;white-space:nowrap;
+}
+table.res td{
+  padding:6px 10px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;
+}
+table.res tr:last-child td{border-bottom:0}
+table.res td.num{text-align:right}
+table.res td.amount-cell{color:var(--amber);font-weight:600;text-align:right}
+
+/* 卡片内的小字说明：计算过程 / 依据 / 如实声明 */
+.notes{margin-top:13px;padding-top:11px;border-top:1px solid var(--line);display:grid;gap:6px}
+.note{display:flex;gap:9px;font-size:11.5px;line-height:1.7}
+.note .nk{flex:0 0 54px;color:var(--muted)}
+.note .nv{flex:1;color:var(--steel);font-family:var(--mono);font-size:11.5px;word-break:break-word}
+
+/* 追问 / 状态卡片的正文 */
+.card-text{font-size:12.5px;line-height:1.8;color:var(--ink);white-space:pre-wrap}
+
+/* ---------------------------------------------- 引用来源（学术引用样式）
+   ⛔ 刻意做成"正文上标编号 + 底部浅灰小字列表"，
+      不用来源卡片、不用 emoji、不写"引用/来源"之外的任何花哨字眼。 */
+sup.cite{font-family:var(--mono);font-size:10px;color:var(--navy);vertical-align:super;padding:0 1px}
+.cites{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.cites .h{font-size:11px;color:var(--muted);margin-bottom:5px}
+.cite-item{font-size:11.5px;line-height:1.75;color:#5a6672;padding-left:2px}
+.cite-item .idx{font-family:var(--mono);color:var(--steel)}
+.cite-item .doc{color:var(--steel)}
+.cite-item .no{font-family:var(--mono)}
+.cite-item .excerpt{color:var(--muted);display:block;padding-left:16px}
+
+/* 接口错误：一行克制的提示，⛔ 不弹窗、不用红色警示块 */
+.line-error{
+  margin:0 0 16px;padding:7px 11px;font-size:11.5px;color:var(--steel);
+  background:var(--panel-alt);border:1px solid var(--line);border-left:3px solid var(--steel);
+  border-radius:2px;font-family:var(--mono);
+}
+
+/* ---------------------------------------------- 底部输入区（固定） */
+.composer{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);padding:11px 22px 14px}
+.composer-inner{max-width:1120px}
+.tags{display:flex;gap:8px;margin-bottom:9px}
+.tag{
+  background:var(--panel);border:1px solid var(--line-strong);border-radius:2px;
+  color:var(--navy);font-size:12px;padding:3px 11px;
+}
+.tag:hover{background:var(--hover);border-color:var(--navy)}
+.input-row{display:flex;gap:10px;align-items:flex-end}
+#q{
+  flex:1;height:52px;padding:8px 11px;resize:none;
+  font-size:13px;line-height:1.6;color:var(--ink);
+  background:var(--panel);border:1px solid var(--line-strong);border-radius:2px;
+}
+#q:focus{outline:none;border-color:var(--navy)}
+#send{
+  flex:0 0 auto;height:52px;padding:0 20px;
+  background:var(--navy);border:1px solid var(--navy);border-radius:2px;
+  color:#fff;font-size:13px;font-weight:600;letter-spacing:.02em;
+}
+#send:hover{background:var(--navy-dark)}
+#send:disabled{background:var(--steel);border-color:var(--steel);cursor:default;opacity:.75}
+.hint{margin-top:7px;font-size:11px;color:var(--muted)}
+.hint .mono{font-size:11px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== 左侧边栏 ===================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>平陆运河航运助手</h1>
+      <div class="en">CanalMind</div>
+    </div>
+
+    <nav class="sessions" id="sessions" aria-label="历史会话"></nav>
+
+    <div class="side-foot">
+      <div class="src-row">
+        <label for="dataSource">数据源</label>
+        <select id="dataSource">
+          <option value="mock">演示数据</option>
+          <option value="api">后端接口</option>
+        </select>
+      </div>
+      <div class="model">
+        <div><span class="k">嵌入</span><span class="v">bge-m3:1024</span></div>
+        <div><span class="k">生成</span><span class="v">glm-5.3-flash / glm-5.3</span></div>
+        <div class="ver">canalmind-api v0.1.0-SNAPSHOT</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== 主区域 ===================== -->
+  <section class="main">
+    <header class="topbar">
+      <div class="topic" id="topic">过闸费测算 · 建材 3200 吨</div>
+      <div class="right">
+        <span class="ts" id="clock"></span>
+        <button class="btn-text" id="export" type="button">导出本会话</button>
+      </div>
+    </header>
+
+    <div class="conv" id="conv"><div class="conv-inner" id="convInner"></div></div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="tags">
+          <button class="tag" type="button" data-q="建材类货物，载货 3200 吨，2026-10-12 过闸，过闸费多少？">查过闸费</button>
+          <button class="tag" type="button" data-q="危险货物运输申报要提前多久提交？">查通航规则</button>
+          <button class="tag" type="button" data-q="下周三有哪些船期靠泊？">查船期</button>
+        </div>
+        <div class="input-row">
+          <textarea id="q" rows="2" placeholder="输入业务问题，例如：建材类货物载货 3200 吨，2026-10-12 过闸，过闸费多少？（回车发送，Shift+回车换行）"></textarea>
+          <button id="send" type="button">发送</button>
+        </div>
+        <div class="hint">
+          金额、费率、档位由受控工具集依据《过闸费费率表》等规则语料计算；引用条款可逐条核对。
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================================
+   一、后端接口契约（与 backend 的 ChatStreamController 严格对应）
+
+   事件名共 5 种：
+     meta       {"sessionId":"..."}
+     structured 单行 JSON —— 路由结论 + 结构化通道五态结果 + 引用来源
+     token      增量正文，**换行已转义**（见 unescapeSse）
+     done       {"chunks":N,"elapsedMs":N}
+     error      {"message":"...","code":"..."}
+
+   ⚠️ 关键约定（与后端 SseTextCodec 逐字符对应，⛔ 两侧必须始终一致）：
+     转义映射为  反斜杠 -> 两个反斜杠 ；LF -> 反斜杠+n ；CR -> 反斜杠+r
+     ⇒ 解码必须**单趟扫描**并根据下一个字符决定还原成什么。
+        ⛔ 不许写成链式 replace：那种写法不是双射，
+          正文里本来就有的字面量（如 Windows 路径 C:\new）会被误还原成换行，
+          把内容悄悄改坏。这正是后端 SseTextCodec 额外转义反斜杠本身的原因。
+   ============================================================================ */
+var API_BASE = "http://127.0.0.1:8080";
+
+function unescapeSse(text) {
+  var out = "";
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (c !== "\\") { out += c; continue; }
+    if (i + 1 >= text.length) { out += "\\"; break; }   // 末尾孤立反斜杠：原样保留
+    var next = text.charAt(++i);
+    if (next === "\\") { out += "\\"; }
+    else if (next === "n") { out += "\n"; }
+    else if (next === "r") { out += "\r"; }
+    else { out += "\\" + next; }                        // 未知转义原样保留 ⇒ 向前兼容
+  }
+  return out;
+}
+
+function parseSseBlock(block) {
+  var name = "";
+  var dataLines = [];
+  var lines = block.split("\n");
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line.charAt(0) === ":") { continue; }           // 注释行（心跳）
+    if (line.indexOf("event:") === 0) { name = line.slice(6).trim(); }
+    else if (line.indexOf("data:") === 0) {
+      var v = line.slice(5);
+      if (v.charAt(0) === " ") { v = v.slice(1); }
+      dataLines.push(v);
+    }
+  }
+  if (!name && dataLines.length === 0) { return null; }
+  // SSE 规范：同一事件的多条 data 行以换行拼接
+  return { event: name || "message", data: dataLines.join("\n") };
+}
+
+/* ---------------------------------------------------------------------------
+   读取真实后端。返回一个可 await 的 Promise。
+   ⚠️ 这里**累积** token 而不是边收边渲染：
+      需求明确要求"不要打字机逐字输出动画，直接显示完整回答"，
+      故 token 只用于拼接，等 done 事件到达后一次性渲染完整正文。
+      结构化帧则**先到先渲染**（它在 token 之前到达），
+      于是"结果卡片立即出现、正文随后整段出现"，既不闪烁也不表演。
+   --------------------------------------------------------------------------- */
+function streamFromBackend(question, sessionId, h) {
+  var url = API_BASE + "/api/chat/stream?question=" + encodeURIComponent(question)
+          + "&sessionId=" + encodeURIComponent(sessionId);
+  var answer = "";
+  return fetch(url, { headers: { "Accept": "text/event-stream" }, cache: "no-store" })
+    .then(function (resp) {
+      if (!resp.ok) { throw new Error("HTTP " + resp.status); }
+      if (!resp.body || !resp.body.getReader) { throw new Error("当前浏览器不支持流式读取"); }
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder("utf-8");
+      var buf = "";
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) { return; }
+          buf += decoder.decode(r.value, { stream: true });
+          // 统一换行：SSE 的分隔符按规范是空行；兼容 CRLF 与 LF 两种服务端实现
+          buf = buf.split("\r\n").join("\n");
+          var idx;
+          while ((idx = buf.indexOf("\n\n")) >= 0) {
+            var block = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            var evt = parseSseBlock(block);
+            if (evt) {
+              if (evt.event === "structured") {
+                try { h.onFrame(JSON.parse(evt.data)); } catch (e) { /* 帧坏了就当没有帧，不影响正文 */ }
+              } else if (evt.event === "token") {
+                answer += unescapeSse(evt.data);
+              } else if (evt.event === "error") {
+                var msg = "生成失败，请稍后重试";
+                try { msg = JSON.parse(evt.data).message || msg; } catch (e) { /* 用默认文案 */ }
+                h.onError(msg);
+              }
+            }
+          }
+          return pump();
+        });
+      }
+      return pump().then(function () { return answer; });
+    });
+}
+
+/* ============================================================================
+   二、演示数据（默认数据源）
+   ⚠️ 演示值不是随手编的：费率取自项目真实仿真语料《过闸费费率表（2026版）》
+      （文号 PLYH-FL-2026-006，生效 2026-09-16 至 2026-12-31，终止日不含），
+      档位区间、加减成规则、引航费与货类无关、申报时限等均照语料条款。
+   ⚠️ 页面为"演示数据"模式时**不在前端算业务账**——下面的金额是按语料条款
+      手工核对后写死的常量，只用于展示卡片长什么样。
+      真实系统里金额一律由后端 FeeCalculationEngine 用纯代码计算
+      （决策 C-33：模型只做参数抽取，金额由代码算），⛔ 前端永不参与计费。
+   ============================================================================ */
+
+function citationOf(docTitle, docNo, articleNo, articleTitle, chapterPath, excerpt) {
+  return {
+    chunkId: "", docTitle: docTitle, docNo: docNo, articleNo: articleNo,
+    articleTitle: articleTitle, chapterPath: chapterPath,
+    partIndex: 1, partCount: 1, excerpt: excerpt
+  };
+}
+
+/** 过闸费测算帧：结构与后端 ChatFrameCodec 产出的完全一致。
+ *  ⚠️ 规则码格式是 `CT-<费种>-<货类>-<档位下限>-<生效起始日>`（由语料派生，
+ *     见后端 corpus_tariff.py 的 _with_rule_codes）——⛔ 不是文号+条款号，
+ *     两者不能混。文号（PLYH-FL-2026-006）只出现在引用来源里。 */
+function frameQuoteFee() {
+  return {
+    v: 1,
+    route: { channel: "STRUCTURED", ruleId: "R1-数值诉求-结构化",
+             reason: "命中数值诉求「多少」⇒ 该数值应由数据库算出，走受控工具集" },
+    tool: {
+      name: "quote_fee", status: "OK",
+      columns: ["费种", "货种", "货类", "计费吨位", "吨位口径", "单价", "单位", "天数", "金额(元)", "规则码"],
+      rows: [["过闸费", "水泥", "建材", "3200", "载货吨位", "3.30", "元/吨", "1", "10560.00", "CT-过闸费-建材-2000-20260916"]],
+      facts: [
+        "过闸费金额 = 10560.00 元",
+        "计算过程：3200（载货吨位） × 3.30 元/吨 = 10560.00 元",
+        "依据规则码 CT-过闸费-建材-2000-20260916（档位 [2000,5000)，生效期 2026-09-16 ~ 2026-12-31）",
+        "未实现条款（如实声明）：引航中止按 50% 计收（08-第六条）：库内无「中止」状态字段，不可触发；"
+          + "自备装卸设备按半价（09-第九条 2）：库内无「是否自备设备」字段，不可触发；"
+          + "堆存与仓储费率（20-第十一/十二条）：无对应数据表，不计费"
+      ],
+      question: null, degradeKind: null
+    },
+    citations: [citationOf("过闸费费率表（2026版）", "PLYH-FL-2026-006", "第四条",
+      "【建材类过闸费费率】", ["第二章 费率标准"],
+      "建材类货物过闸费费率如下：[2000,5000) 档 3.30 元/吨，计费单位为元/吨，按船舶载货吨位计收")]
+  };
+}
+
+/** 追问帧：引航费按总吨位分档、与货类无关，缺参不猜（C-35）。 */
+function frameClarifyPilot() {
+  return {
+    v: 1,
+    route: { channel: "STRUCTURED", ruleId: "R4-仅业务对象-结构化",
+             reason: "只提到业务对象未提数值 ⇒ 先进工具集，由抽取层决定是否追问" },
+    tool: {
+      name: "quote_fee", status: "NEEDS_CLARIFICATION",
+      columns: [], rows: [],
+      facts: ["需要补充信息后才能查询：请补充以下信息：船舶总吨位、业务发生日期。"],
+      question: "请补充以下信息：船舶总吨位、业务发生日期。例如「2026 年 10 月的引航费，船舶总吨位 3000」这样带上费种、吨位与业务日期。",
+      degradeKind: null
+    },
+    citations: [citationOf("引航费与停泊费费率表", "PLYH-FL-2026-008", "第二条",
+      "【引航费费率】", ["第二章 费率标准"],
+      "引航费按船舶总吨位分档计收，与货物所属货类无关，不得因货类不同而调整")]
+  };
+}
+
+/** 无数据帧：数据集里没有船期（班期）表 ⇒ 如实说没有，⛔ 不编一张船期表。 */
+function frameNoSchedule() {
+  return {
+    v: 1,
+    route: { channel: "RETRIEVAL", ruleId: "R6-分类器不可用-兜底走检索",
+             reason: "规则未命中且分类器不可用 ⇒ 兜底走检索" },
+    tool: {
+      name: "query_schedule", status: "NO_DATA",
+      columns: [], rows: [],
+      facts: ["当前业务数据集不含船期（班期）数据：库内有运单、船舶、费用与规则语料，无船期表，因此无法给出靠泊计划"],
+      question: null, degradeKind: null
+    },
+    citations: []
+  };
+}
+
+/** 演示会话集。turns 里每条就是一条消息；frame 为空表示纯文字回答。 */
+var SESSIONS = [
+  {
+    id: "s1", group: "今天", title: "过闸费测算 · 建材 3200 吨",
+    summary: "2026-10-12 · 过闸费 10560.00 元",
+    turns: [
+      { role: "user", text: "建材类货物，载货 3200 吨，2026-10-12 过闸，过闸费多少？" },
+      { role: "sys",
+        text: "按《过闸费费率表（2026版）》第四条，建材类货物 3200 吨落在 [2000, 5000) 档，单价 3.30 元/吨；过闸费按载货吨位计收，空载航次不计费。\n"
+            + "业务发生日 2026-10-12 在 2026 版费率表生效期（2026-09-16 至 2026-12-31，终止日不含）内，故适用 2026 版费率 [1]。\n"
+            + "过闸费合计 10560.00 元，计算明细如下：",
+        frame: frameQuoteFee() },
+      { role: "user", text: "那引航费呢？多少钱？" },
+      { role: "sys",
+        text: "「引航费」按船舶总吨位分档计收，与货物所属货类无关，不得因货类不同而调整 [1]。\n"
+            + "您这次没有给出船舶总吨位与业务发生日期 —— 前者决定适用档位，后者决定适用哪一版费率表，缺任一项都无法测算，因此不给估计值。",
+        frame: frameClarifyPilot() }
+    ]
+  },
+  {
+    id: "s2", group: "更早", title: "费率版本 · 2027 年起适用哪版",
+    summary: "条款检索 · 06-第十一条 / 第十二条",
+    turns: [
+      { role: "user", text: "2027 年 1 月以后过闸，过闸费按哪版费率表算？" },
+      { role: "sys",
+        text: "按**业务发生日**定版本：业务发生日为 2027 年 1 月 1 日（含）之后的，一律适用《过闸费费率表（2027版）》（PLYH-FL-2026-007），不得再援引 2026 版 [1]。\n"
+            + "业务发生日指船舶实际过闸日，不按合同签订日、申报日或者结算日确定；即使结算日落在 2027 年 1 月 1 日之后，只要业务发生日在 2026-12-31（含）之前，仍按 2026 版执行 [2]。\n"
+            + "需要注意：援引已废止的费率表计算 2027-01-01 之后发生的过闸费，属**计费差错** [1]。",
+        frame: { v: 1,
+          route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "同时命中规则话题与规则问法且未提出数值诉求 ⇒ 问的是规定本身" },
+          tool: null,
+          citations: [
+            citationOf("过闸费费率表（2026版）", "PLYH-FL-2026-006", "第十一条",
+              "【本费率表的废止】", ["第三章 废止与版本衔接"],
+              "本费率表自 2027 年 1 月 1 日起废止，由《过闸费费率表（2027版）》替代，不得再援引"),
+            citationOf("过闸费费率表（2026版）", "PLYH-FL-2026-006", "第十二条",
+              "【版本衔接与业务发生日】", ["第三章 废止与版本衔接"],
+              "业务发生日落在 2026-12-31（含）之前的，一律适用本费率表，即使费用结算日在 2027-01-01 之后")
+          ] } }
+    ]
+  },
+  {
+    id: "s3", group: "更早", title: "危险货物申报 · 提前多久提交",
+    summary: "条款检索 · 11-第四条 / 第九条",
+    turns: [
+      { role: "user", text: "危险货物运输申报要提前多久提交？审核要多久？" },
+      { role: "sys",
+        text: "申报时限：危险货物运输申报应当在预计过闸时间**前四十八小时**提交；因抢险、救灾、医疗急救等紧急情形需要紧急过闸的，可以在预计过闸时间**前六小时**提交，并在申报单中说明紧急事由 [1]。\n"
+            + "审核时限：受理机构应当自收到齐备申报材料之时起**二十四小时**内作出审核结论；属紧急过闸情形的，应当在**两小时**内作出 [1]。\n"
+            + "审核通过通知自作出之日起**七十二小时**内有效，超过有效期未安排过闸的，申报失效需重新申报 [1]。",
+        frame: { v: 1,
+          route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "命中规则话题「时限」与规则问法「多久」⇒ 答案在规则文档里" },
+          tool: null,
+          citations: [
+            citationOf("危险货物申报与审核细则", "PLYH-GZ-2026-011", "第四条",
+              "【申报时限】", ["第二章 申报时限与材料"],
+              "危险货物运输申报应当在预计过闸时间前四十八小时提交；紧急情形可于前六小时提交"),
+            citationOf("危险货物申报与审核细则", "PLYH-GZ-2026-011", "第九条",
+              "【审核时限】", ["第三章 审核时限与结论"],
+              "受理机构应当自收到齐备申报材料之时起二十四小时内作出审核结论；紧急过闸情形为两小时")
+          ] } }
+    ]
+  },
+  {
+    id: "s4", group: "更早", title: "停泊费 · 不足一日怎么算",
+    summary: "条款检索 · 08-计费规则",
+    turns: [
+      { role: "user", text: "停泊费停靠不足一天怎么算？" },
+      { role: "sys",
+        text: "停泊时间不足一日的，按一日计收；停泊时间超过一日的，不足一日的尾数部分亦按一日计收 [1]。\n"
+            + "即停泊计费天数按「不足一日进一日」处理：停 6 小时与停 23 小时都按 1 日计价。\n"
+            + "另需注意：停泊费按船舶总吨位分档，与货类无关；计费天数由业务数据给出，不由模型推算 [2]。",
+        frame: { v: 1,
+          route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "命中规则问法「怎么算」⇒ 问的是费率表里的计费口径" },
+          tool: null,
+          citations: [
+            citationOf("引航费与停泊费费率表", "PLYH-FL-2026-008", "计费单位与天数",
+              "【停泊费计费天数】", ["第二章 费率标准"],
+              "停泊时间不足一日的，按一日计收；超过一日的，不足一日的尾数部分亦按一日计收"),
+            citationOf("术语与定义", "PLYH-GZ-2026-025", "第十二条",
+              "【计费吨位口径】", ["第三章 计费口径"],
+              "过闸费、港杂费、装卸费按载货吨位计收；引航费、停泊费按船舶总吨位计收")
+          ] } }
+    ]
+  }
+];
+
+/* ============================================================================
+   三、渲染
+   ============================================================================ */
+
+var state = {
+  activeId: "s1",
+  dataSource: "mock",
+  /** 每条会话的对话历史（演示数据取初始 turns，之后按发送追加） */
+  history: {},
+  collapsed: {},
+  /** 真实接口模式的会话标识（多轮上下文用；后端缺省按 anonymous 处理） */
+  sessionId: "web-" + Math.random().toString(36).slice(2, 10),
+  busy: false
+};
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * 正文渲染：先转义，再做两处轻量标记替换。
+ * ⚠️ 顺序不可颠倒——必须先转义再加标签，否则用户输入里的尖括号会变成标签（XSS）。
+ * ① **强调** → <strong>：演示文案用它标出关键时限与金额档位。
+ *    后端正文是**纯文本**（不含该标记），故同一条渲染路径对真实回答也安全。
+ * ② [n] → 上标引用：只在存在引用时替换，避免把"路径[1]"这类正常文本误改。
+ */
+function renderText(text, hasCitations) {
+  var html = esc(text);
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  if (hasCitations) {
+    html = html.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+  }
+  return html;
+}
+
+function fmtValue(v) {
+  return (v === null || v === undefined || v === "") ? "—" : String(v);
+}
+
+/** 在 columns 里找出「金额」列（后端合同靠列名表达金额，前端不猜） */
+function amountColumnIndex(columns) {
+  for (var i = 0; i < columns.length; i++) {
+    if (String(columns[i]).indexOf("金额") >= 0) { return i; }
+  }
+  return -1;
+}
+
+function factStarting(facts, prefix) {
+  for (var i = 0; i < facts.length; i++) {
+    if (String(facts[i]).indexOf(prefix) === 0) { return String(facts[i]); }
+  }
+  return null;
+}
+
+/**
+ * 结构化结果卡片 —— 演示数据与真实接口**共用这一个渲染器**。
+ * ⚠️ 这是本页的关键设计：两种数据源的帧结构完全相同（都来自后端 ChatFrameCodec 的合同），
+ *    因此卡片只有一份实现，也就不会出现"演示好看、真接上就崩"的分叉。
+ */
+function renderFrame(frame) {
+  if (!frame) { return ""; }
+  var tool = frame.tool;
+  if (!tool) { return ""; }
+
+  var status = tool.status || "";
+  var citations = frame.citations || [];
+  var body = "";
+
+  if (status === "NEEDS_CLARIFICATION") {
+    body = '<div class="card-text">' + esc(tool.question || (tool.facts && tool.facts[0]) || "") + "</div>";
+    return cardShell("clarify", "待补充信息", tool.name, body, citations);
+
+  } else if (status === "OK") {
+    var columns = tool.columns || [];
+    var rows = tool.rows || [];
+    var ai = amountColumnIndex(columns);
+
+    if (rows.length === 0) {
+      body = '<div class="card-text">查询已执行，但没有返回数据行。</div>';
+      return cardShell("status", "无数据行", tool.name, body, citations);
+    }
+
+    if (rows.length === 1) {
+      // ── 单行结果 ⇒ 字段网格 + 金额强调 ──
+      var row = rows[0];
+      var fields = "";
+      for (var c = 0; c < columns.length; c++) {
+        if (c === ai) { continue; }                                  // 金额单独一行展示
+        if (String(columns[c]) === "规则码") { continue; }            // 规则码归到「依据」里
+        fields += '<div class="field"><div class="k">' + esc(columns[c]) + "</div>"
+                + '<div class="v">' + esc(fmtValue(row[c])) + "</div></div>";
+      }
+      body = '<div class="grid">' + fields + "</div>";
+      if (ai >= 0) {
+        body += '<div class="amount-row"><span class="k">' + esc(columns[ai]) + "</span>"
+              + '<span class="amount">' + esc(fmtValue(row[ai])) + "</span>"
+              + '<span class="amount-unit">元</span></div>';
+      }
+    } else {
+      // ── 多行结果 ⇒ 紧凑表（统计/明细类查询走这支） ──
+      var head = "<tr>";
+      for (var h = 0; h < columns.length; h++) {
+        head += "<th>" + esc(columns[h]) + "</th>";
+      }
+      head += "</tr>";
+      var tbody = "";
+      for (var r = 0; r < rows.length; r++) {
+        tbody += "<tr>";
+        for (var k = 0; k < columns.length; k++) {
+          var cls = (k === ai) ? "amount-cell" : (k > 0 ? "num" : "");
+          tbody += '<td class="' + cls + '">' + esc(fmtValue(rows[r][k])) + "</td>";
+        }
+        tbody += "</tr>";
+      }
+      body = "<table class=\"res\"><thead>" + head + "</thead><tbody>" + tbody + "</tbody></table>";
+    }
+    body += renderNotes(tool);
+    return cardShell("", "结构化结果", tool.name, body, citations);
+
+  } else {
+    // ── NO_DATA / REJECTED / DEGRADED：三种都不是"错误"，各自如实说明 ──
+    var title = status === "NO_DATA" ? "查询范围内无数据"
+              : status === "REJECTED" ? "无法按该口径执行"
+              : "本次未给出确定性结果";
+    var lines = (tool.facts || []).map(function (f) { return esc(f); }).join("\n");
+    body = '<div class="card-text">' + (lines || "该通道本次没有可展示的确定性事实。") + "</div>";
+    if (tool.question) {
+      body += '<div class="card-text" style="margin-top:8px">' + esc(tool.question) + "</div>";
+    }
+    return cardShell("status", title, tool.name, body, citations);
+  }
+}
+
+/** 卡片里的「计算过程 / 依据 / 如实声明」小字区 */
+function renderNotes(tool) {
+  var facts = tool.facts || [];
+  var proc = factStarting(facts, "计算过程：");
+  var basis = factStarting(facts, "依据规则码");
+  var gaps = factStarting(facts, "未实现条款");
+  var ruleCode = "";
+  if (basis) { ruleCode = basis.replace(/^依据规则码\s*/, ""); }
+
+  var out = "";
+  if (proc || basis) {
+    out += '<div class="notes">';
+    if (proc) {
+      out += '<div class="note"><span class="nk">计算过程</span><span class="nv">'
+           + esc(proc.replace(/^计算过程：/, "")) + "</span></div>";
+    }
+    if (basis) {
+      out += '<div class="note"><span class="nk">依据</span><span class="nv">'
+           + esc(ruleCode) + "</span></div>";
+    }
+    out += "</div>";
+  }
+  // ⛔ "未实现条款"是后端如实声明的能力边界，必须留在卡片上而不是藏起来
+  if (gaps) {
+    out += '<div class="notes" style="border-top:0;padding-top:2px"><div class="note">'
+         + '<span class="nk">能力边界</span><span class="nv">'
+         + esc(gaps.replace(/^未实现条款（如实声明）：/, "")) + "</span></div></div>";
+  }
+  return out;
+}
+
+function cardShell(extraClass, tagText, toolName, body, citations) {
+  var head = '<div class="card-head"><span class="tag">' + esc(tagText) + "</span>"
+           + '<span class="src">' + esc(toolName || "") + "</span></div>";
+  return '<div class="card ' + extraClass + '">' + head
+       + '<div class="card-body">' + body + renderCitations(citations) + "</div></div>";
+}
+
+/** 引用来源：像学术引用那样——上标编号 + 底部浅灰小字 */
+function renderCitations(citations) {
+  if (!citations || citations.length === 0) { return ""; }
+  var html = '<div class="cites"><div class="h">引用来源</div>';
+  for (var i = 0; i < citations.length; i++) {
+    var c = citations[i];
+    var parts = [];
+    parts.push("<span class=\"doc\">《" + esc(c.docTitle) + "》</span>");
+    if (c.docNo) { parts.push('<span class="no">' + esc(c.docNo) + "</span>"); }
+    var path = (c.chapterPath || []).join(" · ");
+    if (path) { parts.push(esc(path)); }
+    if (c.articleNo) { parts.push(esc(c.articleNo) + (c.articleTitle ? esc(c.articleTitle) : "")); }
+    if (c.partCount > 1) { parts.push("（第 " + c.partIndex + "/" + c.partCount + " 段）"); }
+    html += '<div class="cite-item"><span class="idx">[' + (i + 1) + "]</span> "
+          + parts.join(" ")
+          + (c.excerpt ? '<span class="excerpt">' + esc(c.excerpt) + "</span>" : "")
+          + "</div>";
+  }
+  return html + "</div>";
+}
+
+function renderMessage(msg) {
+  if (msg.role === "user") {
+    return '<div class="msg-user"><div class="bubble">' + esc(msg.text) + "</div></div>";
+  }
+  if (msg.role === "error") {
+    return '<div class="line-error">' + esc(msg.text) + "</div>";
+  }
+  if (msg.role === "pending") {
+    return '<div class="msg-sys"><div class="pending"><span class="dot"></span>'
+         + '<span>正在检索规则库与业务数据…</span></div></div>';
+  }
+  var citations = (msg.frame && msg.frame.citations) || [];
+  var hasCite = citations.length > 0 || /\[\d+\]/.test(msg.text || "");
+  var html = '<div class="msg-sys">'
+           + '<div class="ans' + (msg.frame && msg.frame.tool ? " tight" : "") + '">'
+           + renderText(msg.text || "", hasCite) + "</div>";
+  html += renderFrame(msg.frame);
+  // 纯文字回答（无结构化结果）时，引用直接挂在回答下方
+  if (msg.frame && !msg.frame.tool) {
+    html += '<div style="padding:0 15px 13px">' + renderCitations(citations) + "</div>";
+  }
+  return html + "</div>";
+}
+
+/* ============================================================================
+   四、会话列表与整体绘制
+   ============================================================================ */
+
+function historyOf(id) {
+  if (!state.history[id]) {
+    var s = null;
+    for (var i = 0; i < SESSIONS.length; i++) { if (SESSIONS[i].id === id) { s = SESSIONS[i]; } }
+    state.history[id] = s
+      ? s.turns.map(function (t) { return { role: t.role, text: t.text, frame: t.frame }; })
+      : [];
+  }
+  return state.history[id];
+}
+
+function drawSessions() {
+  var groups = [];
+  for (var i = 0; i < SESSIONS.length; i++) {
+    var g = SESSIONS[i].group;
+    if (groups.indexOf(g) < 0) { groups.push(g); }
+  }
+  var html = "";
+  for (var gi = 0; gi < groups.length; gi++) {
+    var name = groups[gi];
+    var collapsed = !!state.collapsed[name];
+    html += '<div class="group' + (collapsed ? " group-collapsed" : "") + '">'
+          + '<div class="group-head" data-group="' + esc(name) + '">'
+          + "<span>" + esc(name) + '</span><span class="caret">' + (collapsed ? "+" : "−") + "</span></div>"
+          + '<div class="group-body">';
+    for (var si = 0; si < SESSIONS.length; si++) {
+      var s = SESSIONS[si];
+      if (s.group !== name) { continue; }
+      html += '<button type="button" class="session' + (s.id === state.activeId ? " active" : "")
+            + '" data-id="' + esc(s.id) + '">'
+            + '<div class="t">' + esc(s.title) + "</div>"
+            + '<div class="s">' + esc(s.summary) + "</div></button>";
+    }
+    html += "</div></div>";
+  }
+  document.getElementById("sessions").innerHTML = html;
+}
+
+function drawConversation() {
+  var msgs = historyOf(state.activeId);
+  var html = "";
+  for (var i = 0; i < msgs.length; i++) { html += renderMessage(msgs[i]); }
+  document.getElementById("convInner").innerHTML = html;
+  var box = document.getElementById("conv");
+  box.scrollTop = box.scrollHeight;
+}
+
+function drawTopic() {
+  for (var i = 0; i < SESSIONS.length; i++) {
+    if (SESSIONS[i].id === state.activeId) {
+      document.getElementById("topic").textContent = SESSIONS[i].title;
+      return;
+    }
+  }
+}
+
+function pushMessage(msg) {
+  historyOf(state.activeId).push(msg);
+  drawConversation();
+}
+
+function replacePending(msg) {
+  var msgs = historyOf(state.activeId);
+  for (var i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === "pending") { msgs.splice(i, 1); break; }
+  }
+  msgs.push(msg);
+  drawConversation();
+}
+
+/* ============================================================================
+   五、演示数据模式下的本地回答
+   ⚠️ 这一节**只服务于"演示数据"模式**：用关键词把问题分派到几条预置答案，
+      不连网、不调模型。
+   ⛔ 它不做计费。真实系统里金额由后端算（决策 C-33），
+      这里出现的数字全部来自前面 SESSIONS 里已按语料手工核对过的常量。
+   ============================================================================ */
+
+var FALLBACK_TEXT =
+  "这个问题当前演示数据集里没有对应的预置答案。可试三类问法：\n"
+  + "· 费用测算：说明货类、载货吨位与业务日期，例如「建材 3200 吨，2026-10-12 过闸」；\n"
+  + "· 规则条款：直接问规定本身，例如「危险货物申报要提前多久」；\n"
+  + "· 统计与明细：给出日期区间与分组维度。";
+
+function mockReply(q) {
+  // ① 船期：数据集里没有这张表 ⇒ 如实说没有（**不编一张船期表**）
+  if (/船期|班期|靠泊计划|开航时间|到港时间/.test(q)) {
+    return { text: "当前业务数据集里没有船期（班期）数据表，因此无法给出靠泊或开航计划。\n"
+                 + "库内可用的是运单、船舶、费用记录与规则语料四类数据；船期请以港口调度发布的班期通知为准，或转人工核实。",
+             frame: frameNoSchedule() };
+  }
+
+  // ② 引航费 / 停泊费**问金额** ⇒ 追问（这两类费按总吨位分档，与货类无关）
+  if (/引航费|停泊费/.test(q)
+      && /多少钱|多少元|多少|测算|算一下|报价/.test(q)
+      && !/怎么算|怎么收|不足|不满|规定|依据|哪一版|几天/.test(q)) {
+    return { text: "「引航费」与「停泊费」均按船舶总吨位分档计收，与货物所属货类无关，不得因货类不同而调整 [1]。\n"
+                 + "您这次没有给出船舶总吨位与业务发生日期，这两项分别决定适用档位与适用费率版本，缺任一项都无法测算，因此不给估计值。",
+             frame: frameClarifyPilot() };
+  }
+
+  // ③ 停泊费**问规则** ⇒ 条款回答（不足一日按一日）
+  if (/停泊费|引航费/.test(q) && /怎么算|怎么收|不足|不满|规定|依据|几天/.test(q)) {
+    return { text: "停泊时间不足一日的，按一日计收；停泊时间超过一日的，不足一日的尾数部分亦按一日计收 [1]。\n"
+                 + "即停泊计费天数按「不足一日进一日」处理。此外，停泊费按船舶总吨位分档，与货类无关 [2]。",
+             frame: { v: 1,
+               route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "命中规则问法「怎么算」⇒ 问的是费率表里的计费口径" },
+               tool: null,
+               citations: [
+                 citationOf("引航费与停泊费费率表", "PLYH-FL-2026-008", "计费单位与天数",
+                   "【停泊费计费天数】", ["第二章 费率标准"],
+                   "停泊时间不足一日的，按一日计收；超过一日的，不足一日的尾数部分亦按一日计收"),
+                 citationOf("术语与定义", "PLYH-GZ-2026-025", "第十二条",
+                   "【计费吨位口径】", ["第三章 计费口径"],
+                   "过闸费、港杂费、装卸费按载货吨位计收；引航费、停泊费按船舶总吨位计收")
+               ] } };
+  }
+
+  // ④ 申报时限 / 危险货物
+  if (/申报|危险货物|危货/.test(q)) {
+    return { text: "申报时限：危险货物运输申报应当在预计过闸时间**前四十八小时**提交；因抢险、救灾、医疗急救等紧急情形需要紧急过闸的，可在**前六小时**提交并说明紧急事由 [1]。\n"
+                 + "审核时限：受理机构应当自收到齐备申报材料之时起**二十四小时**内作出审核结论；紧急过闸情形为**两小时**内 [2]。\n"
+                 + "审核通过通知自作出之日起**七十二小时**内有效，超期未安排过闸的须重新申报 [1]。",
+             frame: { v: 1,
+               route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "命中规则话题「时限」与规则问法「多久」⇒ 答案在规则文档里" },
+               tool: null,
+               citations: [
+                 citationOf("危险货物申报与审核细则", "PLYH-GZ-2026-011", "第四条",
+                   "【申报时限】", ["第二章 申报时限与材料"],
+                   "危险货物运输申报应当在预计过闸时间前四十八小时提交；紧急情形可于前六小时提交"),
+                 citationOf("危险货物申报与审核细则", "PLYH-GZ-2026-011", "第九条",
+                   "【审核时限】", ["第三章 审核时限与结论"],
+                   "受理机构应当自收到齐备申报材料之时起二十四小时内作出审核结论；紧急过闸情形为两小时")
+               ] } };
+  }
+
+  // ⑤ 费率版本
+  if (/哪一版|版本|废止|2027|2026 ?版|适用哪/.test(q) && /费率|过闸费|过闸/.test(q)) {
+    return { text: "按业务发生日（船舶实际过闸日）定版本 [1]：\n"
+                 + "· 业务发生日在 2026-12-31（含）之前，适用《过闸费费率表（2026版）》，即使结算日在 2027-01-01 之后也不改变其适用版本；\n"
+                 + "· 业务发生日为 2027-01-01（含）之后，一律适用《过闸费费率表（2027版）》，不得再援引 2026 版。",
+             frame: { v: 1,
+               route: { channel: "RETRIEVAL", ruleId: "R2-规则话题-检索", reason: "命中规则话题「版本/适用」⇒ 答案在费率表的版本衔接条款" },
+               tool: null,
+               citations: [
+                 citationOf("过闸费费率表（2026版）", "PLYH-FL-2026-006", "第十一条",
+                   "【本费率表的废止】", ["第三章 废止与版本衔接"],
+                   "本费率表自 2027 年 1 月 1 日起废止，由《过闸费费率表（2027版）》替代，不得再援引"),
+                 citationOf("过闸费费率表（2026版）", "PLYH-FL-2026-006", "第十二条",
+                   "【版本衔接与业务发生日】", ["第三章 废止与版本衔接"],
+                   "业务发生日落在 2026-12-31（含）之前的，一律适用本费率表，即使费用结算日在 2027-01-01 之后")
+               ] } };
+  }
+
+  // ⑥ 过闸费 / 费用测算 ⇒ 金额卡片（演示模式：直接给已按语料核对过的预置结果）
+  if (/过闸费|港杂费|装卸费|费用|运费|多少钱|多少元|测算/.test(q)) {
+    return { text: "按《过闸费费率表（2026版）》第四条，建材类货物 3200 吨落在 [2000, 5000) 档，单价 3.30 元/吨；过闸费按载货吨位计收，空载航次不计费。\n"
+                 + "业务发生日 2026-10-12 在 2026 版费率表生效期内，故适用 2026 版费率 [1]。\n"
+                 + "过闸费合计 10560.00 元，计算明细如下：",
+             frame: frameQuoteFee() };
+  }
+
+  // ⑦ 规则类兜底
+  if (/规则|规定|依据|流程|怎么|为什么|吗|呢/.test(q)) {
+    return { text: "这类问题需要定位到具体条款才能回答。演示数据集里已覆盖的规则话题包括：过闸费与费率的版本衔接、"
+                 + "危险货物申报与审核时限、引航费与停泊费的计费口径、船舶过闸管理办法与尺度控制标准。\n"
+                 + "请把问题收窄到其中一个话题，例如「危险货物申报要提前多久提交」。",
+             frame: { v: 1,
+               route: { channel: "RETRIEVAL", ruleId: "R6-分类器不可用-兜底走检索", reason: "规则未命中且分类器不可用 ⇒ 兜底走检索" },
+               tool: null,
+               citations: [] } };
+  }
+
+  return { text: FALLBACK_TEXT, frame: null };
+}
+
+/* ============================================================================
+   六、发送
+   ============================================================================ */
+
+function submit(question) {
+  var q = (question || "").trim();
+  if (!q || state.busy) { return; }
+
+  state.busy = true;
+  document.getElementById("send").disabled = true;
+  pushMessage({ role: "user", text: q });
+  pushMessage({ role: "pending", text: "" });
+
+  if (state.dataSource === "mock") {
+    // 演示数据：本地即时回答（保持"直接显示完整回答"，⛔ 不做逐字动画）
+    var reply = mockReply(q);
+    window.setTimeout(function () {
+      replacePending({ role: "sys", text: reply.text, frame: reply.frame });
+      state.busy = false;
+      document.getElementById("send").disabled = false;
+    }, 220);
+    return;
+  }
+
+  // 真实接口：先渲染结构化帧（它先到），正文累积到 done 再整段渲染
+  var frameRendered = false;
+  var sessionForCall = state.activeId;
+  streamFromBackend(q, state.sessionId, {
+    onFrame: function (frame) {
+      if (sessionForCall !== state.activeId) { return; }
+      var msgs = historyOf(state.activeId);
+      for (var i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "pending") {
+          msgs[i] = { role: "sys", text: "", frame: frame };
+          frameRendered = true;
+          drawConversation();
+          return;
+        }
+      }
+    },
+    onError: function (message) {
+      if (sessionForCall !== state.activeId) { return; }
+      replacePending({ role: "error", text: "接口返回错误：" + message });
+      state.busy = false;
+      document.getElementById("send").disabled = false;
+    }
+  }).then(function (answer) {
+    if (sessionForCall !== state.activeId) { return; }
+    var msgs = historyOf(state.activeId);
+    // 已经渲染过帧 ⇒ 只补正文；否则整条替换
+    var kept = null;
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "pending") { break; }
+      if (frameRendered && msgs[i].role === "sys") { kept = msgs[i]; break; }
+    }
+    if (frameRendered && kept) {
+      kept.text = answer;
+      drawConversation();
+    } else {
+      replacePending({ role: "sys", text: answer, frame: null });
+    }
+    state.busy = false;
+    document.getElementById("send").disabled = false;
+  }).catch(function (err) {
+    if (sessionForCall !== state.activeId) { return; }
+    replacePending({ role: "error",
+      text: "接口不可用：无法连接 " + API_BASE + "（" + (err && err.message ? err.message : err) + "）" });
+    state.busy = false;
+    document.getElementById("send").disabled = false;
+  });
+}
+
+/* ============================================================================
+   七、事件绑定
+   ============================================================================ */
+
+document.getElementById("sessions").addEventListener("click", function (e) {
+  var head = e.target.closest(".group-head");
+  if (head) {
+    var name = head.getAttribute("data-group");
+    state.collapsed[name] = !state.collapsed[name];
+    drawSessions();
+    return;
+  }
+  var item = e.target.closest(".session");
+  if (item) {
+    state.activeId = item.getAttribute("data-id");
+    drawSessions();
+    drawTopic();
+    drawConversation();
+  }
+});
+
+document.getElementById("dataSource").addEventListener("change", function (e) {
+  state.dataSource = e.target.value;
+  var hint = document.querySelector(".hint");
+  if (state.dataSource === "api") {
+    hint.textContent = "已切到后端接口：" + API_BASE + "/api/chat/stream（需后端在运行，且已开启结构化帧开关）。";
+  } else {
+    hint.textContent = "金额、费率、档位由受控工具集依据《过闸费费率表》等规则语料计算；引用条款可逐条核对。";
+  }
+});
+
+document.getElementById("send").addEventListener("click", function () {
+  var el = document.getElementById("q");
+  var v = el.value;
+  el.value = "";
+  submit(v);
+});
+
+document.getElementById("q").addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    var v = e.target.value;
+    e.target.value = "";
+    submit(v);
+  }
+});
+
+var tagBox = document.querySelector(".tags");
+tagBox.addEventListener("click", function (e) {
+  var b = e.target.closest(".tag");
+  if (b) { submit(b.getAttribute("data-q")); }
+});
+
+/** 导出本会话：纯文本快照（业务系统里核对与归档都要能带走） */
+document.getElementById("export").addEventListener("click", function () {
+  var msgs = historyOf(state.activeId);
+  var title = document.getElementById("topic").textContent;
+  var lines = ["CanalMind 会话导出 · " + title, ""];
+  for (var i = 0; i < msgs.length; i++) {
+    var m = msgs[i];
+    if (m.role === "user") { lines.push("【问】" + m.text); }
+    else if (m.role === "sys") {
+      lines.push("【答】" + (m.text || ""));
+      var tool = m.frame && m.frame.tool;
+      if (tool) {
+        lines.push("     结果状态：" + tool.status);
+        for (var c = 0; c < (tool.columns || []).length; c++) {
+          lines.push("     " + tool.columns[c] + "：" + fmtValue((tool.rows[0] || [])[c]));
+        }
+        for (var f = 0; f < (tool.facts || []).length; f++) { lines.push("     " + tool.facts[f]); }
+      }
+      var cites = (m.frame && m.frame.citations) || [];
+      for (var ci = 0; ci < cites.length; ci++) {
+        lines.push("     [" + (ci + 1) + "] 《" + cites[ci].docTitle + "》" + (cites[ci].docNo || "")
+                 + " " + (cites[ci].chapterPath || []).join(" · ") + " " + (cites[ci].articleNo || ""));
+      }
+    }
+    lines.push("");
+  }
+  var blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "canalmind-session-" + state.activeId + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+});
+
+function tick() {
+  var d = new Date();
+  function p(n) { return (n < 10 ? "0" : "") + n; }
+  document.getElementById("clock").textContent =
+    d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+tick();
+window.setInterval(tick, 30000);
+
+drawSessions();
+drawTopic();
+drawConversation();
+</script>
+</body>
+</html>
