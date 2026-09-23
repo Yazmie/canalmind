@@ -71,6 +71,21 @@ public final class JudgeRunCli {
      */
     private static final int JUDGE_MAX_TOKENS = 4096;
 
+    /**
+     * 落进产物与库里的**判分模型名**（`judgeModel` / `judge_model`）。
+     *
+     * <p>⚠️ **它只是一个标签**：真正发出去的模型名由
+     * {@link LlmRerankerFactory#chatModelFromEnvironment} 从 {@code .env} 的
+     * {@code DEEPSEEK_CHAT_MODEL}（小档）取，两者**必须一致**，否则产物会谎报
+     * "这批分是哪个模型打的"——而本项目的归因纪律正依赖这一列（换了模型而指标变了，
+     * 与改了提示词而指标变了，必须分得开）。
+     *
+     * <p>2026-09-23（**C-61**）随小档改名：{@code deepseek-v4-flash} → {@code glm-5.3-flash}。
+     * ⚠️ 改名**之前**的判分产物（`docs/评测报告/layer-L*-judged-*.json`）里仍写着旧名，
+     * 那是**历史值，⛔ 不改写**；库里已落库的行同样保持旧值。
+     */
+    private static final String JUDGE_MODEL = "glm-5.3-flash";
+
     /** 严格口径：三维每维都要 ≥ 该值。 */
     private static final int STRICT_MIN_EACH = 4;
 
@@ -140,14 +155,14 @@ public final class JudgeRunCli {
         ChatModel chatModel = LlmRerankerFactory.chatModelFromEnvironment(env, JUDGE_MAX_TOKENS);
         JdbcTemplate jdbc = new JdbcTemplate(HarnessCli.dataSource(env));
         LlmJudge judge = new LlmJudge(new DeepSeekJsonInvoker(chatModel, JUDGE_MAX_TOKENS),
-                "deepseek-v4-flash");
+                JUDGE_MODEL);
 
         ObjectNode out = MAPPER.createObjectNode();
         out.put("layer", layer);
         out.put("answersSource", ap.getFileName().toString());
         out.put("strictMinEach", STRICT_MIN_EACH);
         out.put("lenientMinMean", LENIENT_MIN_MEAN);
-        out.put("judgeModel", "deepseek-v4-flash");
+        out.put("judgeModel", JUDGE_MODEL);
         out.put("judgeSameVendorAsSystem", true);
         out.put("datasetTotal", datasetTotal);
         ArrayNode arr = out.putArray("judged");

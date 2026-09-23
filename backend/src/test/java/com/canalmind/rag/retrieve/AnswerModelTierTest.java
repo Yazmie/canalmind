@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AnswerModelTierTest {
 
     @Test
-    @DisplayName("强档默认 deepseek-v4-pro；显式给值就听显式的")
+    @DisplayName("强档默认 glm-5.3；显式给值就听显式的")
     void resolvesStrongModel() {
-        assertEquals("deepseek-v4-pro",
+        assertEquals("glm-5.3",
                 LlmRerankerFactory.answerModel(Map.of()));
 
         Map<String, String> env = new HashMap<>();
@@ -40,12 +40,12 @@ class AnswerModelTierTest {
     void blankStrongModelFallsBackToSmallTier() {
         Map<String, String> env = new HashMap<>();
         env.put(LlmRerankerFactory.ANSWER_MODEL_ENV, "");
-        env.put("DEEPSEEK_CHAT_MODEL", "deepseek-v4-flash");
+        env.put("DEEPSEEK_CHAT_MODEL", "glm-5.3-flash");
 
-        assertEquals("deepseek-v4-flash", LlmRerankerFactory.answerModel(env));
+        assertEquals("glm-5.3-flash", LlmRerankerFactory.answerModel(env));
 
         env.put(LlmRerankerFactory.ANSWER_MODEL_ENV, "   ");
-        assertEquals("deepseek-v4-flash", LlmRerankerFactory.answerModel(env),
+        assertEquals("glm-5.3-flash", LlmRerankerFactory.answerModel(env),
                 "只有空白也算置空 —— 否则配置文件里多一个空格就会静默用错模型");
     }
 
@@ -54,7 +54,7 @@ class AnswerModelTierTest {
     void absentKeyVersusExplicitlyBlank() {
         Map<String, String> env = new HashMap<>();
         env.put("DEEPSEEK_CHAT_MODEL", "small-tier-model");
-        assertEquals("deepseek-v4-pro", LlmRerankerFactory.answerModel(env),
+        assertEquals("glm-5.3", LlmRerankerFactory.answerModel(env),
                 "⛔ 键**不存在**不等于回退：配置漏了也要按裁示用强档");
 
         env.put(LlmRerankerFactory.ANSWER_MODEL_ENV, "");

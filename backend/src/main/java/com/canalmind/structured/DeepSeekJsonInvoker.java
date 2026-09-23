@@ -110,7 +110,7 @@ public final class DeepSeekJsonInvoker implements JsonChatInvoker {
      * 这里是**结构化通道内的那次调用**（参数抽取与分类器都走它），故它的父节点是
      * {@code ai.tool.param.extract} 或 {@code ai.intent.route}——⛔ 不是根。
      *
-     * <p>记高基数 {@code ai.config.version} = 模型标识（如 {@code deepseek-chat}）：
+     * <p>记高基数 {@code ai.config.version} = 模型标识（如 {@code glm-5.3-flash}）：
      * "这条 Trace 是哪一次换模型之前/之后跑的"必须能直接看出来——
      * 本项目"每轮只改少量变量"的归因纪律需要它（换了模型而指标变了，
      * 与改了提示词而指标变了，是两件必须分开的事）。

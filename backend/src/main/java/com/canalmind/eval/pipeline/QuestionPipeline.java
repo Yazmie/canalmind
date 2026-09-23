@@ -186,8 +186,9 @@ public final class QuestionPipeline {
      *
      * <p>⚠️ 只把**最终生成**换成强档，路由 / 参数抽取 / 查询改写**刻意不动**：
      * 那些环节是"检索与判据口径"的一部分，换了会让本轮的分层数字与既有基线不可比
-     * （本项目纪律：每轮只改少量变量）。实测两档模型分别为 {@code deepseek-v4-flash}（小档）
-     * 与 {@code deepseek-v4-pro}（强档）。
+     * （本项目纪律：每轮只改少量变量）。两档模型名由 {@code .env} 提供
+     * （2026-09-23 **C-61** 起：小档 {@code glm-5.3-flash}、强档 {@code glm-5.3}；
+     * 改名前的 2026-09-22 记录写的是 {@code deepseek-v4-flash} / {@code deepseek-v4-pro}）。
      *
      * @param routeChatModel  路由 + 参数抽取用的模型（小档）
      * @param answerChatModel 最终生成用的模型（强档）

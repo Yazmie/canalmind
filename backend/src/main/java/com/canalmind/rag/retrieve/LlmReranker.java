@@ -31,7 +31,8 @@ import com.canalmind.observability.AiObservation;
 import com.canalmind.observability.AiSpans;
 
 /**
- * LLM 重排器（第 2 周第 5 项，决策 C-27 的<b>主实现</b>）：让 DeepSeek {@code deepseek-chat}
+ * LLM 重排器（第 2 周第 5 项，决策 C-27 的<b>主实现</b>）：让 LLM（走 DeepSeek 客户端，
+ * 模型名取自 {@code .env} 的小档——2026-09-23 <b>C-61</b> 起为 {@code glm-5.3-flash}）
  * 对融合后的候选重新排序，输出严格 JSON，解析后写进 {@code rerankRank}/{@code rerankScore}。
  *
  * <h2>⚠️ 本实现依赖外部服务（成本与延迟随候选数增长）</h2>

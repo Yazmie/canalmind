@@ -10,7 +10,8 @@ package com.canalmind.chat.session;
  *
  * <p><b>⚠️ {@link #heuristic()} 的返回值不得当作真实 token 数引用</b>：它**没有被本项目的
  * provider 分词器校验过**。本机 {@code .env} 里 {@code DEEPSEEK_BASE_URL=https://fastmodel.top/v1}
- * 是第三方中转端点、模型名是 {@code deepseek-v4-flash}，其真实分词口径与本仓库无任何可核对出处，
+ * 是第三方中转端点、模型名是 {@code glm-5.3-flash}（2026-09-23 **C-61** 起；改名前的记录写的是
+ * {@code deepseek-v4-flash}），其真实分词口径与本仓库无任何可核对出处，
  * 故本仓库**没有任何一次实测**能证明这些系数成立（`AGENTS.md` §6 第 1 条：没有出处的数字不许写）。
  * 它只用于"要不要压缩"这类**阈值比较**；任何要写进文档或评测报告的 token 数必须另有出处。
  */

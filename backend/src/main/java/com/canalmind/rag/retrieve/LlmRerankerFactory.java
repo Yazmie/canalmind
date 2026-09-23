@@ -78,21 +78,38 @@ public final class LlmRerankerFactory {
     /** 与 {@code application.yml} 的 {@code spring.ai.deepseek.base-url} 默认值一致。 */
     public static final String DEFAULT_BASE_URL = "https://api.deepseek.com";
 
-    /** 与 {@code application.yml} 的 {@code spring.ai.deepseek.chat.options.model} 默认值一致。 */
+    /**
+     * 与 {@code application.yml} 的 {@code spring.ai.deepseek.chat.options.model} 默认值一致。
+     *
+     * <p>⚠️ **它只服务"官方直连端点"的兜底，不是"本项目当前在用的模型"**：本项目本机读的是
+     * {@code .env} 的 {@code DEEPSEEK_CHAT_MODEL}（2026-09-23 **C-61** 起为 {@code glm-5.3-flash}）。
+     * ⛔ 别把本常量读成当前小档——它与 {@link #DEFAULT_BASE_URL}（官方端点）是**成对**的兜底值：
+     * 单独把其中一个换成 glm 系，会让这对兜底自相矛盾（官方端点不提供 glm 系模型）。
+     */
     public static final String DEFAULT_MODEL = "deepseek-chat";
 
     /**
-     * **强档**模型名（**C-56**）：最终生成用它，路由/改写/参数抽取仍用小档。
-     * 规格书第 662 行的分工就是"小模型做路由改写、大模型做生成"。
+     * **强档**模型名（**C-56**；2026-09-23 **C-61** 改名）：最终生成用它，
+     * 路由 / 改写 / 参数抽取仍用小档。规格书第 662 行的分工就是"小模型做路由改写、大模型做生成"。
      *
-     * <p>⚠️ **实测值**（2026-09-22，本项目中继 {@code DEEPSEEK_BASE_URL=https://fastmodel.top/v1}，
+     * <p>⚠️ **2026-09-23（C-61）由 {@code deepseek-v4-pro} 改名为 {@code glm-5.3}**，
+     * 小档同时由 {@code deepseek-v4-flash} 改名为 {@code glm-5.3-flash}（都在 {@code .env}）；
+     * **端点与密钥一个字都没改**。⛔ 改名的**唯一**依据是用户当日的指示，
+     * ⛔ **不是**实测比较的结果——本轮**没有**做过 {@code glm-5.3} 与 {@code deepseek-v4-pro}
+     * 的任何对照（所以⛔ 不得据此宣称"换模型后质量提升/下降"）。
+     *
+     * <p>⛔ **下面这条实测记录属于"改名之前"，不得读成对 {@code glm-5.3} 的验证**：
+     * 2026-09-22（C-56，本项目中继 {@code DEEPSEEK_BASE_URL=https://fastmodel.top/v1}，
      * 6 次极短调用）：{@code deepseek-v4-pro} **3/3 成功**、响应**回显** {@code deepseek-v4-pro}
      * （未被中继静默回落成别的模型）、2.8–3.9 s、约 200 token；
      * 而字面量 {@code deepseek-chat} **3/3 返回 HTTP 503**（该中继不提供它）。
-     * 本机 {@code .env} 的小档是 {@code deepseek-v4-flash} ⇒ 两档同族。
      * 原始记录：{@code backend/target/probe/strong-model.txt}（构建产物目录，不入 git）。
+     *
+     * <p>⇒ **{@code glm-5.3} / {@code glm-5.3-flash} 至今没有任何真实调用记录**：本轮改名是
+     * **零付费**的（只改配置、代码默认值与文档）。要补证需 1~2 次极短付费调用，
+     * 或用本地回显桩（{@code backend/scripts/stub_deepseek.py}）跑一次 {@code LayerRunCli --smoke}。
      */
-    public static final String DEFAULT_ANSWER_MODEL = "deepseek-v4-pro";
+    public static final String DEFAULT_ANSWER_MODEL = "glm-5.3";
 
     /** 强档模型名的环境变量键；**置空 ⇒ 一键回退到小档**（⛔ 不需要改代码）。 */
     public static final String ANSWER_MODEL_ENV = "DEEPSEEK_ANSWER_MODEL";

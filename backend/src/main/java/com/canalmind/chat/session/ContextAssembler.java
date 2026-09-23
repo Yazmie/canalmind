@@ -247,7 +247,8 @@ public final class ContextAssembler {
          * 故这里给检索侧与输出额度留出余量，而不是把整个窗口额度都算给对话。
          * 至于"真实窗口到底多大"，本仓库**无法自证**：{@code .env} 里
          * {@code DEEPSEEK_BASE_URL=https://fastmodel.top/v1} 是第三方中转端点、
-         * 模型名是 {@code deepseek-v4-flash}，其窗口大小在仓库内没有任何出处。
+         * 模型名是 {@code glm-5.3-flash}（2026-09-23 **C-61** 起；改名前的记录写的是
+         * {@code deepseek-v4-flash}），其窗口大小在仓库内没有任何出处。
          * 所以它只是"没显式注入时不会太离谱"的兜底，真正生效的取值应由调用方注入。
          */
         public static final int DEFAULT_MAX_ESTIMATED_TOKENS = 4096;

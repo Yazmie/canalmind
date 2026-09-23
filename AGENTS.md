@@ -285,7 +285,7 @@ canalmind/                          ← git 仓库根（main 分支）
 | Maven | 3.9.12 | 2026-09-18 |
 | Spring Boot | **3.5.9**（C-16，已确认） | 2026-09-19 |
 | Spring AI | **1.1.2**（C-16，已确认） | 2026-09-19 |
-| DeepSeek 模型 | `deepseek-chat`（默认值，可用 `DEEPSEEK_CHAT_MODEL` 覆盖） | 2026-09-19 |
+| 大模型两档 | 小档 **`glm-5.3-flash`**（`.env` 的 `DEEPSEEK_CHAT_MODEL`；路由/改写/抽取/重排/Judge）、强档 **`glm-5.3`**（`DEEPSEEK_ANSWER_MODEL`；**只**做最终生成） | 2026-09-23（**C-61** 改名，原 `deepseek-v4-flash` / `deepseek-v4-pro`） |
 
 > 每确认一项即更新此行，避免后续会话重复摸索。
 
@@ -576,6 +576,11 @@ python docs\工程复盘\check_links.py
 | **长期不变的规则** | 本文件 `AGENTS.md` |
 
 ---
+
+*本文件 v3.9 ｜ 2026-09-23 ｜ §7 版本表的「DeepSeek 模型」一行改为「**大模型两档**」：
+小档 **`glm-5.3-flash`** / 强档 **`glm-5.3`**（**C-61**，用户 2026-09-23 指示改名；⛔ **端点与密钥未变**，
+原 `deepseek-v4-flash` / `deepseek-v4-pro`）。⚠️ 刻意**没动** `application.yml` / `DEFAULT_MODEL` 里
+`deepseek-chat` 那对"官方直连端点"兜底——它与 `DEFAULT_BASE_URL` 成对，只换一个会自相矛盾*
 
 *本文件 v3.8 ｜ 2026-09-22 ｜ §4.5 的状态列与 `DECISIONS.md` **对账扫齐**：
 `D7→C-37`、`D9→C-57（不做）`、`D10→C-38 + C-53 收口`、`D13→C-28`、`D14→C-39`、`D15→C-54`、`D16→C-55`
