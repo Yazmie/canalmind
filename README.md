@@ -6,7 +6,13 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-green)]()
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4%20%2B%20pgvector%200.8.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-624%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-672%20passing-brightgreen)]()
+
+> **项目状态：✅ 交付（2026-09-23，决策 `C-68`）** —— 第 3、4 周各 **6/6** 完成；**第 5 周已收口**
+> （6/6 处置完毕 = **4 项交付 + 2 项裁定**：②「OTLP 打通」半按 **`C-54` 改道**（自写导出器，⛔ **不接 OTLP 后端**）、
+> ⑤（加分）GraphRAG + 自生成 SQL 按 **`C-57` 不做**）。
+> ⚠️⛔ **"交付"不等于"没有已知限制"** —— 请务必读文末 [「已知限制」](#已知限制) **22 条**
+> （尤其：**L5/L6 通过率是下界而非点估计**、**强档 `glm-5.3` 无真实调用记录**、**`L6` 缺口已修但"改后"无分**）。
 
 ---
 
@@ -203,14 +209,15 @@ mvn -o -s ..\.proto\settings.xml -gs ..\.proto\settings.xml `
   "-DargLine=-javaagent:.m2repo\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar" test
 ```
 
-**实测 `Tests run: 624, Failures: 0, Errors: 0, Skipped: 1`**（跳过的一项是需要整跑的执行段评测）。
-⚠️ 这个数字**跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
+**实测 `Tests run: 672, Failures: 0, Errors: 0, Skipped: 2`**（2026-09-23，`C-65` 修补后；跳过的 2 项是需要整跑的执行段评测）。
+⚠️ 本行**曾是 624**（较早快照）——**这个数字跟着改动走**：改动后必须**先删 `target/classes` 与 `target/test-classes`** 再跑（否则可能拿到假绿，
 本项目实测撞到过"源码编译不过而构建仍绿"，见 `docs/工程复盘/工程方法/编译错误被静默放过/README.md`）。
 
 **看见 Trace（可选，默认关）**：跑任何走 `QuestionPipeline.create` / `LlmRerankerFactory` 的命令时加
 `-Dcanalmind.observability.export=<文件路径>`，JVM 退出那一刻会把 §7.2 的 Span 树导成 JSON
 （零新依赖；LF 换行、UTF-8 无 BOM）。⛔ 不设该属性时**连 handler 都不注册**，默认行为零变化。
-⚠️ **本项目没有接真 OTLP 导出器**——规格书第 661 行那一项**未完成**，见「已知限制」第 14 条。
+⚠️ **本项目没有接真 OTLP 导出器**——规格书第 661 行那一项已**按 `C-54` 改道收口**（2026-09-23，`C-68`）：
+✅ 其中「**8 个集成测试场景**」那半**已交付**（9 条测试），⚠️ **但 OTLP 本身仍未打通、不接任何 Trace 后端** ⇒ 见「已知限制」第 14 条。
 
 测试分三层，**刻意分开**，以便失败时能判断是接线错、协议错还是网络错：
 
@@ -263,7 +270,7 @@ canalmind/
 | # | 限制 | 锚点 / 量化 |
 |---|---|---|
 | 1 | **前端未实现**：`frontend/` 只有 `.gitkeep`。规格书明写"复杂前端不做，单页聊天足够，甚至只做 Swagger" | 后端接口与演示脚本已可用 |
-| 2 | **Trace 导出未接入（OTLP / 任何后端都没有）**：规格书第 661 行属第 5 周任务，观测平台选型 **D15 已确认 → C-54**（**选自写导出器**，⛔ **不是 OTLP**）。 ⚠️ **实测类路径**（2026-09-22）：**有** `spring-boot-starter-actuator 3.5.9`、`micrometer-observation 1.15.7`、`context-propagation 1.1.3`；**没有** `micrometer-tracing`、`micrometer-tracing-bridge-otel`、`opentelemetry-instrumentation-annotations`（⇒ **`@WithSpan` 用不了**）；`spring-boot-starter-opentelemetry` 在**本机两个 Maven 仓库里都不存在**（知识库第 424 行称其为 Spring Boot 4 的用法，本项目 3.5.9）。⚠️ 易看走眼处：`micrometer-tracing-bom` 目录**在**（15 个版本），但**实测含 `0` 个 JAR**——**那只是版本清单**，⛔ 别把"BOM 在"当成"实现可用" | ⇒ 业务 Span **只能用 Micrometer Observation API**；**现在可用 C-54 的自写导出器把 Span 树导成 JSON**（只接在 `QuestionPipeline.create` 与 `LlmRerankerFactory` 两处，见第 14 条），测试内亦可用 `ObservationHandler` 断言；但**仍没有任何 Trace 后端 / UI 可看**（⛔ 别把「能导出 JSON」说成「接了观测平台」） | `pom.xml` + `AiObservabilityTest` |
+| 2 | **Trace 导出未接入（OTLP / 任何后端都没有）**：规格书第 661 行该项已**按 `C-54` 改道收口**（2026-09-23，`C-68`）——⚠️⛔ **"收口"指的是改用自写导出器，OTLP 至今未打通、不接任何 Trace 后端**（⛔ 别把 `[x]` 读成"OTLP 打通了"）。观测平台选型 **D15 已确认 → C-54**（**选自写导出器**，⛔ **不是 OTLP**）。 ⚠️ **实测类路径**（2026-09-22）：**有** `spring-boot-starter-actuator 3.5.9`、`micrometer-observation 1.15.7`、`context-propagation 1.1.3`；**没有** `micrometer-tracing`、`micrometer-tracing-bridge-otel`、`opentelemetry-instrumentation-annotations`（⇒ **`@WithSpan` 用不了**）；`spring-boot-starter-opentelemetry` 在**本机两个 Maven 仓库里都不存在**（知识库第 424 行称其为 Spring Boot 4 的用法，本项目 3.5.9）。⚠️ 易看走眼处：`micrometer-tracing-bom` 目录**在**（15 个版本），但**实测含 `0` 个 JAR**——**那只是版本清单**，⛔ 别把"BOM 在"当成"实现可用" | ⇒ 业务 Span **只能用 Micrometer Observation API**；**现在可用 C-54 的自写导出器把 Span 树导成 JSON**（只接在 `QuestionPipeline.create` 与 `LlmRerankerFactory` 两处，见第 14 条），测试内亦可用 `ObservationHandler` 断言；但**仍没有任何 Trace 后端 / UI 可看**（⛔ 别把「能导出 JSON」说成「接了观测平台」） | `pom.xml` + `AiObservabilityTest` |
 | 3 | **HNSW 索引"可用且结果正确"，但当前规模下规划器不选它**（实测 **≥1000 行才自发选**）| ⛔ 不得对外说"线上在用 HNSW" |
 | 4 | **`L6` 有 5 类实现缺口 + 1 类未登记缺口**（2026-09-23 探针复核后逐条状态；**✅ 同日六类已全部修补 → `C-65`，⚠️ 但分数未重出、仍为修前口径**）：①**契约越界判 `DEGRADED` 而非 `REJECTED`**（`L6-010/011/012`）——⚠️ ⛔ **2026-09-23 实测更正**：越界参数被**定向强制送入**时 **`SchemaGate` 拦住了**（`DEGRADED` + **数据层未被调用**；对照合法值 `OK` 且照常执行）⇒ **表述落到「执行层校验拦住了注入」，⛔ 不等于「没有注入风险」**；②**非法日期判 `REJECTED` 而非追问**（`L6-014` `2027-02-30`）⇒ **探针下仍存在**（文档曾标「正确」，是因为那轮**模型自己申报了缺参**，缺口被**模型行为掩盖**）；③**单位错误未识别**（`L6-006`「5000 米」）⇒ ⚠️ **无法判定**（本层**无单位概念**，端到端是否漏判取决于模型抽取行为，需真实调用，本轮未付费）；④**缺量级提示**（`L6-007` 5 万吨）⇒ **仍存在**（`OK` + `200000.00 元`，trace 零「量级/口径外」字样）；⑤**窗口外判 `NO_DATA` 而非 `DEGRADED`**（`L6-015`）⇒ **仍存在**；⑥**`引航费`/`停泊费` 传入货类时「忽略而非拒绝」**（`L6-008/009`）⇒ **仍存在**（`OK` + `300.00`/`360.00 元`，trace 写「与货类无关，**已忽略**传入的货类」），**本次正式登记为第 6 类**。⚠️ 两条限定：第二道防线（`GROUP_EXPR` 白名单）**本次未触达**、需连库另验；更早那次 `OK` **只能推断**成因，⛔ **不得写成「当初测错了」**。**✅ 2026-09-23 六类已全部修补（`C-65`，零付费）**：①`limit` 越界 / `group_by` 注入 / 全量下载 ⇒ **`REJECTED`**（值类关键字才拒绝；**缺参**仍走追问）；②非法日期 ⇒ **追问**；③「米」⇒ **追问**（新增单位守卫）；④ ⇒ **`DEGRADED`**（量级口径外，**阈值有出处、非魔数**）；⑤窗口外日期 ⇒ **`DEGRADED`**；⑥引航费/停泊费传货类 ⇒ **`REJECTED`**（**不再静默忽略后照算**）。⛔ **三条必须一起说**：(a)**L6 的 `0.3333`/`0.4000`、`L1` 的 `1.0000` 一字未变**——让分数反映修复必须**重跑 L6 作答（付费）**，而判分正被**中继网关 ~60 秒墙**堵着（`C-62`）；(b)**`L6-010` 的端到端失败在守卫层之外**（该题**模型没调工具**）**未修**；(c)**`L1` 未重跑**（`40/40` 是**修前**实测）⇒ 参数接受口径的端到端回归**未验证**。依据：`docs/评测报告/证据/l6-gaps-fix-2026-09-23/修补报告.md` | 报告 §5.3/§5.5（含复现锚点）+ `badcase记录.md` |
 | 5 | **Judge 与被测系统同模型** ⇒ 自增强偏差**未排除**（本机端点无法换裁判模型） | 报告 §5.1 |
