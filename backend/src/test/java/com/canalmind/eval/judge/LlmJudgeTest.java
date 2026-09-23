@@ -112,15 +112,15 @@ class LlmJudgeTest {
     @Test
     @DisplayName("严格口径与宽松口径都算得出，且未取得有效评分时两者都不算通过")
     void passCriteriaSemantics() {
-        JudgeScores allFour = new JudgeScores(4, 4, 4, false, "尚可", true, "raw");
+        JudgeScores allFour = new JudgeScores(4, 4, 4, false, "尚可", true, "raw", 1);
         assertThat(allFour.passStrict(4)).isTrue();
         assertThat(allFour.passLenient(3.5)).isTrue();
 
-        JudgeScores uneven = new JudgeScores(5, 2, 5, false, "相关性差", true, "raw");
+        JudgeScores uneven = new JudgeScores(5, 2, 5, false, "相关性差", true, "raw", 1);
         assertThat(uneven.passStrict(4)).isFalse();
         assertThat(uneven.passLenient(3.5)).isTrue();
 
-        JudgeScores human = new JudgeScores(5, 5, 5, true, "证据不足", true, "raw");
+        JudgeScores human = new JudgeScores(5, 5, 5, true, "证据不足", true, "raw", 1);
         assertThat(human.passStrict(4)).isFalse();
         assertThat(human.passLenient(3.5)).isFalse();
 
@@ -151,5 +151,123 @@ class LlmJudgeTest {
     @DisplayName("modelName 上浮到接口，便于《评测报告》记录 Judge 模型（同源偏差必须可见）")
     void modelNameIsExposed() {
         assertThat(judgeReturning("{}").modelName()).isEqualTo("deepseek-v4-flash");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // 空应答重试（2026-09-23，**C-62**，用户批准）：**只对"空"重试、上限 1 次**
+    // 背景：判分端空应答随机游走（旧空→新正常 3 题、旧正常→新空 2 题，见 C-60）⇒
+    //      整层重判不能根除，只能给判分器加"空 ⇒ 再试 1 次"。
+    // 边界（三条都被下面的用例钉住）：①只对空重试 ②上限 1 次 ③重试仍空⇒如实记
+    // ──────────────────────────────────────────────────────────────────────
+
+    /** 计数桩：按顺序吐预设应答并数调用次数——守"非空不许多调一次"这条边界。 */
+    private static final class CountingInvoker implements JsonChatInvoker {
+        private final List<String> replies;
+        private int calls;
+
+        CountingInvoker(String... replies) {
+            this.replies = new ArrayList<>(List.of(replies));
+        }
+
+        @Override
+        public String invoke(String systemPrompt, String userPrompt) {
+            calls++;
+            return replies.get(Math.min(calls - 1, replies.size() - 1));
+        }
+    }
+
+    private static final String VALID_JSON =
+            "{\"faithfulness\": 4, \"relevance\": 4, \"completeness\": 4, "
+                    + "\"needs_human_review\": false, \"reasoning\": \"重试后正常\"}";
+
+    @Test
+    @DisplayName("非空应答 ⇒ 恰好 1 次调用，⛔ 一次都不许多调（即使它解析不出来）")
+    void nonEmptyResponseIsCalledExactlyOnce() {
+        CountingInvoker inv = new CountingInvoker("我觉得这个回答挺好的。", VALID_JSON);
+        JudgeScores s = new LlmJudge(inv, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(inv.calls).isEqualTo(1);
+        assertThat(s.attempts()).isEqualTo(1);
+        assertThat(s.retried()).isFalse();
+        assertThat(s.parseOk()).isFalse();
+    }
+
+    @Test
+    @DisplayName("空应答 ⇒ 恰好重试 1 次；重试拿到合法 JSON 就用它的分数，并标 attempts=2")
+    void blankResponseIsRetriedExactlyOnce() {
+        CountingInvoker inv = new CountingInvoker("   ", VALID_JSON);
+        JudgeScores s = new LlmJudge(inv, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(inv.calls).isEqualTo(2);
+        assertThat(s.attempts()).isEqualTo(2);
+        assertThat(s.retried()).isTrue();
+        assertThat(s.parseOk()).isTrue();
+        assertThat(s.faithfulness()).isEqualTo(4);
+        assertThat(s.reasoning()).contains("重试后正常");
+        assertThat(s.rawResponse()).isEqualTo(VALID_JSON);
+    }
+
+    @Test
+    @DisplayName("重试后仍空 ⇒ 恰好 2 次调用（⛔ 不循环），并如实记为仍未取得有效评分")
+    void blankAfterRetryIsRecordedHonestly() {
+        CountingInvoker inv = new CountingInvoker("", "   ");
+        JudgeScores s = new LlmJudge(inv, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(inv.calls).isEqualTo(2);
+        assertThat(s.attempts()).isEqualTo(2);
+        assertThat(s.parseOk()).isFalse();
+        assertThat(s.valid()).isFalse();
+        assertThat(s.reasoning()).contains("空应答").contains("重试 1 次后仍为空");
+        // ⛔ 不伪造分数：0 分的含义是"未取得有效评分"，不是"答得很差"
+        assertThat(s.asList()).containsExactly(0, 0, 0);
+        assertThat(s.passStrict(4)).isFalse();
+        assertThat(s.needsHumanReview()).isTrue();
+    }
+
+    @Test
+    @DisplayName("重试拿到非空但不可解析的应答 ⇒ 仍记为无效，且原文保留（⛔ 不猜分数）")
+    void retryWithUnparsableResponseIsStillInvalid() {
+        CountingInvoker inv = new CountingInvoker("", "我觉得挺好的。");
+        JudgeScores s = new LlmJudge(inv, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(inv.calls).isEqualTo(2);
+        assertThat(s.attempts()).isEqualTo(2);
+        assertThat(s.parseOk()).isFalse();
+        assertThat(s.reasoning()).contains("重试 1 次后仍不可解析");
+        assertThat(s.rawResponse()).isEqualTo("我觉得挺好的。");
+    }
+
+    @Test
+    @DisplayName("调用抛异常不触发重试（那是「调用失败」不是「空应答」）")
+    void invokeFailureIsNotRetried() {
+        int[] calls = {0};
+        JsonChatInvoker boom = (system, user) -> {
+            calls[0]++;
+            throw new SocketTimeoutException("read timed out");
+        };
+        JudgeScores s = new LlmJudge(boom, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(calls[0]).isEqualTo(1);
+        assertThat(s.attempts()).isEqualTo(1);
+        assertThat(s.reasoning()).contains("SocketTimeoutException");
+    }
+
+    @Test
+    @DisplayName("重试那一次本身失败 ⇒ attempts=2 且理由写明「重试 1 次时调用失败」（不静默降级）")
+    void failureDuringRetryIsRecordedWithAttempts() {
+        int[] calls = {0};
+        JsonChatInvoker inv = (system, user) -> {
+            calls[0]++;
+            if (calls[0] == 1) {
+                return "";
+            }
+            throw new SocketTimeoutException("read timed out");
+        };
+        JudgeScores s = new LlmJudge(inv, "glm-5.3-flash").judge(anyInput());
+
+        assertThat(calls[0]).isEqualTo(2);
+        assertThat(s.attempts()).isEqualTo(2);
+        assertThat(s.parseOk()).isFalse();
+        assertThat(s.reasoning()).contains("重试 1 次时调用失败").contains("SocketTimeoutException");
     }
 }

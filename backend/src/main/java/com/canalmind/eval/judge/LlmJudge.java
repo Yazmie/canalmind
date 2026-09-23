@@ -20,6 +20,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li><b>0 分只表示"未取得有效评分"，不表示"答得很差"。</b>所以 {@link JudgeScores#valid()}
  *       是分开的一位，统计通过率时**分母必须剔除无效评分并单独报出条数**，
  *       ⛔ 不得把裁判故障算成被测系统答错。</li>
+ *   <li><b>空应答只重试一次，且只对"空"重试。</b>（2026-09-23，**C-62**，用户批准）
+ *       判分端空应答长期存在且**随机游走**——实测同一题重跑可能变正常、也可能新冒出来
+ *       （L3/L5/L6 重判前后：旧空→新正常 3 题、旧正常→新空 2 题，见 `DECISIONS.md` C-60）。
+ *       故加"空 ⇒ 再试 1 次"，三条边界缺一不可：<br>
+ *       ①**只对空白应答**触发；网络异常与"非空但解析失败"（含不是 JSON、缺字段）**一律不重试**
+ *       ——它们不是空应答，重试它们等于悄悄改变判分成本；<br>
+ *       ②**上限 1 次**，⛔ 不循环重试；<br>
+ *       ③重试后仍空 ⇒ **如实记为"仍未取得有效评分"**，⛔ 不伪造分数，也⛔ 不许写成"点估计"。<br>
+ *       调用次数落在 {@link JudgeScores#attempts()}（1/2），判分产物写 `judgeAttempts`：
+ *       事后审计要能一眼看出"这题重试过、重试后是成功还是仍空"。</li>
  * </ol>
  */
 public final class LlmJudge implements Judge {
@@ -43,17 +53,52 @@ public final class LlmJudge implements Judge {
         return modelName;
     }
 
+    /**
+     * 判分一次；**仅当裁判应答为空**时再试 **1** 次（上限 1，见类注释第 4 条）。
+     *
+     * <p>⛔ 非空应答**一次都不多调**——这是用户批准的范围（C-62）：
+     * 只加"空应答重试"，⛔ 不改判分预算、⛔ 不改提示词、⛔ 不改模型档位。
+     */
     @Override
     public JudgeScores judge(JudgeInput input) {
         String raw;
         try {
             raw = invoker.invoke(JudgePrompt.systemPrompt(), JudgePrompt.userPrompt(input));
         } catch (Exception ex) {
-            // ⛔ 不抛出去：单条失败不能带走整批（见类注释第 1 条）
+            // ⛔ 不抛出去：单条失败不能带走整批（见类注释第 1 条）。
+            // ⚠️ 也**不重试**：这是"调用失败"，不是"空应答"（类注释第 4 条①）。
             return JudgeScores.unparsed("",
                     "裁判调用失败（" + ex.getClass().getSimpleName() + "：" + ex.getMessage() + "）");
         }
-        return parse(raw);
+        if (!isBlank(raw)) {
+            // 非空 ⇒ 恰好 1 次调用；即使解析失败也不重试（那不是空应答）
+            return parse(raw);
+        }
+
+        // ── 空应答 ⇒ 恰好重试 1 次 ──
+        String retryRaw;
+        try {
+            retryRaw = invoker.invoke(JudgePrompt.systemPrompt(), JudgePrompt.userPrompt(input));
+        } catch (Exception ex) {
+            return JudgeScores.unparsed("",
+                    "裁判返回空应答，重试 1 次时调用失败（" + ex.getClass().getSimpleName()
+                            + "：" + ex.getMessage() + "）", 2);
+        }
+        JudgeScores again = parse(retryRaw);
+        if (again.parseOk()) {
+            return new JudgeScores(again.faithfulness(), again.relevance(), again.completeness(),
+                    again.needsHumanReview(), again.reasoning(), true, again.rawResponse(), 2);
+        }
+        // ⛔ 重试后仍空（或仍不可解析）：**如实记为"仍未取得有效评分"**，⛔ 不伪造分数
+        return JudgeScores.unparsed(again.rawResponse(),
+                isBlank(again.rawResponse())
+                        ? "裁判返回空应答，重试 1 次后仍为空"
+                        : "裁判返回空应答，重试 1 次后仍不可解析：" + again.reasoning(),
+                2);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     /**
@@ -82,7 +127,7 @@ public final class LlmJudge implements Judge {
         }
         boolean human = node.path("needs_human_review").asBoolean(false);
         String reasoning = node.path("reasoning").asText("");
-        return new JudgeScores(f, r, c, human, reasoning, true, raw);
+        return new JudgeScores(f, r, c, human, reasoning, true, raw, 1);
     }
 
     private static String stripFence(String raw) {

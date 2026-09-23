@@ -53,6 +53,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * 故知识库《AI 应用评测体系》第 188–192 行点名的**自增强偏差无法排除**：
  * 模型可能偏好自己风格的答案。⇒ 结果里必须同时报**严格口径与均分口径**，
  * 并把 `needsHumanReview` 的题数单独列出，⛔ 不得只报一个更好看的数。
+ *
+ * <h2>⚠️ 空应答：只重试 1 次，且重试与否要留痕（2026-09-23，C-62）</h2>
+ * 判分端空应答**随机游走**（同一题重跑可能变正常、也可能新冒出来 ⇒ 整层重判清不掉，
+ * 见 `DECISIONS.md` C-60），故在 {@link LlmJudge} 里加"空 ⇒ 再试 1 次"。
+ * 本类负责把这件事**落进产物**：每题写 `judgeAttempts`（1 = 未重试，2 = 重试过），
+ * 顶层写 `judgeRetriedCount`，重试后仍无效的题还会单独报警。
+ * ⛔ **不要**因为"重试过"就把它当已解决：重试后仍空 ⇒ 该层通过率**仍是下界**。
  */
 public final class JudgeRunCli {
 
@@ -187,6 +194,8 @@ public final class JudgeRunCli {
         int ruleChecked = 0;
         int rulePassed = 0;
         int skipped = 0;
+        /** 触发过"空应答重试 1 次"的题数（2026-09-23，C-62）：产物与汇总都要能看见。 */
+        int retried = 0;
         Map<String, int[]> bySplit = new TreeMap<>();
 
         for (JsonNode r : results) {
@@ -217,6 +226,11 @@ public final class JudgeRunCli {
                 if (ps) {
                     bySplit.get(split)[1]++;
                 }
+                // ⚠️ 续跑进来的旧条目也要统计"重试过"：否则重跑一次那条命令，
+                //    汇总里的 judgeRetriedCount 会凭空变成 0（旧条目被跳过）⇒ 审计被骗。
+                if (pj.path("judgeAttempts").asInt(1) > 1) {
+                    retried++;
+                }
                 skipped++;
                 System.out.println("  " + id + " → 续跑跳过（已判分且解析成功）");
                 continue;
@@ -239,6 +253,17 @@ public final class JudgeRunCli {
             n.put("passStrict", s.passStrict(STRICT_MIN_EACH));
             n.put("passLenient", s.passLenient(LENIENT_MIN_MEAN));
             n.put("reasoning", s.reasoning());
+            // ⚠️ **"这题重试过没有"必须落进产物**（2026-09-23，C-62）：事后审计要能区分
+            //    "一次就空"与"重试过还空"——两者对"能否升级为点估计"的结论相同（都不能），
+            //    但要判断"重试到底有没有生效"，只能靠这一位。
+            n.put("judgeAttempts", s.attempts());
+            if (s.retried()) {
+                retried++;
+                if (!s.parseOk()) {
+                    // 重试过仍无效 ⇒ 显式报警：这题**仍是空应答**，该层⛔ 不能升级为点估计
+                    System.out.println("  [WARN] " + id + " 空应答重试 1 次后仍未取得有效评分");
+                }
+            }
             // ⚠️ 解析失败时**必须把原始应答留下来**：那是唯一能判断
             //    "是提示词问题 / 还是被 token 预算截断 / 还是模型没按格式"的证据。
             //    实测第一次判分 L3 有 17/20 解析失败、L6 有 7/15，当时产物里**没存原文**，
@@ -282,6 +307,7 @@ public final class JudgeRunCli {
             System.out.println("  " + id + " 三维 " + s.faithfulness() + "/" + s.relevance() + "/"
                     + s.completeness() + " 均分 " + round4(s.mean())
                     + " 严格" + (s.passStrict(STRICT_MIN_EACH) ? "通过" : "未过")
+                    + (s.retried() ? "，空应答重试 1 次" : "")
                     + (ruleVerdict == null ? "" : "，规则判据 " + ruleVerdict));
             // 边判边写：**与 LayerRunCli 同因**——进程被杀时，已付费拿到的判分必须留在盘上。
             // 实测踩到：L5 判分跑到一半随会话暂停被杀，而产物只在**最后**写一次 ⇒
@@ -297,6 +323,7 @@ public final class JudgeRunCli {
         out.put("strictRate", round4(results.isEmpty() ? 0 : (double) strict / results.size()));
         out.put("lenientRate", round4(results.isEmpty() ? 0 : (double) lenient / results.size()));
         out.put("parseFail", parseFail);
+        out.put("judgeRetriedCount", retried);
         out.put("skipped", skipped);
         out.put("needsHumanReview", humanReview);
         out.put("ruleChecked", ruleChecked);
@@ -318,6 +345,8 @@ public final class JudgeRunCli {
                 + " = " + round4(results.isEmpty() ? 0 : (double) lenient / results.size()));
         System.out.println("规则判据通过（客观）：" + rulePassed + "/" + ruleChecked);
         System.out.println("解析失败 " + parseFail + " 题；标为需人工复核 " + humanReview + " 题");
+        System.out.println("空应答重试 1 次（C-62）触发 " + retried + " 题"
+                + (retried == 0 ? "（本次没有出现空应答）" : ""));
         System.out.println("分批严格通过率：" + splitNode);
         // ⚠️ 解析失败**必须显式报警**：它等于"没判成"，⛔ 不能被当成低分混进通过率
         if (parseFail > 0) {
