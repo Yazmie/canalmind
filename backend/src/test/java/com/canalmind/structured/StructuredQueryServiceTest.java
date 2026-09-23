@@ -139,18 +139,34 @@ class StructuredQueryServiceTest {
     }
 
     @Test
-    @DisplayName("引航费：自动按船舶总吨位口径，且忽略传入的货类")
-    void pilotFeeIgnoresCategory() {
+    @DisplayName("引航费：自动按船舶总吨位口径；**传入货类则拒绝**（不再静默忽略后照算）")
+    void pilotFeeWithCategoryIsRejected() {
+        // ⚠️ 本用例原先断言的是「已忽略传入的货类」——那正是 D24 登记的第 6 类缺口
+        //    （`L6-008`/`L6-009` 期望 REJECTED，实测却是"静默忽略 + 照算出一个确定金额"，
+        //    2026-09-23 探针：引航费+化工 得 300.00 元、停泊费+金属 得 360.00 元，状态 OK）。
+        //    ⇒ 断言随生产行为一起改（缺口已按 C-65 修复），⛔ 不是"把测试改绿"。
+        FakeData data = new FakeData();
         ToolResult r = service("""
                 {"tool":"quote_fee","arguments":{"fee_type":"引航费","cargo_category":"建材",
                  "tonnage":1500,"biz_date":"2026-10-01"},"missing":[],"reason":"算引航费"}
-                """).ask("引航费多少");
-        assertFalse(r.ok());
-        // 规则未命中（假实现对引航费无规则）→ 必须**如实说明**且给出可核对原因，而不是返回 0 元
-        assertEquals(ToolResult.STATUS_NO_DATA, r.status());
-        assertTrue(r.facts().get(0).contains("引航费"));
+                """, new FakeTariff(), data).ask("引航费多少");
+        assertEquals(ToolResult.STATUS_REJECTED, r.status(), r.facts().toString());
+        assertTrue(r.facts().get(0).contains("与货类无关"), "拒绝理由必须说清口径：" + r.facts().get(0));
+        assertFalse(r.facts().get(0).contains("已忽略"), "⛔ 不能再是「已忽略后照算」");
         assertTrue(r.traces().stream().anyMatch(t -> t.contains("吨位口径（由费种推导）：引航费 → 船舶总吨位")));
-        assertTrue(r.traces().stream().anyMatch(t -> t.contains("与货类无关，已忽略")));
+        assertNull(data.lastCall, "被拒绝的调用不得触达数据层");
+    }
+
+    @Test
+    @DisplayName("引航费：**不**传货类时照常走费率查询（拒绝只针对「按货类分档」这一诉求）")
+    void pilotFeeWithoutCategoryProceedsNormally() {
+        ToolResult r = service("""
+                {"tool":"quote_fee","arguments":{"fee_type":"引航费",
+                 "tonnage":1500,"biz_date":"2026-10-01"},"missing":[],"reason":"算引航费"}
+                """).ask("引航费多少");
+        // 假费率表里没有引航费规则 ⇒ 如实说「未命中」；关键是**没有被拒绝**
+        assertEquals(ToolResult.STATUS_NO_DATA, r.status(), r.facts().toString());
+        assertTrue(r.traces().stream().anyMatch(t -> t.contains("费率未命中")));
     }
 
     @Test
@@ -237,16 +253,21 @@ class StructuredQueryServiceTest {
     }
 
     @Test
-    @DisplayName("统计窗口超出业务窗口：裁剪并**在事实里写明**，不假装统计了整个区间")
+    @DisplayName("统计窗口：整段在窗口外 ⇒ DEGRADED（缺口⑤）；部分超出 ⇒ 裁剪后照常统计")
     void trafficClipsWindowAndSaysSo() {
         FakeData data = new FakeData();
         ToolResult r = service("""
                 {"tool":"query_traffic","arguments":{"date_from":"2026-01-01","date_to":"2026-02-01",
                  "metric":"吨位","group_by":"无"},"missing":[],"reason":"x"}
                 """, new FakeTariff(), data).ask("2026 年 1 月的运量");
-        assertEquals(ToolResult.STATUS_NO_DATA, r.status(), "整个区间都在业务窗口之前 → 如实说无数据");
+        // ⚠️ 本断言原先要的是 NO_DATA——那是 D24 缺口⑤（`L6-015` 期望 DEGRADED）。
+        //    分界：整段在窗口外 ⇒ 本层没有可比对的数据与费率 ⇒ DEGRADED；
+        //    「窗口内查过、确实没有」才叫 NO_DATA（下面第二段仍走那条路）。
+        assertEquals(ToolResult.STATUS_DEGRADED, r.status(), "整个区间都在业务窗口之前 → 口径外，不是「窗口内无记录」");
+        assertEquals(ExtractionOutcome.KIND_OUT_OF_WINDOW, r.degradeKind());
         assertTrue(r.facts().get(0).contains("业务数据窗口"));
         assertFalse(r.facts().get(0).contains("合计"));
+        assertNull(data.lastCall, "窗口外的请求不得触达数据层");
 
         ToolResult r2 = service("""
                 {"tool":"query_traffic","arguments":{"date_from":"2026-01-01","date_to":"2026-11-01",
@@ -289,7 +310,7 @@ class StructuredQueryServiceTest {
     }
 
     @Test
-    @DisplayName("SQL 注入面：多余参数在 Schema 层就被拦下，永远到不了 SQL")
+    @DisplayName("SQL 注入面：非枚举分组维度判 REJECTED（缺口①），且永远到不了 SQL")
     void injectionAttemptNeverReachesSql() {
         FakeData data = new FakeData();
         ToolResult r = service("""
@@ -297,8 +318,12 @@ class StructuredQueryServiceTest {
                  "metric":"吨位","group_by":"货类; DROP TABLE waybill"},
                  "missing":[],"reason":"x"}
                 """, new FakeTariff(), data).ask("恶意分组");
-        assertEquals(ToolResult.STATUS_DEGRADED, r.status());
-        assertEquals(ExtractionOutcome.KIND_SCHEMA_INVALID, r.degradeKind());
+        // ⚠️ 状态原先要的是 DEGRADED + SCHEMA_INVALID——那是 D24 缺口①（`L6-012` 期望 REJECTED）：
+        //    「枚举不符」是**用户诉求本身越出契约**，应如实拒绝，而不是笼统"通道降级"。
+        assertEquals(ToolResult.STATUS_REJECTED, r.status());
+        assertNull(r.degradeKind(), "拒绝不是降级：degradeKind 只标记降级原因");
+        assertTrue(String.join(String.valueOf((char) 10), r.facts()).contains("group_by"),
+                "拒绝理由要指名是哪个参数：" + r.facts());
         assertNull(data.lastCall, "被拦下的调用不得触达 SQL 层");
     }
 

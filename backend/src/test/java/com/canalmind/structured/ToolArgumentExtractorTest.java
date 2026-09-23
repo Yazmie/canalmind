@@ -89,18 +89,46 @@ class ToolArgumentExtractorTest {
     }
 
     @Test
-    @DisplayName("Schema 不合规：错误反馈里点名违规字段，重试用尽后降级 SCHEMA_INVALID")
-    void degradesAfterSchemaRetries() {
+    @DisplayName("参数**值**越界（枚举不符）：错误反馈里点名违规字段，重试用尽后判 REJECTED")
+    void valueViolationBecomesRejected() {
         StubInvoker stub = new StubInvoker(
-                "{\"tool\":\"query_tariff\",\"arguments\":{\"fee_type\":\"过路费\"},\"missing\":[],\"reason\":\"x\"}");
+                "{\"tool\":\"query_tariff\",\"arguments\":{\"fee_type\":\"过路费\",\"cargo_category\":\"建材\","
+                        + "\"tonnage\":1200,\"biz_date\":\"2026-10-01\"},\"missing\":[],\"reason\":\"x\"}");
         ExtractionOutcome o = extractor(stub).extract("过路费多少");
-        assertTrue(o.degraded());
-        assertEquals(ExtractionOutcome.KIND_SCHEMA_INVALID, o.degradeKind());
+        // ⚠️ 本用例原先断言 DEGRADED + SCHEMA_INVALID——那是 D24 登记的缺口①：
+        //    「值越界 / 枚举不符」是**用户诉求本身越出契约**（重试也改不对），应如实拒绝；
+        //    而"缺必填/多余键/格式错"才是"模型没说清"，仍走降级（见下一个用例）。
+        assertTrue(o.rejected(), "枚举不符应判 REJECTED，实际 " + o.status());
+        assertEquals(ExtractionOutcome.KIND_PARAM_VIOLATION, o.degradeKind());
         assertEquals(3, o.attempts(), "1 次 + 重试 2 次（C-32 写死 ≤2）");
         assertEquals(3, stub.calls.get());
         assertFalse(o.errors().isEmpty());
-        assertNull(o.call(), "降级时不得留下半成品调用");
+        assertNotNull(o.call(), "拒绝要指名工具与实参（与降级不同，这里保留调用）");
+        assertEquals("query_tariff", o.call().tool());
+        assertTrue(o.errors().get(0).contains("fee_type"), "拒绝理由要点名违规参数：" + o.errors().get(0));
         assertTrue(stub.seenUsers.get(1).contains("过路费"), "反馈须带上具体越界取值");
+    }
+
+    @Test
+    @DisplayName("越界值夹在同一次输出的形状错里：**仍判 REJECTED**（越界不因同时漏字段而变得可满足）")
+    void valueViolationMixedWithShapeErrorStillRejected() {
+        // 这条应答同时违反：①枚举（fee_type=过路费）②必填（缺 tonnage / biz_date）
+        StubInvoker stub = new StubInvoker(
+                "{\"tool\":\"query_tariff\",\"arguments\":{\"fee_type\":\"过路费\"},\"missing\":[],\"reason\":\"x\"}");
+        ExtractionOutcome o = extractor(stub).extract("过路费多少");
+        assertTrue(o.rejected(), "只要出现越界/枚举违规就应拒绝，实际 " + o.status());
+        assertEquals(ExtractionOutcome.KIND_PARAM_VIOLATION, o.degradeKind());
+    }
+
+    @Test
+    @DisplayName("形状不合规（缺必填）：仍是降级 SCHEMA_INVALID，⛔ 不得被当成「值越界」判拒绝")
+    void shapeViolationStaysDegraded() {
+        StubInvoker stub = new StubInvoker(
+                "{\"tool\":\"query_tariff\",\"arguments\":{\"tonnage\":1000},\"missing\":[],\"reason\":\"x\"}");
+        ExtractionOutcome o = extractor(stub).extract("过闸费多少");
+        assertTrue(o.degraded(), "缺必填属于「模型没说清」，实际 " + o.status());
+        assertEquals(ExtractionOutcome.KIND_SCHEMA_INVALID, o.degradeKind());
+        assertNull(o.call(), "降级时不得留下半成品调用");
     }
 
     @Test
@@ -168,7 +196,7 @@ class ToolArgumentExtractorTest {
                 + "{\"tool\":\"query_tariff\",\"arguments\":{\"tonnage\":1000},\"missing\":[],\"reason\":\"x\"}"
                 + LF + "```");
         ExtractionOutcome o = extractor(badFenced).extract("过闸费多少");
-        assertTrue(o.degraded());
+        assertTrue(o.degraded(), "缺必填仍是降级（不是 REJECTED），实际 " + o.status());
         assertEquals(ExtractionOutcome.KIND_SCHEMA_INVALID, o.degradeKind());
     }
 

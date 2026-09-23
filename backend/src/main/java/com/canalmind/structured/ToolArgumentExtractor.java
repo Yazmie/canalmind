@@ -27,6 +27,8 @@ import com.canalmind.observability.AiSpans;
  *   <tr><td>模型调用异常</td><td>重试；用尽 → {@code MODEL_ERROR}</td></tr>
  *   <tr><td>应答非 JSON</td><td>先尝试剥离代码块围栏/截取首个花括号对象；仍不行 → 重试 → {@code NOT_JSON}</td></tr>
  *   <tr><td>Envelope/参数 Schema 不合规</td><td>重试 → {@code SCHEMA_INVALID}</td></tr>
+ *   <tr><td>参数**值**越界 / 枚举不符（如 {@code limit=10000}、非枚举的 {@code group_by}）</td>
+ *       <td>重试 → 用尽后 <b>{@code REJECTED}</b>（缺口①，决策 D24）</td></tr>
  *   <tr><td>模型选了不存在的工具</td><td>重试（枚举本已挡住，这是双保险）→ {@code TOOL_UNKNOWN}</td></tr>
  *   <tr><td>模型判定不属工具集</td><td>不重试，直接 {@code TOOL_NONE}（交给检索通道）</td></tr>
  *   <tr><td>缺必填参数</td><td>不重试，直接追问（{@code MISSING_PARAMS}）——**不能逼模型编一个值**</td></tr>
@@ -95,6 +97,10 @@ public final class ToolArgumentExtractor {
         List<String> errors = List.of();
         int attempts = 0;
         long start = System.nanoTime();
+        // ⚠️ 只跟踪**最后一次**尝试的违规与调用：终局判定说的是"最后交上来的东西犯了什么规"，
+        //    把历史尝试的违规混进来会让"第一次越界、第三次改成缺必填"这种情形判错。
+        List<SchemaGate.Violation> lastViolations = List.of();
+        ToolCall lastCall = null;
 
         for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
             attempts = attempt;
@@ -122,6 +128,27 @@ public final class ToolArgumentExtractor {
                 return outcome.finalOutcome();
             }
             errors = outcome.errors();
+            lastViolations = outcome.violations();
+            lastCall = outcome.call();
+        }
+
+        // ── 终局判定（决策 D24 → 缺口①）────────────────────────────────────────
+        // 重试用尽后，把「**值越界 / 枚举不符**」与「形状不合规」分开：
+        //   前者（用户要的取值本身越出契约，如 limit=10000、非枚举的 group_by）
+        //   ⇒ REJECTED —— 重试也改不对，因为要改的是**用户的诉求**；
+        //   后者（缺必填、多余键、格式错、非 JSON、模型调用失败）
+        //   ⇒ 保持原有 DEGRADED + 各自 KIND，⛔ 不动（否则「缺参」会被误判成拒绝）。
+        // ⚠️ 判定用 **any**（只要出现一条越界/枚举违规就拒绝），不用 all：
+        //    "用户要的取值越出契约"这件事**不因为同一次输出里还漏了别的字段而变得可以满足**；
+        //    反过来，**没有**任何值违规时（纯缺必填/格式错）一律不拒绝 ⇒ 「缺参仍走追问」不受影响。
+        if (lastViolations.stream().anyMatch(SchemaGate::isValueViolation)) {
+            List<String> detail = new ArrayList<>(lastViolations.size());
+            for (SchemaGate.Violation v : lastViolations) {
+                detail.add(SchemaGate.describeForUser(v));
+            }
+            log.warn("参数抽取：值越界/枚举不符，重试用尽后拒绝执行（{} 条违规）：{}",
+                    lastViolations.size(), detail.get(0));
+            return ExtractionOutcome.rejected(lastCall, detail, attempts, raw, ms(start));
         }
 
         String kind = errors.isEmpty() ? ExtractionOutcome.KIND_MODEL_ERROR
@@ -191,9 +218,18 @@ public final class ToolArgumentExtractor {
                     ms(startNanos)));
         }
 
-        List<String> argErrors = gate.validateArguments(tool, args);
-        if (!argErrors.isEmpty()) {
-            return AttemptOutcome.retry(argErrors);
+        // ⚠️ 只校验**一次**（拿结构化违规），可读文案由它派生：调两次 `validateArguments*`
+        //    会白跑一遍校验并多出一个同名 Span，把规格书 §7.2 的节点数直接翻倍。
+        List<SchemaGate.Violation> argViolations = gate.validateArgumentsAsViolations(tool, args);
+        if (!argViolations.isEmpty()) {
+            // ⚠️ 把**结构化违规**一并带出去：终局判定要按关键字分「值越界/枚举不符」与
+            //    「形状不合规」，⛔ 不能从错误文案里反解（那是把给人看的文本当机器判据）。
+            List<String> argErrors = new ArrayList<>(argViolations.size());
+            for (SchemaGate.Violation v : argViolations) {
+                argErrors.add(v.message());
+            }
+            return AttemptOutcome.retryWithViolations(argErrors, argViolations,
+                    new ToolCall(tool, args, missing, reason));
         }
 
         ToolCall call = new ToolCall(tool, args, missing, reason);
@@ -206,15 +242,25 @@ public final class ToolArgumentExtractor {
      * <p>⛔ 为什么不直接返回 {@link ExtractionOutcome} 并用 {@code null} 表示"继续重试"：
      * 那样无法区分"要继续重试"与"这次真的产出了 null"（后者是 bug 而非流程）。
      * 用两个字段把两种意图写开，读的人不必靠约定去猜。
+     *
+     * @param violations 本次尝试的**结构化**违规（只有参数层校验才有；用于终局分的
+     *                   「值越界/枚举不符 ⇒ 拒绝」判定）
+     * @param call       本次尝试**已通过 envelope、但参数违规**的那个调用（拒绝时要指名工具与实参）
      */
-    private record AttemptOutcome(ExtractionOutcome finalOutcome, List<String> errors) {
+    private record AttemptOutcome(ExtractionOutcome finalOutcome, List<String> errors,
+                                  List<SchemaGate.Violation> violations, ToolCall call) {
 
         static AttemptOutcome done(ExtractionOutcome outcome) {
-            return new AttemptOutcome(Objects.requireNonNull(outcome, "outcome"), List.of());
+            return new AttemptOutcome(Objects.requireNonNull(outcome, "outcome"), List.of(), List.of(), null);
         }
 
         static AttemptOutcome retry(List<String> errors) {
-            return new AttemptOutcome(null, List.copyOf(errors));
+            return new AttemptOutcome(null, List.copyOf(errors), List.of(), null);
+        }
+
+        static AttemptOutcome retryWithViolations(List<String> errors, List<SchemaGate.Violation> violations,
+                                                  ToolCall call) {
+            return new AttemptOutcome(null, List.copyOf(errors), List.copyOf(violations), call);
         }
     }
 

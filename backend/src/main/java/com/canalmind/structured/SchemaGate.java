@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import com.canalmind.observability.AiObservation;
 import com.canalmind.observability.AiSpans;
@@ -108,30 +109,137 @@ public final class SchemaGate {
      * 既保留规格书的节点名，又不让两个同名节点变成无法区分的一份数据。
      */
     public List<String> validateArguments(String tool, JsonNode arguments) {
+        return messages(validateArgumentsAsViolations(tool, arguments));
+    }
+
+    /**
+     * 同 {@link #validateArguments(String, JsonNode)}，但返回**带关键字的结构化违规**。
+     *
+     * <p>⚠️ <b>为什么需要它</b>（决策 D24 → 缺口①）：服务层必须把「**值越界 / 枚举不符**」
+     * 与「形状不合规（缺必填、多余键、格式错）」**分开处置**——前者是"用户要的东西本身
+     * 越出了契约允许的范围"，应判 {@code REJECTED} 而不是整条通道降级；后者才是
+     * "模型没说清"，继续走原有的降级路径。而 {@code validateArguments} 只回**人类可读的错误文案**
+     * （那是要**原样喂回模型重试**的），从文案反解关键字就是「拿给人看的文本当机器判据」——
+     * 本项目已因同类错误两次得出错误结论（《评测报告》§6.1 第 3、8 条）。
+     * ⇒ 关键字必须从 {@code Error.getKeyword()} 直接取，不从字符串里猜。
+     */
+    public List<Violation> validateArgumentsAsViolations(String tool, JsonNode arguments) {
         Observation observation = AiObservation.start(AiSpans.TOOL_PARAM_VALIDATE, observationRegistry);
         return observation.observe(() -> {
             AiObservation.lowCardinality(observation, AiSpans.KEY_TOOL_VALIDATE_STAGE,
                     AiSpans.VALUE_VALIDATE_STAGE_ARGUMENTS);
             Schema s = toolSchemas.get(tool);
-            List<String> errors = s == null ? List.of("未知工具：" + tool) : validate(s, arguments);
+            List<Violation> violations = s == null
+                    ? List.of(new Violation(KEYWORD_UNKNOWN_TOOL, "未知工具：" + tool, ""))
+                    : violations(s, arguments);
             AiObservation.highCardinality(observation, AiSpans.KEY_RAG_RESULT_COUNT,
-                    Integer.toString(errors.size()));
-            return errors;
+                    Integer.toString(violations.size()));
+            return violations;
         });
+    }
+
+    /** 一条 Schema 违规：**机器可判的关键字** + 喂回模型的可读文案 + 出错的实例路径。 */
+    public record Violation(String keyword, String message, String instancePath) {
+
+        public Violation {
+            keyword = keyword == null ? "" : keyword;
+            message = message == null ? "" : message;
+            instancePath = instancePath == null ? "" : instancePath;
+        }
+    }
+
+    /** 工具名不在契约里（不是"值越界"，不得判 {@code REJECTED}）。 */
+    public static final String KEYWORD_UNKNOWN_TOOL = "unknownTool";
+
+    /**
+     * 「**值越界 / 枚举不符**」这一类违规的 JSON Schema 关键字（缺口①的判据）。
+     *
+     * <p>⛔ <b>刻意只收这几项</b>：{@code required} / {@code additionalProperties} / {@code pattern} /
+     * {@code type} 等**形状类**违规**不在其中**——它们要么是「缺参」（本该追问），
+     * 要么是「模型输出格式不对」（本该重试后降级），语义与"取值越出允许范围"不同。
+     * 把它们混进来会让「缺参」被误判成 {@code REJECTED}，直接违反决策 C-35 的口径。
+     */
+    private static final Set<String> VALUE_VIOLATION_KEYWORDS = Set.of(
+            "enum", "const", "maximum", "minimum", "exclusiveMaximum", "exclusiveMinimum");
+
+    /** 该违规是否属于「值越界 / 枚举不符」（⇒ 服务层可判 {@code REJECTED}）。 */
+    public static boolean isValueViolation(Violation v) {
+        return v != null && VALUE_VIOLATION_KEYWORDS.contains(v.keyword());
+    }
+
+    /** 关键字 → 中文（用于**给用户看的**拒绝理由；⛔ 不参与喂回模型的重试文案）。 */
+    private static final Map<String, String> KEYWORD_CN = Map.of(
+            "maximum", "不得超过上限",
+            "exclusiveMaximum", "必须小于上限",
+            "minimum", "不得低于下限",
+            "exclusiveMinimum", "必须大于下限",
+            "enum", "只能是契约枚举内的固定取值",
+            "const", "只能是契约写死的取值");
+
+    /**
+     * 把一条「值越界/枚举不符」违规渲染成**给人看的中文**一句话（附原始文案以便核对）。
+     *
+     * <p>⚠️ 为什么保留英文原文：networknt 的文案里带着**具体边界值**（如
+     * {@code must have a maximum value of 50}），而回答层要把这个数字如实说出来；
+     * 只写中文标签会把数字丢掉，只写英文原文则用户看不懂。
+     */
+    public static String describeForUser(Violation v) {
+        if (v == null) {
+            return "";
+        }
+        String what = KEYWORD_CN.get(v.keyword());
+        String name = pathTail(v.instancePath());
+        String where = name.isBlank() ? "参数" : "参数 " + name;
+        if (what == null) {
+            return where + " 不符合契约（" + v.message() + "）";
+        }
+        return where + " " + what + "（" + v.message() + "）";
+    }
+
+    /** 取实例路径的最后一段（{@code $.limit} / {@code /limit} → {@code limit}）；根路径返回空串。 */
+    private static String pathTail(String instancePath) {
+        if (instancePath == null || instancePath.isBlank() || "$".equals(instancePath)
+                || "/".equals(instancePath)) {
+            return "";
+        }
+        int cut = Math.max(instancePath.lastIndexOf('.'), instancePath.lastIndexOf('/'));
+        return cut < 0 ? instancePath : instancePath.substring(cut + 1);
     }
 
     /** 底层校验（静态，便于单测直接喂 Schema）。 */
     public static List<String> validate(Schema schema, JsonNode node) {
+        return messages(violations(schema, node));
+    }
+
+    /** 底层校验的**结构化**版本：关键字与文案同源，避免"文案改了、判据就漂了"。 */
+    public static List<Violation> violations(Schema schema, JsonNode node) {
         ExecutionContext ctx = new ExecutionContext();
         schema.validate(ctx, node);
         List<Error> errors = ctx.getErrors();
-        List<String> out = new ArrayList<>();
+        List<Violation> out = new ArrayList<>();
         if (errors != null) {
             for (Error e : errors) {
-                out.add(describe(e));
+                out.add(new Violation(e.getKeyword(), describe(e), locationOf(e)));
             }
         }
         return List.copyOf(out);
+    }
+
+    private static List<String> messages(List<Violation> violations) {
+        List<String> out = new ArrayList<>(violations.size());
+        for (Violation v : violations) {
+            out.add(v.message());
+        }
+        return List.copyOf(out);
+    }
+
+    /** 实例路径（如 {@code $.limit}）；拿不到就返回空串（⛔ 不让它把整条校验搞失败）。 */
+    private static String locationOf(Error e) {
+        try {
+            return e.getInstanceLocation() == null ? "" : e.getInstanceLocation().toString();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
     }
 
     /**

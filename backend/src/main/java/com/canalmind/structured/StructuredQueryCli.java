@@ -362,10 +362,22 @@ public final class StructuredQueryCli {
         ExtractionOutcome bad = extractWith(catalog, gate, List.of("nope", "nope", "nope", "nope"));
         expect(bad.degraded() && ExtractionOutcome.KIND_NOT_JSON.equals(bad.degradeKind()) && bad.attempts() == 3,
                 "全畸形应答应重试到上限后降级 NOT_JSON，实际 " + bad.status() + "/" + bad.degradeKind() + "/" + bad.attempts(), failures);
+        ExtractionOutcome valueViolation = extractWith(catalog, gate,
+                List.of("{\"tool\":\"query_tariff\",\"arguments\":{\"fee_type\":\"过路费\","
+                        + "\"cargo_category\":\"建材\",\"tonnage\":1200,\"biz_date\":\"2026-10-01\"},"
+                        + "\"missing\":[],\"reason\":\"x\"}"));
+        expect(valueViolation.rejected()
+                        && ExtractionOutcome.KIND_PARAM_VIOLATION.equals(valueViolation.degradeKind()),
+                "值越界/枚举不符应**拒绝执行**（缺口① / D24 → C-65），实际 "
+                        + valueViolation.status() + "/" + valueViolation.degradeKind(), failures);
+        expect(!valueViolation.errors().isEmpty() && !valueViolation.errors().get(0).isBlank(),
+                "拒绝必须带**非空**理由（否则回答层只能说「参数不合法」）", failures);
         ExtractionOutcome schemaBad = extractWith(catalog, gate,
-                List.of("{\"tool\":\"query_tariff\",\"arguments\":{\"fee_type\":\"过路费\"},\"missing\":[],\"reason\":\"x\"}"));
+                List.of("{\"tool\":\"query_tariff\",\"arguments\":{\"tonnage\":1200,"
+                        + "\"biz_date\":\"2026-10-01\"},\"missing\":[],\"reason\":\"x\"}"));
         expect(schemaBad.degraded() && ExtractionOutcome.KIND_SCHEMA_INVALID.equals(schemaBad.degradeKind()),
-                "Schema 不合规应降级 SCHEMA_INVALID，实际 " + schemaBad.degradeKind(), failures);
+                "缺必填（形状类违规）仍应降级 SCHEMA_INVALID，实际 " + schemaBad.status() + "/"
+                        + schemaBad.degradeKind(), failures);
         expect(!schemaBad.errors().isEmpty() && !schemaBad.errors().get(0).isBlank(),
                 "降级必须带**非空**错误消息（空消息喂回模型等于没喂）", failures);
         ExtractionOutcome noneTool = extractWith(catalog, gate,

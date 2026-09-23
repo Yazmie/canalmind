@@ -6,6 +6,7 @@ import io.micrometer.observation.ObservationRegistry;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import com.canalmind.observability.AiObservation;
 import com.canalmind.observability.AiSpans;
@@ -26,6 +28,19 @@ import com.canalmind.observability.AiSpans;
  *
  * <p>⚠️ 缺参一律**追问而不是猜**（决策 C-35 的判据之一是"缺参是否追问"）：
  * 日期/吨位这类参数一旦猜错，答案会"看起来正确"却全错，这比答不出更危险。
+ *
+ * <p><b>五种终态的分界（决策 D24 → C-65 修完 6 类缺口后的口径）</b>：
+ * <table>
+ *   <tr><th>状态</th><th>什么时候</th><th>例子</th></tr>
+ *   <tr><td>{@code OK}</td><td>参数合法、窗口内、量级内，且查到了确定性事实</td><td>1200 吨建材过闸费</td></tr>
+ *   <tr><td>{@code NEEDS_CLARIFICATION}</td><td><b>用户要补一个参数</b>：缺参（C-35）、
+ *       日历上不存在的日期（缺口②）、单位错（缺口③）</td><td>「2027-02-30」「5000 米」</td></tr>
+ *   <tr><td>{@code REJECTED}</td><td><b>用户要的东西本身与契约/口径冲突</b>：参数取值越界或枚举不符（缺口①）、
+ *       引航费/停泊费按货类分档（缺口⑥）</td><td>{@code limit=10000}、注入串当分组维度</td></tr>
+ *   <tr><td>{@code NO_DATA}</td><td><b>窗口内查过、确实没有</b>（含部分裁剪后窗口内无记录）</td><td>窗口内某货类无运单</td></tr>
+ *   <tr><td>{@code DEGRADED}</td><td><b>这一路这次给不出确定性结果</b>：模型输出畸形/调用失败/不属于工具集、
+ *       合法日期但在业务窗口外（缺口⑤）、吨位远超仿真数据量级（缺口④）</td><td>「2030-01-01」「5 万吨」</td></tr>
+ * </table>
  */
 public final class StructuredQueryService {
 
@@ -118,7 +133,7 @@ public final class StructuredQueryService {
         Observation observation = AiObservation.start(AiSpans.STRUCTURED_QUERY, observationRegistry);
         return observation.observe(() -> {
             ExtractionOutcome outcome = extractor.extract(question);
-            ToolResult result = run(outcome);
+            ToolResult result = run(outcome, question);
             // 规格书 §7.3 第 570 行的低基数键 ai.rag.result（hit / empty）在这里表达
             // "结构化通道这次到底给没给出可用结果"：只有 STATUS_OK 算命中，
             // NO_DATA / REJECTED / NEEDS_CLARIFICATION / DEGRADED 四种状态一律记 empty
@@ -134,8 +149,14 @@ public final class StructuredQueryService {
     /** {@link #askDetailed(String)} 的返回值：抽取（工具 + 实参 + 降级/追问状态）与执行结果。 */
     public record AskOutcome(ExtractionOutcome extraction, ToolResult result) {}
 
-    /** 抽取之后的一切：校验信息、降级、追问、执行。（由 {@link #askDetailed} 调用） */
-    private ToolResult run(ExtractionOutcome outcome) {
+    /**
+     * 抽取之后的一切：校验信息、降级、拒绝、追问、执行。（由 {@link #askDetailed} 调用）
+     *
+     * @param question 用户**原始问句**：单位一致性守卫（缺口③）要靠它比对
+     *                 "模型传进来的吨位是不是抄了问句里的一个长度值"。
+     *                 ⚠️ 这是本方法唯一用到问句的地方，⛔ 不参与参数抽取（抽取在模型侧）。
+     */
+    private ToolResult run(ExtractionOutcome outcome, String question) {
         List<String> traces = new ArrayList<>();
         traces.add("抽取：状态=" + outcome.status() + "，尝试=" + outcome.attempts() + "，耗时=" + outcome.latencyMs() + "ms");
         if (!outcome.errors().isEmpty()) {
@@ -157,6 +178,18 @@ public final class StructuredQueryService {
             };
             return ToolResult.degraded(null, kind, reason, traces);
         }
+        // ── 缺口①（决策 D24 → C-65）：**值越界 / 枚举不符** ⇒ 拒绝执行，⛔ 不是整条通道降级 ──
+        // 语义差别是实质性的：DEGRADED 的意思是"这一路这次没算出东西，请用户重述"，
+        // 而这里的事实是"用户要的取值本身越出了契约允许的范围"（limit=10000、把注入串当分组维度）
+        // ⇒ 必须**明确拒绝**并说明边界，而不是让用户以为只是"系统抽不出参数"。
+        // ⚠️ 走到这里说明参数**从未送进执行层**：违规调用不得触达数据层（契约与既有测试都钉着这一条）。
+        if (outcome.rejected()) {
+            ToolCall call = outcome.call();
+            String reason = outcome.errors().isEmpty() ? "参数取值不符合工具契约"
+                    : String.join("；", outcome.errors());
+            traces.add("违规拒绝（参数取值越界/枚举不符，未执行）：" + reason);
+            return ToolResult.rejected(call == null ? null : call.tool(), reason, traces);
+        }
         if (outcome.needsClarification()) {
             ToolCall call = outcome.call();
             List<String> missingRequired = missingRequiredParams(call);
@@ -167,7 +200,7 @@ public final class StructuredQueryService {
 
         ToolCall call = outcome.call();
         traces.add("工具=" + call.tool() + "，参数=" + call.arguments());
-        return execute(call, traces);
+        return execute(call, traces, question);
     }
 
     /** 只保留**该工具真正必填**的参数名（模型可能把有默认值的参数也报成 missing）。 */
@@ -204,17 +237,46 @@ public final class StructuredQueryService {
         return sb.toString();
     }
 
-    private ToolResult execute(ToolCall call, List<String> traces) {
+    /**
+     * 「**需要用户澄清**」而不是「缺参」的抛出物（缺口②/③）。
+     *
+     * <p>⚠️ 为什么不复用 {@code MISSING_PARAM_PREFIX} 那条路径：那条路径的话术由**缺参模板**拼装
+     * （"{@code 前缀}；请补充{@code 参数名}。例如「2026 年 10 月的过闸费，货重 1200 吨」…"），
+     * 而这两类要说清的是**错在哪**——"「5000 米」是长度单位、要的是吨"、
+     * "2027 年 2 月只有 28 天、2027-02-30 在日历上不存在"。用缺参模板会把这句话挤掉，
+     * 而数据集的 rubric 恰好要求把它们说出来。
+     *
+     * <p>⛔ 两者的**状态码相同**（都是 {@code NEEDS_CLARIFICATION}）：对下游与评测而言，
+     * "用户需要补/改一个参数"是同一件事，区别只在话术。
+     */
+    private static final class NeedClarificationException extends RuntimeException {
+
+        private final String kind;
+
+        NeedClarificationException(String kind, String question) {
+            super(question);
+            this.kind = kind;
+        }
+
+        String kind() {
+            return kind;
+        }
+    }
+
+    private ToolResult execute(ToolCall call, List<String> traces, String question) {
         try {
             return switch (call.tool()) {
-                case "query_tariff" -> queryTariff(call, traces);
-                case "quote_fee" -> quoteFee(call, traces);
+                case "query_tariff" -> queryTariff(call, traces, question);
+                case "quote_fee" -> quoteFee(call, traces, question);
                 case "query_traffic" -> queryTraffic(call, traces);
                 case "query_waybill" -> queryWaybill(call, traces);
                 case "query_vessel" -> queryVessel(call, traces);
                 default -> ToolResult.degraded(call.tool(), ExtractionOutcome.KIND_TOOL_UNKNOWN,
                         "未知工具：" + call.tool(), traces);
             };
+        } catch (NeedClarificationException e) {
+            traces.add("需要用户澄清（" + e.kind() + "）：" + e.getMessage());
+            return ToolResult.clarify(call.tool(), e.getMessage(), traces);
         } catch (IllegalArgumentException e) {
             String msg = e.getMessage() == null ? "" : e.getMessage();
             int idx = msg.indexOf(MISSING_PARAM_PREFIX);
@@ -232,14 +294,85 @@ public final class StructuredQueryService {
         }
     }
 
+    // ==================== 参数守卫（缺口②③④⑤） ====================
+
+    /**
+     * 缺口③：问句里的「数字 + 长度单位」与该吨位同值、且问句里没有同值的「…吨」⇒ **追问**。
+     *
+     * <p>⚠️ 诚实边界：本层的确定性信息只有"模型交给我的 tonnage"与"用户原话"，
+     * 判不出模型是猜的还是抄的 ⇒ 只做**证据驱动**的追问，判定规则见 {@link TonnageUnitGuard}。
+     */
+    private void requireUnitConsistency(String question, BigDecimal tonnage, List<String> traces) {
+        String why = TonnageUnitGuard.explainIfLengthUnitMistake(question, tonnage);
+        if (why != null) {
+            traces.add("单位一致性检查：不通过");
+            throw new NeedClarificationException("单位错误", why + "。请补充实际计费吨位（吨）。");
+        }
+        traces.add("单位一致性检查：问句里没有与该吨位同值的长度单位表述");
+    }
+
+    /**
+     * 缺口④：计费吨位远超仿真业务数据量级 ⇒ {@code DEGRADED}（给量级提示，⛔ 不给确定金额）。
+     *
+     * <p>阈值与出处全部在 {@link SimulatedDataScope}（具名常量 + 文档锚点），此处只做调用。
+     *
+     * @return 命中时返回该降级结果，未命中返回 {@code null}
+     */
+    private ToolResult outOfScopeOrNull(String tool, String tonnageBasis, BigDecimal tonnage,
+                                        List<String> traces) {
+        String why = SimulatedDataScope.explainIfOutOfScope(tonnageBasis, tonnage);
+        if (why == null) {
+            return null;
+        }
+        traces.add("量级检查：超出仿真数据量级");
+        return ToolResult.degraded(tool, ExtractionOutcome.KIND_MAGNITUDE_OUT_OF_RANGE, why, traces);
+    }
+
+    /**
+     * 缺口⑤：**合法日期但落在业务数据窗口之外** ⇒ {@code DEGRADED}（⛔ 不是 {@code NO_DATA}）。
+     *
+     * <p>⚠️ 与缺口②的分界必须写清（决策 D24）：
+     * <ul>
+     *   <li>② 是「**日历上不存在的日期**」（{@code 2027-02-30}）⇒ **追问**（用户给的日期本身是错的，要改）；</li>
+     *   <li>⑤ 是「**合法日期但在窗口外**」（{@code 2030-01-01}）⇒ {@code DEGRADED}
+     *       （日期没错，是这一路没有该区间的数据与费率 ⇒ 不能装作"查过了、没有"）；</li>
+     *   <li>窗口内 ⇒ 一切照常。</li>
+     * </ul>
+     *
+     * <p>⚠️ 为什么不判 {@code NO_DATA}：{@code NO_DATA} 的语义是"**在业务窗口内查过、确实没有**"
+     * （{@code query_traffic} 的部分裁剪就属于它）；而"整段区间都在窗口外"意味着
+     * **本层根本没有可比对的数据与费率**，把它说成"没有数据"会让回答层把它当成一条正常事实。
+     */
+    private ToolResult outOfWindowOrNull(String tool, String what, LocalDate date, List<String> traces) {
+        if (!date.isBefore(StructuredQueryRepository.BUSINESS_START)
+                && !date.isAfter(StructuredQueryRepository.BUSINESS_END)) {
+            return null;
+        }
+        String why = what + " " + date + " 落在业务数据窗口 "
+                + StructuredQueryRepository.BUSINESS_START + " ~ " + StructuredQueryRepository.BUSINESS_END
+                + "（通航后一年）之外：本层没有该区间的费率与业务数据，故不给确定结果";
+        traces.add(why);
+        return ToolResult.degraded(tool, ExtractionOutcome.KIND_OUT_OF_WINDOW, why, traces);
+    }
+
     // ==================== 工具实现 ====================
 
-    private ToolResult queryTariff(ToolCall call, List<String> traces) {
+    private ToolResult queryTariff(ToolCall call, List<String> traces, String question) {
         String feeType = requireArg(call, "fee_type");
         BigDecimal tonnage = requireTonnage(call);
+        requireUnitConsistency(question, tonnage, traces);
         LocalDate bizDate = requireDate(call, "biz_date");
         String basis = basisOf(feeType, traces);
         String category = categoryOf(call, feeType, traces);
+
+        ToolResult outOfScope = outOfScopeOrNull("query_tariff", basis, tonnage, traces);
+        if (outOfScope != null) {
+            return outOfScope;
+        }
+        ToolResult outOfWindow = outOfWindowOrNull("query_tariff", "业务日", bizDate, traces);
+        if (outOfWindow != null) {
+            return outOfWindow;
+        }
 
         Optional<TariffRuleRow> found = tariffRepo.findRule(feeType, category, basis, tonnage, bizDate);
         if (found.isEmpty()) {
@@ -266,11 +399,22 @@ public final class StructuredQueryService {
                 rows, facts, traces);
     }
 
-    private ToolResult quoteFee(ToolCall call, List<String> traces) {
+    private ToolResult quoteFee(ToolCall call, List<String> traces, String question) {
         String feeType = requireArg(call, "fee_type");
         BigDecimal tonnage = requireTonnage(call);
+        requireUnitConsistency(question, tonnage, traces);
         LocalDate bizDate = requireDate(call, "biz_date");
+        // ⚠️ 量级/窗口两道守卫**刻意放在查危险品属性之前**：它们一旦命中就整条不执行，
+        //    此时数据层不该被调用（与缺口①"违规不得触达数据层"同一条纪律）。
         String basis = basisOf(feeType, traces);
+        ToolResult outOfScope = outOfScopeOrNull("quote_fee", basis, tonnage, traces);
+        if (outOfScope != null) {
+            return outOfScope;
+        }
+        ToolResult outOfWindow = outOfWindowOrNull("quote_fee", "业务日", bizDate, traces);
+        if (outOfWindow != null) {
+            return outOfWindow;
+        }
         String category = categoryOf(call, feeType, traces);
         int days = call.intArg("days", 1);
         if (!FeeCalculationEngine.PER_DAY_FEE_TYPE.equals(feeType) && call.arguments().has("days")) {
@@ -354,11 +498,14 @@ public final class StructuredQueryService {
         LocalDate wFrom = from.isBefore(StructuredQueryRepository.BUSINESS_START) ? StructuredQueryRepository.BUSINESS_START : from;
         LocalDate wTo = to.isAfter(StructuredQueryRepository.BUSINESS_END) ? StructuredQueryRepository.BUSINESS_END : to;
         if (wTo.isBefore(wFrom)) {
+            // 缺口⑤（决策 D24）：整段区间都在业务窗口外 ⇒ DEGRADED，⛔ 不是 NO_DATA。
+            // 依据：数据集 `L6-015`（2027-10-01 ~ 2027-10-20）期望 `DEGRADED`；
+            // 而"窗口内查过确实没有"才是 NO_DATA（部分裁剪下面那一支即属此类，保持不变）。
             String why = "请求区间 " + from + " ~ " + to + " 完全落在业务数据窗口 "
                     + StructuredQueryRepository.BUSINESS_START + " ~ " + StructuredQueryRepository.BUSINESS_END
-                    + " 之外，窗口内没有记录（不是查询失败）";
+                    + " 之外，本层没有该区间的费率与业务数据（不是查询失败，也不是「窗口内没有记录」）";
             traces.add(why);
-            return ToolResult.noData("query_traffic", List.of(why), traces);
+            return ToolResult.degraded("query_traffic", ExtractionOutcome.KIND_OUT_OF_WINDOW, why, traces);
         }
         boolean clipped = !wFrom.equals(from) || !wTo.equals(to);
         if (clipped) {
@@ -498,6 +645,26 @@ public final class StructuredQueryService {
         return d;
     }
 
+    /** 契约里日期参数的形状（{@code tool-contracts.json} 的 {@code pattern}）。 */
+    private static final Pattern DATE_SHAPE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+    /**
+     * 日期参数：**缺** ⇒ 走缺参追问；**形状对但日历上不存在** ⇒ 缺口②追问；其余一律如实拒绝。
+     *
+     * <p>⚠️⚠️ <b>缺口②（决策 D24 → C-65）：{@code 2027-02-30} 这类"日历上不存在的日期"要**追问**，
+     * ⛔ 不是 {@code REJECTED}</b>。原实现一律抛"业务拒绝：业务发生日期不是合法日期"，实测（2026-09-23 探针）
+     * 桩发 {@code biz_date=2027-02-30} ⇒ {@code REJECTED}，而数据集 `L6-014` 要的是
+     * {@code NEEDS_CLARIFICATION}（rubric：「必须指出 2027-02-30 不是合法日期（2027 年 2 月只有 28 天）
+     * 并请用户确认日期」）。
+     *
+     * <p>⚠️ 为什么这个区分是**实质**的：{@code REJECTED} 的话术是"无法执行"，
+     * 而这里用户只是**把日期写错了**——他要的东西（"那天的运量"）完全合法，
+     * 换个真实存在的日期就能答。把它当作"拒绝"会让回答层直接拒答，而不是告诉用户"这个日期不存在"。
+     *
+     * <p>⚠️ 但**只对"形状合乎契约却过不了日历"的取值**这么做（{@code 2027-02-30}、{@code 2027-13-01}）：
+     * 形状本身就不对的取值（{@code 2026年10月1日}）由 `SchemaGate` 的 `pattern` 拦下
+     * ⇒ 走重试后降级，⛔ 不归到这里。这样"追问"的适用面被压到最小。
+     */
     private LocalDate optionalDate(ToolCall call, String name) {
         String raw = call.stringArg(name);
         if (raw == null || raw.isBlank()) {
@@ -506,8 +673,44 @@ public final class StructuredQueryService {
         try {
             return LocalDate.parse(raw);
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException(PARAM_CN.getOrDefault(name, name) + "不是合法日期（须 YYYY-MM-DD）：" + raw);
+            String cn = PARAM_CN.getOrDefault(name, name);
+            String why = calendarExplain(raw.trim());
+            if (why != null) {
+                throw new NeedClarificationException("不存在的日期",
+                        cn + " " + raw.trim() + " 在日历上不存在（" + why + "），"
+                                + "请确认一个真实存在的日期后我再统计（⛔ 不会自行改成相近日期）");
+            }
+            throw new IllegalArgumentException(cn + "不是合法日期（须 YYYY-MM-DD）：" + raw);
         }
+    }
+
+    /**
+     * 给"形状对但日历上不存在"的日期一句可核对的解释；⛔ 解释不出来就返回 {@code null}
+     * （宁可按原样拒绝，也不猜一句可能说错的话）。
+     */
+    private static String calendarExplain(String raw) {
+        if (!DATE_SHAPE.matcher(raw).matches()) {
+            return null;
+        }
+        int year;
+        int month;
+        int day;
+        try {
+            year = Integer.parseInt(raw.substring(0, 4));
+            month = Integer.parseInt(raw.substring(5, 7));
+            day = Integer.parseInt(raw.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (month < 1 || month > 12) {
+            return "月份 " + raw.substring(5, 7) + " 不存在，只能是 01–12";
+        }
+        int lastDay = YearMonth.of(year, month).lengthOfMonth();
+        if (day < 1 || day > lastDay) {
+            return year + " 年 " + month + " 月只有 " + lastDay + " 天";
+        }
+        // 形状对、月日都合法 ⇒ 理论上不会被 LocalDate.parse 拒绝；真到这就是无法解释的情形
+        return null;
     }
 
     /** 计费吨位口径由**费种**决定（语料 `25-第十二条`）——不让模型传，模型只会传错。 */
@@ -526,19 +729,39 @@ public final class StructuredQueryService {
      * 根因不在模型（它已正确填了 `cargo_name`），而在**这里只看 `cargo_category`**。
      * 契约里写的是"货种**或**货类"，服务端就必须真的接受这两种入口，
      * 否则"契约允许的输入"与"服务端接受的状态"不一致——**表现出来像模型抽取不准，其实是实现漏了一支**。
+     *
+     * <p>⚠️⚠️ <b>缺口⑥（决策 D24 → C-65）：引航费/停泊费传入货类/货种时**拒绝**，⛔ 不再"静默忽略"</b>。
+     * 原实现是"提示：引航费/停泊费与货类无关，已忽略传入的货类 化工"然后**照常算出确定金额**——
+     * 两次确定性探针（2026-09-23）实测：引航费+化工 得 300.00 元、停泊费+金属 得 360.00 元，状态都是 {@code OK}。
+     * 数据集 `L6-008`/`L6-009` 要的是 {@code REJECTED}，理由是**用户的诉求本身与口径矛盾**
+     * （语料 `08-引航费与停泊费费率表` 第二条/第四条/第七条末段：这两类费"与货物所属货类无关，
+     * 不得因货类不同而调整"，费率表货类栏为「不区分」）：
+     * <ul>
+     *   <li>"忽略后照算"会给出一个**看起来正确、实则答非所问**的金额（用户以为已按货类分档）；
+     *       这正是本项目反复强调的「错答比不答危险」。</li>
+     *   <li>拒绝时**如实说明**为什么不能按货类分档（而不是只说"参数不合法"）。</li>
+     * </ul>
      */
     private String categoryOf(ToolCall call, String feeType, List<String> traces) {
         String category = call.stringArg("cargo_category");
+        String cargoName = call.stringArg("cargo_name");
         if (PER_TIME_FEE_TYPES.contains(feeType)) {
             if (category != null && !category.isBlank()) {
-                traces.add("提示：引航费/停泊费与货类无关，已忽略传入的货类 " + category);
+                throw new IllegalArgumentException("「" + feeType + "」按**船舶总吨位**分档、**与货类无关**"
+                        + "（语料 08-引航费与停泊费费率表：第二条/第四条/第七条末段，费率表货类栏为「不区分」），"
+                        + "不得因货类不同而调整 ⇒ 无法按货类「" + category + "」给「" + feeType
+                        + "」分档；传入的货类**不被接受**（不是忽略后照算）");
+            }
+            if (cargoName != null && !cargoName.isBlank()) {
+                throw new IllegalArgumentException("「" + feeType + "」按**船舶总吨位**分档、**与货种/货类无关**"
+                        + "（语料 08-引航费与停泊费费率表：第二条/第四条/第七条末段），"
+                        + "不接受传入的货种「" + cargoName + "」（不是忽略后照算）");
             }
             return TariffRuleRow.NO_CATEGORY;
         }
         if (category != null && !category.isBlank()) {
             return category;
         }
-        String cargoName = call.stringArg("cargo_name");
         if (cargoName != null && !cargoName.isBlank()) {
             ToolCatalog.CargoInfo info = catalog.cargo(cargoName);
             if (info == null) {

@@ -120,6 +120,44 @@ class SchemaGateTest {
                 "校验器里的工具 Schema 必须与契约同源");
     }
 
+    @Test
+    @DisplayName("违规分类：值越界/枚举不符可机器判定（缺口①），形状类违规不得误入")
+    void classifiesValueViolationsByKeyword() throws Exception {
+        // ①-a 上限越界（`L6-011` 的 limit=10000 同形）
+        List<SchemaGate.Violation> overLimit = GATE.validateArgumentsAsViolations("query_waybill",
+                json("{\"date_from\":\"2027-08-01\",\"limit\":10000}"));
+        assertTrue(overLimit.stream().allMatch(SchemaGate::isValueViolation),
+                "上限越界应全部判为「值越界」，实际 " + overLimit);
+
+        // ①-b 枚举不符（`L6-012` 的注入串同形）
+        List<SchemaGate.Violation> badEnum = GATE.validateArgumentsAsViolations("query_traffic",
+                json("{\"date_from\":\"2027-01-01\",\"date_to\":\"2027-06-30\",\"metric\":\"运单数\","
+                        + "\"group_by\":\"货类); DROP TABLE waybill;--\"}"));
+        assertTrue(badEnum.stream().allMatch(SchemaGate::isValueViolation),
+                "枚举不符应全部判为「值越界」，实际 " + badEnum);
+        assertTrue(badEnum.stream().anyMatch(v -> v.message().contains("枚举") || v.message().contains("enum")
+                        || v.message().contains("货类")),
+                "错误文案要指出枚举取值：" + badEnum);
+
+        // 形状类：缺必填 / 多余键 / 格式错 ⇒ ⛔ 不得判为「值越界」（否则缺参会被误判成拒绝）
+        assertFalse(GATE.validateArgumentsAsViolations("query_tariff",
+                        json("{\"tonnage\":1000}")).stream().anyMatch(SchemaGate::isValueViolation),
+                "缺必填不是值越界");
+        assertFalse(GATE.validateArgumentsAsViolations("query_tariff",
+                        json("{\"fee_type\":\"过闸费\",\"tonnage\":1000,\"biz_date\":\"2026-10-01\",\"evil\":1}"))
+                        .stream().anyMatch(SchemaGate::isValueViolation),
+                "多余参数不是值越界");
+        assertFalse(GATE.validateArgumentsAsViolations("query_tariff",
+                        json("{\"fee_type\":\"过闸费\",\"tonnage\":1000,\"biz_date\":\"2026/10/01\"}"))
+                        .stream().anyMatch(SchemaGate::isValueViolation),
+                "日期格式错不是值越界");
+
+        // 人话渲染要带上受限参数名与具体边界（回答层据此说出"上限 50"）
+        String userText = SchemaGate.describeForUser(overLimit.get(0));
+        assertTrue(userText.contains("limit"), userText);
+        assertTrue(userText.contains("50") || userText.contains("maximum"), userText);
+    }
+
     private static void expectRejected(String jsonText, String tool, String what) throws Exception {
         JsonNode node = json(jsonText);
         List<String> envErrors = GATE.validateEnvelope(node);
