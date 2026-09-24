@@ -92,6 +92,20 @@ spring:
       embedding:
         model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
 
+# ============================================================
+# ⚠️ 前端跨域白名单**不在本文件里**（与 `canalmind.chat.structured-frame` 同一惯例：
+#    带默认值的自有开关在 Java 常量里定义，yml 只留指路，避免"两份来源同一事实"漂移）。
+#
+#    属性名：`canalmind.chat.cors.allowed-origin-patterns`
+#    定义处：com.canalmind.config.ChatCorsConfig（默认只放「双击打开的网页」与 localhost，
+#            ⛔ **不是**通配 "*"；放行范围只到 `/api/chat/**`）
+#    为什么需要它（2026-09-24 实测故障）：前端页是**单文件、双击即开**，与后端不同源，
+#            后端不发 CORS 头时浏览器会丢弃响应并断开连接 —— 前端只看到
+#            `Failed to fetch`，后端只看到 `SseEmitter.send` 写 socket 失败。
+#    ⚠️ 放行面就是**对外可达面**（本接口无鉴权、每次问答都真实调用付费模型）
+#       ⇒ 改它属 A 类决策，见 DECISIONS.md **C-70**。
+# ============================================================
+
 server:
   port: ${SERVER_PORT:8080}
   # SSE 是长连接：Tomcat 的异步超时不能太小，否则长回答会被掐断

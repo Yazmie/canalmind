@@ -1018,6 +1018,30 @@ function mockReply(q) {
    六、发送
    ============================================================================ */
 
+/**
+ * 把 fetch 层的失败翻译成「能拿去排查」的话。
+ *
+ * ⚠️ 起因是一次真实故障（2026-09-24）：后端没发 CORS 头时浏览器抛的是
+ * TypeError: Failed to fetch，而本页当时把它显示成「接口不可用：无法连接 …」——
+ * 于是「跨域被拦」被读成了「端口不通 / 后端没起」，把排查方向带偏了
+ * （真相是请求**已经打到后端**并开始推流，是浏览器丢弃响应并断开连接）。
+ *
+ * ⛔ 三种成因（跨域被拦 / 后端没起 / 中途断网）在 fetch 层的表现**完全一样**，
+ * 所以文案把可能性列全，**不替用户下结论**；HTTP 状态码则与它们明确区分开。
+ */
+function diagnoseFetchError(err) {
+  var raw = (err && err.message) ? err.message : String(err);
+  if (/Failed to fetch|NetworkError|Load failed|Network request failed|fetch failed/i.test(raw)) {
+    return "浏览器没拿到 " + API_BASE + " 的响应（" + raw + "）。可能原因：后端未启动；"
+      + "或后端未放行本页来源的跨域请求（CORS）——此时后端日志里能看到该请求，页面却读不到响应；"
+      + "或网络中断。";
+  }
+  if (/^HTTP \d+/.test(raw)) {
+    return "后端返回错误状态码 " + raw.replace(/^HTTP /, "") + "，请看后端日志。";
+  }
+  return "读取响应流失败（" + raw + "），请看后端日志。";
+}
+
 function submit(question) {
   var q = (question || "").trim();
   if (!q || state.busy) { return; }
@@ -1079,8 +1103,7 @@ function submit(question) {
     document.getElementById("send").disabled = false;
   }).catch(function (err) {
     if (sessionForCall !== state.activeId) { return; }
-    replacePending({ role: "error",
-      text: "接口不可用：无法连接 " + API_BASE + "（" + (err && err.message ? err.message : err) + "）" });
+    replacePending({ role: "error", text: diagnoseFetchError(err) });
     state.busy = false;
     document.getElementById("send").disabled = false;
   });

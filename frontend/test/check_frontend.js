@@ -433,6 +433,10 @@ async function checkBackendPath(page, els) {
   global.fetch = function (url) {
     requests.push(url);
     const p = plan;
+    if (p && p.reject) {
+      // fetch 层被拦：跨域被浏览器拦下 / 后端没起 / 断网 —— 浏览器给的都是同一个 TypeError
+      return Promise.reject(new TypeError(p.reject));
+    }
     if (p && p.status && p.status !== 200) {
       return Promise.resolve({ ok: false, status: p.status, body: null });
     }
@@ -573,6 +577,9 @@ async function checkBackendPath(page, els) {
     const last = msgs[msgs.length - 1];
     ok(last.role === "error", "HTTP 500 时应渲染错误行，实测 " + last.role);
     ok(last.text.indexOf("500") > 0, "错误行应带上状态码，实测 " + JSON.stringify(last.text));
+    ok(!/跨域|CORS/.test(last.text),
+      "HTTP 500 是后端**答复了**的状态码，⛔ 不得说成跨域被拦（两类成因必须分开），实测 "
+        + JSON.stringify(last.text));
     ok(page.state.busy === false, "出错后 busy 未复位（发送键会永久禁用）");
     ok(els.send.disabled === false, "出错后发送键未恢复可用");
   }
@@ -587,6 +594,27 @@ async function checkBackendPath(page, els) {
     ids.forEach(function (id, i) {
       ok(id.indexOf("web-") === 0, "sessionId[" + i + "] 前缀异常：" + id);
     });
+  }
+
+  // ── D5：⭐ fetch 层被拦时，文案必须指向跨域（2026-09-24 真实故障的回归护栏）──
+  //     那次故障：后端没发 CORS 头 ⇒ 浏览器 TypeError: Failed to fetch；
+  //     而页面当时显示「接口不可用：无法连接 …」，把「跨域被拦」读成了「连不上」，
+  //     排查方向被带偏。⇒ 现在文案必须把跨域列为可能原因，并保留原文便于搜索。
+  {
+    page.state.dataSource = "api";
+    page.state.activeId = "s2";
+    plan = { reject: "Failed to fetch" };
+    page.submit("你好");
+    await flushTimes(20);
+    const msgs = page.state.history["s2"];
+    const last = msgs[msgs.length - 1];
+    ok(last.role === "error", "fetch 被拦时应渲染错误行，实测 " + last.role);
+    ok(/跨域|CORS/.test(last.text),
+      "文案必须指出「可能是跨域被拦」——⛔ 不能只说无法连接，实测 " + JSON.stringify(last.text));
+    ok(last.text.indexOf("Failed to fetch") > 0,
+      "原始错误文本要保留（用户可拿去搜索/贴日志），实测 " + JSON.stringify(last.text));
+    ok(page.state.busy === false, "fetch 被拦后 busy 未复位");
+    ok(els.send.disabled === false, "fetch 被拦后发送键未恢复可用");
   }
 }
 
