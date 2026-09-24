@@ -111,6 +111,7 @@ input,textarea,select,button{font-family:inherit}
 .topbar .topic{font-size:13.5px;font-weight:600;color:var(--navy)}
 .topbar .right{display:flex;align-items:center;gap:14px}
 .topbar .ts{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.topbar .sid{font-family:var(--mono);font-size:11px;color:var(--steel)}
 .btn-text{
   background:none;border:1px solid var(--line-strong);border-radius:2px;
   color:var(--steel);font-size:11.5px;padding:3px 9px;
@@ -278,6 +279,7 @@ sup.cite{font-family:var(--mono);font-size:10px;color:var(--navy);vertical-align
     <header class="topbar">
       <div class="topic" id="topic">过闸费测算 · 建材 3200 吨</div>
       <div class="right">
+        <span class="sid" id="sid"></span>
         <span class="ts" id="clock"></span>
         <button class="btn-text" id="export" type="button">导出本会话</button>
       </div>
@@ -590,10 +592,28 @@ var state = {
   /** 每条会话的对话历史（演示数据取初始 turns，之后按发送追加） */
   history: {},
   collapsed: {},
-  /** 真实接口模式的会话标识（多轮上下文用；后端缺省按 anonymous 处理） */
-  sessionId: "web-" + Math.random().toString(36).slice(2, 10),
+  /**
+   * 每条会话**各自**的后端会话标识（多轮上下文用）。
+   *
+   * ⚠️ 这里曾经只有一个全页共用的 `state.sessionId`，于是左侧 4 个会话切来切去，
+   *    发给后端的 `sessionId` **始终是同一个** ⇒ 后端的滑窗 / 压缩会把
+   *    **不同会话的上下文混在一起**。演示模式看不出来（历史由前端自己分装），一联调必踩。
+   * ⇒ 改为**按会话惰性分配**：同一会话的多轮之间保持一致（多轮上下文才成立），
+   *    不同会话之间互不串台。id 里带上会话短名，便于在日志/网络面板里认人。
+   *    ⚠️ 本页**无持久化**（README 已知限制），刷新即重新分配 ⇒ 后端上下文随之丢失。
+   */
+  backendSessionIds: {},
   busy: false
 };
+
+/** 取（必要时分配）某会话的后端会话标识。⛔ 不要退回"全页一个"。 */
+function sessionIdFor(activeId) {
+  if (!state.backendSessionIds[activeId]) {
+    state.backendSessionIds[activeId] =
+      "web-" + activeId + "-" + Math.random().toString(36).slice(2, 10);
+  }
+  return state.backendSessionIds[activeId];
+}
 
 function esc(s) {
   return String(s == null ? "" : s)
@@ -850,11 +870,27 @@ function drawConversation() {
 }
 
 function drawTopic() {
+  var title = "";
   for (var i = 0; i < SESSIONS.length; i++) {
-    if (SESSIONS[i].id === state.activeId) {
-      document.getElementById("topic").textContent = SESSIONS[i].title;
-      return;
-    }
+    if (SESSIONS[i].id === state.activeId) { title = SESSIONS[i].title; break; }
+  }
+  document.getElementById("topic").textContent = title;
+  drawSid();
+}
+
+/**
+ * 顶栏的会话号：**只在后端接口模式下显示**。
+ * ⚠️ 演示数据模式下**故意不显示**——那时压根没有后端会话，编一个号出来才是误导。
+ * 它同时也是"切会话即换会话号"这条修复的**可见证据**：切一下会话就能看到号变了。
+ */
+function drawSid() {
+  var el = document.getElementById("sid");
+  if (state.dataSource === "api") {
+    el.textContent = "会话号 " + sessionIdFor(state.activeId);
+    el.style.display = "";
+  } else {
+    el.textContent = "";
+    el.style.display = "none";
   }
 }
 
@@ -1005,7 +1041,7 @@ function submit(question) {
   // 真实接口：先渲染结构化帧（它先到），正文累积到 done 再整段渲染
   var frameRendered = false;
   var sessionForCall = state.activeId;
-  streamFromBackend(q, state.sessionId, {
+  streamFromBackend(q, sessionIdFor(sessionForCall), {
     onFrame: function (frame) {
       if (sessionForCall !== state.activeId) { return; }
       var msgs = historyOf(state.activeId);
@@ -1075,10 +1111,13 @@ document.getElementById("dataSource").addEventListener("change", function (e) {
   state.dataSource = e.target.value;
   var hint = document.querySelector(".hint");
   if (state.dataSource === "api") {
-    hint.textContent = "已切到后端接口：" + API_BASE + "/api/chat/stream（需后端在运行，且已开启结构化帧开关）。";
+    hint.textContent = "已切到后端接口：" + API_BASE + "/api/chat/stream（会话号 "
+      + sessionIdFor(state.activeId) + "，每条会话各一个；需后端在运行，且已开启结构化帧开关）。";
   } else {
     hint.textContent = "金额、费率、档位由受控工具集依据《过闸费费率表》等规则语料计算；引用条款可逐条核对。";
   }
+  // 会话号只在后端接口模式下有意义，切数据源要跟着显示/隐藏
+  drawSid();
 });
 
 document.getElementById("send").addEventListener("click", function () {

@@ -1,0 +1,13 @@
+# headless 浏览器量几何的三个坑
+
+> 类别：[环境坑](README.md) ｜ 返回总索引：[../README.md](../README.md)
+
+| 项 | 内容 |
+|---|---|
+| **背景** | 2026-09-23 交付 `frontend/index.html` 后，需要**真浏览器**量布局（"最小宽度 1200px 不许挤"是用户明确的验收点）。方法是 CDP（`--remote-debugging-port` + Node 内置 `fetch`/`WebSocket` + `Runtime.evaluate`，见 [看不见图时怎么验界面](../工程方法/看不见图时怎么验界面.md)）——**方法本身是对的，坑全在环境里**。现成脚本：`frontend/test/check_geometry.js`。 |
+| **坑 ①：Chrome 在受限沙箱下起不来，而表现是"无输出 + 退出码 0"** | 现象：脚本该打印十几行报告，实跑**一个字都没有、退出码却是 0**。真相要靠**同步写文件**才看得到（见坑③）：`spawn` 其实**成功**（拿到了 pid），但子进程**立刻退出、退出码 `4294930433` = `0xFFFF0001`**，CDP 端口始终连不上（`fetch failed` 连续 40 次）。⚠️ 这与本轮更早那次 `--screenshot` 报 `mojo::public::cpp::platform::platform_channel.cc:108 Check failed` **是同一个根因**：Chrome 的 **Mojo IPC 需要命名管道**，而受限沙箱**不允许打开命名管道**。⇒ **需要在更宽权限下运行**（本机实测 `danger-full-access` 才起得来，且同一个脚本换权限后**一次通过**）。⛔ 自查法：直接跑 `chrome --headless=new --remote-debugging-port=9334 about:blank`，**秒退即环境限制**，不是脚本写错。 |
+| **坑 ②：`window.resizeTo()` 在 headless 下无效** | 想让同一个页面在两个视口宽度下各量一次，第一版用 `window.resizeTo(1440,900)` + 等 350ms ⇒ **两次量出来的 `innerWidth` 完全一样（1178）**，差一点就把"1440 那档"当成独立测量写进结论。正确做法是 CDP 的 **`Emulation.setDeviceMetricsOverride`**（`width` / `height` / `deviceScaleFactor` / `mobile`），量到的 `innerWidth` **精确等于**指定值（实测 1200 / 1440 / 1000 三档各自吻合）。⚠️ **这个正确做法早在同一天就写在 [看不见图时怎么验界面](../工程方法/看不见图时怎么验界面.md) 里了**，我这一轮**还是先写了 `resizeTo`**——因为那份文档只有结论、**没有能跑的脚本**。⇒ 教训见 [一次性的验证脚本等于没验证](../工程方法/验证工具本身也要被验证/交付了却从未运行过的工具/一次性的验证脚本等于没验证.md)。 |
+| **坑 ③：本进程的 stdout 在管道下会丢** | 现象：输出**在源头就丢了**——重定向到文件也是 **0 字节**。同族证据：本仓库早先实测 `chrome --headless=new --dump-dom` **stdout 0 字节**（同一构建里 `--screenshot` 出图正常）。⇒ 可靠做法：**结果同步写文件**（`fs.writeFileSync` / `fs.appendFileSync`——同步写不会被丢），调用方再读文件；`check_geometry.js` 即写到 `%TEMP%\canalmind-geom-result.txt`（⛔ 不往仓库里落运行产物）。⚠️ 另两条同族：**Windows 下 `process.exit()` 会截断尚未冲出的管道输出** ⇒ 脚本结尾**别用 `process.exit(0)`**，用 `process.exitCode = 1`；判"有没有输出"时⛔ **别在同一条管道里既截断又判退出码**。 |
+| **坑 ④（同族，已单独立条）** | `[System.IO.File]::*` 的相对路径按**进程当前目录**解析，而 `Set-Location` 只改 PowerShell 的当前位置 ⇒ 本轮又踩一次：`[System.IO.File]::ReadAllBytes("backend\scripts\demo.ps1")` 报"找不到路径"（它找的是 `D:\Project_AI\backend\scripts\demo.ps1`）。见 [同一个相对路径解析到两个目录](同一个相对路径解析到两个目录.md)。 |
+| **业务含义** | 三条的共同点：**"没有输出"不等于"没有问题"，"退出码 0"也不等于"跑成功了"。** 本轮若只看"退出码 0 + 无输出"就收工，会得出"几何量测不需要浏览器"这种荒唐结论；而真相是**浏览器根本没起来**。⇒ **凡"本该有很多输出却什么都没有"，先怀疑工具链没跑起来，并换一条能留下证据的通道（同步写文件）去确认。** |
+| **相关** | [看不见图时怎么验界面](../工程方法/看不见图时怎么验界面.md)（方法）｜[一次性的验证脚本等于没验证](../工程方法/验证工具本身也要被验证/交付了却从未运行过的工具/一次性的验证脚本等于没验证.md)｜[同一个相对路径解析到两个目录](同一个相对路径解析到两个目录.md)｜[PowerShell脚本的反引号陷阱](PowerShell脚本的反引号陷阱.md) |

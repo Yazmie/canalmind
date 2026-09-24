@@ -8,6 +8,7 @@
   ⚠️ 默认【零付费】：所有段都用本地计算或库内 SQL，不产生任何 API 花费。
      - 本地嵌入走 Ollama bge-m3，⛔ 不付费；
      - 路由 / Schema 门 / 检索 / 分层通过率均不调用 DeepSeek。
+#     - 前端自检 frontend\test\check_frontend.js（零依赖 Node，脚本不出网）。
   ⚠️ -IncludePaid 会追加一次**真实的端到端问答**（走完整「路由→通道→作答」链路），
      这一步**会调用付费模型**，请先确认再做。
 
@@ -63,6 +64,7 @@ $JavaExe = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else 
 $PythonExe = Resolve-Tool -Name 'python' -Candidates @('D:\APP\Python\python.exe')
 $MvnExe = Resolve-Tool -Name 'mvn' -Candidates @('D:\APP\apache-maven-3.9.12\bin\mvn.cmd')
 $PsqlExe = Resolve-Tool -Name 'psql' -Candidates @('D:\APP\PostgreSQL\18\bin\psql.exe')
+$NodeExe = Resolve-Tool -Name 'node' -Candidates @('D:\APP\nodejs\node.exe')
 $script:Cp = $null
 
 # ---------------------------------------------------------------------------
@@ -140,6 +142,7 @@ Write-Host "  JDK      : $(if ($JavaExe) { $JavaExe } else { '(未找到！)' })
 Write-Host "  Python   : $(if ($PythonExe) { $PythonExe } else { '(未找到)' })"
 Write-Host "  Maven    : $(if ($MvnExe) { $MvnExe } else { '(未找到)' })"
 Write-Host "  psql     : $(if ($PsqlExe) { $PsqlExe } else { '(未找到)' })"
+Write-Host "  Node     : $(if ($NodeExe) { $NodeExe } else { '(未找到，前端自检将跳过)' })"
 Write-Host "  模式     : $(if ($IncludePaid) { '含付费段（-IncludePaid）' } else { '零付费（默认）' })"
 
 $Missing = @()
@@ -229,6 +232,17 @@ if (-not $SkipDocCheck -and $PythonExe) {
     Write-Head -Title '文档自检（链接可达性 / 结构 / 编码）' -Cost '零付费'
     Invoke-Step -Display 'python docs\工程复盘\check_links.py' -Exe $PythonExe `
         -Arguments @((Join-Path $RepoRoot 'docs\工程复盘\check_links.py')) | Out-Null
+}
+
+# 前端自检（零依赖 Node）：把「前端与后端契约一致」变成**会变红**的检查。
+# ⚠️ 为什么放进演示脚本：一次性跑过就删掉的断言等于没验证——
+#    脚本删了以后，前端被改坏（契约走样 / 金额算错 / 混进动画）不会有人发现。
+if ($NodeExe) {
+    Write-Head -Title '前端自检（SSE 契约 / 渲染 / 后端接口路径）' -Cost '零付费'
+    Invoke-Step -Display 'node frontend\test\check_frontend.js' -Exe $NodeExe `
+        -Arguments @((Join-Path $RepoRoot 'frontend\test\check_frontend.js')) | Out-Null
+} else {
+    Write-Warn '未找到 node：跳过前端自检（frontend\test\check_frontend.js）'
 }
 
 # ---------------------------------------------------------------------------
