@@ -18,7 +18,7 @@ import java.util.function.LongSupplier;
  */
 public final class InMemoryCache implements AnswerCache {
 
-    /** 默认容量：本项目 28 篇语料 + 有限问句集，远够用且不会失控。 */
+    /** 默认容量：本项目 26 篇语料 + 有限问句集，远够用且不会失控。 */
     public static final int DEFAULT_MAX_ENTRIES = 512;
 
     private final int maxEntries;

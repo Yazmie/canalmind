@@ -87,7 +87,7 @@ public final class RetrievalPipeline {
      * 知识库标识（规格书 §7.3 点名的 {@code knowledge_base_id}，C-59，2026-09-22 补写）。
      *
      * <p><b>⚠️ 如实记一笔：它今天是常量。</b>本项目只有<b>一个</b>知识库
-     * （{@code docs/规则语料/} 的 28 篇 → 库内 541 个 chunk，同属索引档案
+     * （{@code docs/规则语料/} 的 26 篇 → 库内 541 个 chunk，同属索引档案
      * {@code ollama:bge-m3:1024}），所以这个键当下<b>基数并不高</b>。
      * 仍按规格书 §7.3 归入高基数一侧（只进 Trace），理由是它<b>随知识库数量增长</b>，
      * 而本项目的对外形态是<b>多知识库</b>。
