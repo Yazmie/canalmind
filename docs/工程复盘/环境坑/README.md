@@ -25,7 +25,7 @@
 | [env文件里的变量读不到](env文件里的变量读不到.md) | `.env` 被加载进 map，但取值点用的是只读 `System.getenv` 的老助手 ⇒ **口令读成空串**；⚠️ "配置存在" ≠ "配置生效"，而 `default ""` 会**把故障吸收成默认值**（空口令可连的环境里永远不会暴露） |
 | [Java控制台输出编码](Java控制台输出编码.md) | ⚠️ **同一个 JVM、同一组参数，一半 CLI 乱码一半正常**：JDK 18+ 的 `System.out` 按**控制台代码页**编码 ⇒ 只写 `-Dfile.encoding` 不管用，要 **`-Dstdout.encoding`**；RAG 侧之所以正常，是因为 `CliConsole` 里**恰好**写着 `System.setOut(UTF-8)`——**那是碰巧没踩到，不是已解决** |
 | [按Split数子串会被按字符切](按Split数子串会被按字符切.md) | `$t.Split($old)` 想数出现次数：`String.Split` 没有 `Split(string)` 重载 ⇒ PowerShell 把字符串当 `char[]`，**按每个字符切**（期望 1，实测 **21272**）。⇒ 用 `[regex]::Matches` 数。⚠️ 真正值钱的是**它没写坏文件**：补丁脚本一律「精确匹配 → 断言恰好 1 次 → 不满足就 `ABORT`、一个文件都不写」，同日两次 `ABORT` **文件分毫未动** |
-| [headless浏览器量几何的三个坑](headless浏览器量几何的三个坑.md) | ①**Chrome 在受限沙箱下起不来**（Mojo 需命名管道 ⇒ 秒退 `0xFFFF0001`），而表现是「**无输出 + 退出码 0**」，要先换通道才看得见；②**`window.resizeTo()` 在 headless 下无效**（两次视口一模一样）⇒ 必须用 CDP `Emulation.setDeviceMetricsOverride`；③**本进程 stdout 在管道下会丢**（重定向也 0 字节）⇒ 结果**同步写文件**，且结尾⛔ 别用 `process.exit()`（会截断未冲出的输出） |
+| [headless浏览器量几何的三个坑](headless浏览器量几何的三个坑.md) | ①**Chrome 在受限沙箱下起不来**（Mojo 需命名管道 ⇒ 秒退 `0xFFFF0001`），而表现是「**无输出 + 退出码 0**」，要先换通道才看得见；②**`window.resizeTo()` 在 headless 下无效**（两次视口一模一样）⇒ 必须用 CDP `Emulation.setDeviceMetricsOverride`；③**受限沙箱下"本该有很多输出"的脚本输出会丢**（重定向也 0 字节；⚠️ **机制未隔离**，换更宽权限后同一脚本输出正常）⇒ 结果**同步写文件**，⛔ 别只靠 stdout |
 
 ## 本类最有价值的部分（**这才是该讲的**）
 
